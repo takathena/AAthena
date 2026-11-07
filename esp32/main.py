@@ -36,17 +36,35 @@ wlan = network.WLAN(network.STA_IF)
 
 
 def connect_wifi():
-    wlan.active(True)
     if wlan.isconnected():
         return True
+    # Reset state WiFi dulu — connect() tanpa ini memicu "Wifi Internal State Error".
+    try:
+        wlan.disconnect()
+    except Exception:
+        pass
+    try:
+        if not wlan.active():
+            wlan.active(True)
+    except Exception as e:
+        print("[WiFi] Gagal aktifkan radio: %s" % e)
+        return False
     print("[WiFi] Menghubungkan ke %s ..." % WIFI_SSID)
-    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+    try:
+        wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+    except OSError as e:
+        print("[WiFi] connect() error: %s — coba lagi nanti" % e)
+        return False
     for _ in range(WIFI_TIMEOUT):
         if wlan.isconnected():
             print("[WiFi] Terhubung, IP: %s" % wlan.ifconfig()[0])
             return True
         time.sleep(1)
-    print("[WiFi] Gagal terhubung")
+    print("[WiFi] Gagal terhubung (cek SSID/password/jarak)")
+    try:
+        wlan.disconnect()
+    except Exception:
+        pass
     return False
 
 
@@ -89,7 +107,7 @@ def main():
     while True:
         if not wlan.isconnected():
             connect_wifi()
-            time.sleep(2)
+            time.sleep(5)  # backoff — jangan hammer connect(), bikin state error
             continue
         data = read_sensors()
         if data is not None:

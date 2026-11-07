@@ -5,6 +5,7 @@ WIFI_SSID = "GANTI_DENGAN_NAMA_WIFI"
 WIFI_PASSWORD = "GANTI_DENGAN_PASSWORD_WIFI"
 
 # Endpoint ingest iot-go (ganti IP server kamu)
+# PENTING: urequests MicroPython hanya mendukung http:// BUKAN https://
 API_URL = "http://GANTI_DENGAN_IP_SERVER:8080/data"
 
 # Harus sama persis dengan device yang dibuat di dashboard
