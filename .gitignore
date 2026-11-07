@@ -2,3 +2,4 @@
 *.db
 .env
 /iot-go
+esp32/secrets.py
