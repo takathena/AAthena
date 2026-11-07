@@ -34,6 +34,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /devices", a.createDevice)
 	mux.HandleFunc("POST /devices/form", a.createDeviceForm)
 	mux.HandleFunc("POST /devices/{id}/rotate", a.rotateKey)
+	mux.HandleFunc("POST /thresholds/form", a.calibrateForm)
 	mux.HandleFunc("GET /devices", a.listDevices)
 	mux.HandleFunc("POST /data", a.ingest)
 	mux.HandleFunc("GET /devices/{id}/history", a.history)
@@ -231,6 +232,37 @@ type dashPage struct {
 	Rows   []dashRow
 	Alerts []store.Alert
 	NewKey string // api_key baru dari form/rotate, tampil sekali di banner
+	Th     store.Thresholds
+	Saved  string
+}
+
+// calibrateForm: simpan kalibrasi ambang dari dashboard (Fase 4).
+func (a *API) calibrateForm(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form tidak valid", 400)
+		return
+	}
+	if !a.adminOK(r.FormValue("admin_token")) {
+		http.Error(w, "admin token salah", 401)
+		return
+	}
+	get := func(k string) (float64, bool) {
+		v, err := strconv.ParseFloat(r.FormValue(k), 64)
+		return v, err == nil
+	}
+	tw, ok1 := get("temp_warn")
+	td, ok2 := get("temp_danger")
+	sw, ok3 := get("smoke_warn")
+	sd, ok4 := get("smoke_danger")
+	if !ok1 || !ok2 || !ok3 || !ok4 {
+		http.Error(w, "semua ambang harus berupa angka", 400)
+		return
+	}
+	if err := a.S.SetThresholds(store.Thresholds{TempWarn: tw, TempDanger: td, SmokeWarn: sw, SmokeDanger: sd}); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	http.Redirect(w, r, "/?saved=kalibrasi", http.StatusSeeOther)
 }
 
 var dashTpl = template.Must(template.New("dash").Parse(`<!doctype html>
@@ -256,6 +288,14 @@ code{background:var(--card);padding:.1rem .3rem} .muted{color:var(--muted);font-
 <input name="name" placeholder="nama (Ruang Server)" required>
 <input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
 <button type="submit">Tambah</button></form>
+{{if .Saved}}<p style="background:var(--card);padding:.6rem;border-radius:6px">Kalibrasi tersimpan.</p>{{end}}
+<h2>Kalibrasi sensor</h2>
+<p class="muted">Normal = di bawah warning · Warning = warning s.d. danger · Danger = di atas danger.</p>
+<form method="post" action="/thresholds/form" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">
+<label>DHT22 suhu (°C) normal &lt; <input name="temp_warn" type="number" step="0.5" value="{{.Th.TempWarn}}" style="width:4.5rem" required> warning s.d. <input name="temp_danger" type="number" step="0.5" value="{{.Th.TempDanger}}" style="width:4.5rem" required> danger</label>
+<label>SMOKE (ppm) normal &lt; <input name="smoke_warn" type="number" step="1" value="{{.Th.SmokeWarn}}" style="width:4.5rem" required> warning s.d. <input name="smoke_danger" type="number" step="1" value="{{.Th.SmokeDanger}}" style="width:4.5rem" required> danger</label>
+<input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
+<button type="submit">Simpan kalibrasi</button></form>
 {{if not .Rows}}<p>Belum ada device. Isi form di atas atau via <code>POST /devices</code>.</p>{{end}}
 {{range .Rows}}<h2>{{.Device.DeviceID}} — {{.Device.Name}}</h2>
 <table><tr><th>Status</th><th>Terakhir terlihat</th><th>Sensor</th><th>Data</th><th>Waktu data</th></tr>
@@ -299,6 +339,12 @@ func (a *API) dashboard(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row)
 	}
 	alerts, _ := a.S.ListAlerts(20)
+	th := a.S.Thresholds()
+	for i := range rows {
+		if rows[i].Latest != nil {
+			rows[i].Status, rows[i].StatusMsg = store.EvaluateWith(rows[i].Latest.SensorType, rows[i].Latest.Data, th)
+		}
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	dashTpl.Execute(w, dashPage{Rows: rows, Alerts: alerts, NewKey: r.URL.Query().Get("new_key")})
+	dashTpl.Execute(w, dashPage{Rows: rows, Alerts: alerts, NewKey: r.URL.Query().Get("new_key"), Th: th, Saved: r.URL.Query().Get("saved")})
 }

@@ -73,3 +73,34 @@ func TestRotateKey(t *testing.T) {
 		t.Fatal("rotate device tak ada harus error")
 	}
 }
+
+// Fase 4: kalibrasi ambang dari dashboard dipakai saat ingest + tersimpan.
+func TestCalibrateThresholds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iot.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetThresholds(Thresholds{TempWarn: 25, TempDanger: 28, SmokeWarn: 50, SmokeDanger: 80}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetThresholds(Thresholds{TempWarn: 30, TempDanger: 30, SmokeWarn: 50, SmokeDanger: 80}); err == nil {
+		t.Fatal("warning >= danger harus ditolak")
+	}
+	key, _ := s.CreateDevice("ESP32-004", "Kalibrasi")
+	if err := s.InsertReading("ESP32-004", key, "DHT22", `{"temperature":26}`); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := s.ListAlerts(5)
+	if len(rows) != 1 || rows[0].Level != "warning" {
+		t.Fatalf("26°C dgn ambang 25/28 harus warning, got %+v", rows)
+	}
+	// Buka ulang: kalibrasi tetap dipakai.
+	s2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if th := s2.Thresholds(); th.TempWarn != 25 || th.TempDanger != 28 {
+		t.Fatalf("kalibrasi harus persisten, got %+v", th)
+	}
+}

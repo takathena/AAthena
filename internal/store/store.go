@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -19,7 +20,11 @@ import (
 var ErrNotFound = errors.New("not found")
 var ErrBadKey = errors.New("invalid api_key")
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db *sql.DB
+	mu sync.RWMutex
+	th Thresholds
+}
 
 type Device struct {
 	DeviceID  string `json:"device_id"`
@@ -46,7 +51,7 @@ type Alert struct {
 	Timestamp  string `json:"timestamp"`
 }
 
-// shortcut: ambang global konstanta, upgrade ke env/per-device bila perlu beda per ruangan.
+// Ambang default (Fase 4: bisa dikalibrasi dari dashboard, disimpan di tabel thresholds).
 const (
 	TempWarn    = 30.0  // °C DHT22
 	TempDanger  = 35.0  // °C DHT22
@@ -54,8 +59,84 @@ const (
 	SmokeDanger = 200.0 // ppm SMOKE
 )
 
-// Evaluate mengembalikan level "ok"|"warning"|"danger" untuk payload sensor.
+// Thresholds: batas warning & danger per sensor.
+// Range: normal = di bawah warning, warning = [warning, danger), danger = >= danger.
+type Thresholds struct {
+	TempWarn    float64 `json:"temp_warn"`
+	TempDanger  float64 `json:"temp_danger"`
+	SmokeWarn   float64 `json:"smoke_warn"`
+	SmokeDanger float64 `json:"smoke_danger"`
+}
+
+var DefaultThresholds = Thresholds{TempWarn, TempDanger, SmokeWarn, SmokeDanger}
+
+func (s *Store) Thresholds() Thresholds {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.th
+}
+
+// SetThresholds menyimpan kalibrasi baru; harus 0 <= warning < danger untuk tiap sensor.
+func (s *Store) SetThresholds(t Thresholds) error {
+	if t.TempWarn < 0 || t.TempWarn >= t.TempDanger || t.SmokeWarn < 0 || t.SmokeWarn >= t.SmokeDanger {
+		return errors.New("harus 0 <= warning < danger untuk tiap sensor")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, r := range []struct {
+		sensor string
+		warn   float64
+		danger float64
+	}{{"DHT22", t.TempWarn, t.TempDanger}, {"SMOKE", t.SmokeWarn, t.SmokeDanger}} {
+		if _, err := tx.Exec(`INSERT INTO thresholds(sensor_type,warn,danger) VALUES(?,?,?)
+			ON CONFLICT(sensor_type) DO UPDATE SET warn=excluded.warn, danger=excluded.danger`,
+			r.sensor, r.warn, r.danger); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.th = t
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *Store) loadThresholds() error {
+	th := DefaultThresholds
+	rows, err := s.db.Query(`SELECT sensor_type,warn,danger FROM thresholds`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sensor string
+		var warn, danger float64
+		if err := rows.Scan(&sensor, &warn, &danger); err != nil {
+			return err
+		}
+		switch strings.ToUpper(sensor) {
+		case "DHT22":
+			th.TempWarn, th.TempDanger = warn, danger
+		case "SMOKE":
+			th.SmokeWarn, th.SmokeDanger = warn, danger
+		}
+	}
+	s.th = th
+	return rows.Err()
+}
+
+// Evaluate memakai ambang default (kompatibel lama).
 func Evaluate(sensorType, data string) (level, msg string) {
+	return EvaluateWith(sensorType, data, DefaultThresholds)
+}
+
+// EvaluateWith mengembalikan level "ok"|"warning"|"danger" untuk payload sensor.
+func EvaluateWith(sensorType, data string, th Thresholds) (level, msg string) {
 	var v map[string]float64
 	if json.Unmarshal([]byte(data), &v) != nil {
 		return "ok", ""
@@ -64,19 +145,19 @@ func Evaluate(sensorType, data string) (level, msg string) {
 	case "DHT22":
 		if t, ok := v["temperature"]; ok {
 			switch {
-			case t >= TempDanger:
-				return "danger", fmt.Sprintf("suhu %.1f°C >= %.0f°C", t, TempDanger)
-			case t >= TempWarn:
-				return "warning", fmt.Sprintf("suhu %.1f°C >= %.0f°C", t, TempWarn)
+			case t >= th.TempDanger:
+				return "danger", fmt.Sprintf("suhu %.1f°C >= %.0f°C", t, th.TempDanger)
+			case t >= th.TempWarn:
+				return "warning", fmt.Sprintf("suhu %.1f°C >= %.0f°C", t, th.TempWarn)
 			}
 		}
 	case "SMOKE":
 		if p, ok := v["ppm"]; ok {
 			switch {
-			case p >= SmokeDanger:
-				return "danger", fmt.Sprintf("asap %.0f ppm >= %.0f ppm", p, SmokeDanger)
-			case p >= SmokeWarn:
-				return "warning", fmt.Sprintf("asap %.0f ppm >= %.0f ppm", p, SmokeWarn)
+			case p >= th.SmokeDanger:
+				return "danger", fmt.Sprintf("asap %.0f ppm >= %.0f ppm", p, th.SmokeDanger)
+			case p >= th.SmokeWarn:
+				return "warning", fmt.Sprintf("asap %.0f ppm >= %.0f ppm", p, th.SmokeWarn)
 			}
 		}
 	}
@@ -100,11 +181,17 @@ func Open(path string) (*Store, error) {
 	CREATE TABLE IF NOT EXISTS alerts(
 		id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL,
 		sensor_type TEXT NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL,
-		data TEXT NOT NULL, timestamp TEXT NOT NULL);`)
+		data TEXT NOT NULL, timestamp TEXT NOT NULL);
+	CREATE TABLE IF NOT EXISTS thresholds(
+		sensor_type TEXT PRIMARY KEY, warn REAL NOT NULL, danger REAL NOT NULL);`)
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db}, nil
+	s := &Store{db: db}
+	if err := s.loadThresholds(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func HashKey(k string) string {
@@ -180,7 +267,7 @@ func (s *Store) InsertReading(deviceID, key, sensorType, data string) error {
 		deviceID, sensorType, data, now); err != nil {
 		return err
 	}
-	if level, msg := Evaluate(sensorType, data); level != "ok" {
+	if level, msg := EvaluateWith(sensorType, data, s.Thresholds()); level != "ok" {
 		if _, err := tx.Exec(`INSERT INTO alerts(device_id,sensor_type,level,message,data,timestamp) VALUES(?,?,?,?,?,?)`,
 			deviceID, sensorType, level, msg, data, now); err != nil {
 			return err
