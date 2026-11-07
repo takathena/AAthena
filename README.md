@@ -68,5 +68,6 @@ ESP32: arahkan `API_URL` ke `http://<IP-VPS>:8080/data`.
 - **Fase 2 — Alert (selesai):** ambang batas per sensor (DHT22 suhu ≥30/≥35°C, SMOKE ≥100/≥200 ppm), status warning/danger di dashboard, riwayat alert `GET /alerts`. Detail: [docs/FASE2.md](docs/FASE2.md).
 - **Fase 3 — Kelola device dari dashboard (selesai):** tambah device via form di `GET /`, generate API key baru bila key hilang (`POST /devices/{id}/rotate`, key lama langsung mati). Detail: [docs/FASE3.md](docs/FASE3.md).
 - **Fase 4 — Kalibrasi sensor (selesai):** atur range normal/warning/danger DHT22 & SMOKE dari dashboard (`POST /thresholds/form`), tersimpan di DB dan dipakai ingest berikutnya. Detail: [docs/FASE4.md](docs/FASE4.md).
+- **Fase 5 — Kalibrasi per-device (selesai):** device bisa punya kalibrasi sendiri yang menimpa global; device tanpa kalibrasi otomatis ikut global, hapus kalibrasi → kembali ke global. Detail: [docs/FASE5.md](docs/FASE5.md).
 
 Dokumentasi lengkap Fase 1 (arsitektur, API, cara cek, troubleshooting): [docs/FASE1.md](docs/FASE1.md).

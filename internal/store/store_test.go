@@ -104,3 +104,51 @@ func TestCalibrateThresholds(t *testing.T) {
 		t.Fatalf("kalibrasi harus persisten, got %+v", th)
 	}
 }
+
+// Fase 5: kalibrasi device menimpa global; tanpa kalibrasi device ikut global.
+func TestDeviceCalibrationOverridesGlobal(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "iot.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetThresholds(Thresholds{TempWarn: 25, TempDanger: 28, SmokeWarn: 50, SmokeDanger: 80}); err != nil {
+		t.Fatal(err)
+	}
+	kCustom, _ := s.CreateDevice("CUSTOM-1", "Custom")
+	kGlobal, _ := s.CreateDevice("GLOBAL-1", "Global")
+	// Device custom: suhu warning mulai 20°C (global 25°C tidak dipakai).
+	if err := s.SetDeviceThresholds("CUSTOM-1", Thresholds{TempWarn: 20, TempDanger: 22, SmokeWarn: 10, SmokeDanger: 20}); err != nil {
+		t.Fatal(err)
+	}
+	if _, custom := s.DeviceCalibration("CUSTOM-1"); !custom {
+		t.Fatal("CUSTOM-1 harus custom")
+	}
+	if _, custom := s.DeviceCalibration("GLOBAL-1"); custom {
+		t.Fatal("GLOBAL-1 harus ikut global")
+	}
+	// 21°C: custom → warning, global → ok (tanpa alert).
+	if err := s.InsertReading("CUSTOM-1", kCustom, "DHT22", `{"temperature":21}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.InsertReading("GLOBAL-1", kGlobal, "DHT22", `{"temperature":21}`); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := s.ListAlerts(10)
+	if len(rows) != 1 || rows[0].DeviceID != "CUSTOM-1" {
+		t.Fatalf("hanya CUSTOM-1 yang harus alert, got %+v", rows)
+	}
+	// Hapus kalibrasi device → kembali ikut global (21°C ok lagi).
+	if err := s.ClearDeviceThresholds("CUSTOM-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.InsertReading("CUSTOM-1", kCustom, "DHT22", `{"temperature":21}`); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ = s.ListAlerts(10)
+	if len(rows) != 1 {
+		t.Fatalf("setelah clear tidak boleh ada alert baru, got %+v", rows)
+	}
+	if err := s.SetDeviceThresholds("tidak-ada", Thresholds{TempWarn: 1, TempDanger: 2, SmokeWarn: 1, SmokeDanger: 2}); err == nil {
+		t.Fatal("device tak ada harus error")
+	}
+}

@@ -76,10 +76,17 @@ func (s *Store) Thresholds() Thresholds {
 	return s.th
 }
 
-// SetThresholds menyimpan kalibrasi baru; harus 0 <= warning < danger untuk tiap sensor.
-func (s *Store) SetThresholds(t Thresholds) error {
+func validateThresholds(t Thresholds) error {
 	if t.TempWarn < 0 || t.TempWarn >= t.TempDanger || t.SmokeWarn < 0 || t.SmokeWarn >= t.SmokeDanger {
 		return errors.New("harus 0 <= warning < danger untuk tiap sensor")
+	}
+	return nil
+}
+
+// SetThresholds menyimpan kalibrasi global; harus 0 <= warning < danger untuk tiap sensor.
+func (s *Store) SetThresholds(t Thresholds) error {
+	if err := validateThresholds(t); err != nil {
+		return err
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -128,6 +135,84 @@ func (s *Store) loadThresholds() error {
 	}
 	s.th = th
 	return rows.Err()
+}
+
+// DeviceCalibration mengembalikan kalibrasi khusus device. custom=false berarti
+// pakai global (perangkat tidak diset kalibrasi sendiri).
+func (s *Store) DeviceCalibration(deviceID string) (t Thresholds, custom bool) {
+	rows, err := s.db.Query(`SELECT sensor_type,warn,danger FROM device_thresholds WHERE device_id=?`, deviceID)
+	if err != nil {
+		return s.Thresholds(), false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sensor string
+		var warn, danger float64
+		if err := rows.Scan(&sensor, &warn, &danger); err != nil {
+			continue
+		}
+		if err := rows.Err(); err != nil {
+			break
+		}
+		switch strings.ToUpper(sensor) {
+		case "DHT22":
+			t.TempWarn, t.TempDanger = warn, danger
+		case "SMOKE":
+			t.SmokeWarn, t.SmokeDanger = warn, danger
+		}
+		custom = true
+	}
+	if !custom {
+		return s.Thresholds(), false
+	}
+	return t, true
+}
+
+// EffectiveThresholds: kalibrasi device sendiri bila ada, selain itu global.
+func (s *Store) EffectiveThresholds(deviceID string) Thresholds {
+	t, _ := s.DeviceCalibration(deviceID)
+	return t
+}
+
+func (s *Store) deviceExists(id string) bool {
+	var one int
+	return s.db.QueryRow(`SELECT 1 FROM devices WHERE device_id=?`, id).Scan(&one) == nil
+}
+
+// SetDeviceThresholds menyimpan kalibrasi khusus satu device (menimpa global untuk device itu).
+func (s *Store) SetDeviceThresholds(deviceID string, t Thresholds) error {
+	if err := validateThresholds(t); err != nil {
+		return err
+	}
+	if !s.deviceExists(deviceID) {
+		return ErrNotFound
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, r := range []struct {
+		sensor string
+		warn   float64
+		danger float64
+	}{{"DHT22", t.TempWarn, t.TempDanger}, {"SMOKE", t.SmokeWarn, t.SmokeDanger}} {
+		if _, err := tx.Exec(`INSERT INTO device_thresholds(device_id,sensor_type,warn,danger) VALUES(?,?,?,?)
+			ON CONFLICT(device_id,sensor_type) DO UPDATE SET warn=excluded.warn, danger=excluded.danger`,
+			deviceID, r.sensor, r.warn, r.danger); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ClearDeviceThresholds menghapus kalibrasi device → kembali pakai global.
+func (s *Store) ClearDeviceThresholds(deviceID string) error {
+	if !s.deviceExists(deviceID) {
+		return ErrNotFound
+	}
+	_, err := s.db.Exec(`DELETE FROM device_thresholds WHERE device_id=?`, deviceID)
+	return err
 }
 
 // Evaluate memakai ambang default (kompatibel lama).
@@ -183,7 +268,11 @@ func Open(path string) (*Store, error) {
 		sensor_type TEXT NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL,
 		data TEXT NOT NULL, timestamp TEXT NOT NULL);
 	CREATE TABLE IF NOT EXISTS thresholds(
-		sensor_type TEXT PRIMARY KEY, warn REAL NOT NULL, danger REAL NOT NULL);`)
+		sensor_type TEXT PRIMARY KEY, warn REAL NOT NULL, danger REAL NOT NULL);
+	CREATE TABLE IF NOT EXISTS device_thresholds(
+		device_id TEXT NOT NULL, sensor_type TEXT NOT NULL,
+		warn REAL NOT NULL, danger REAL NOT NULL,
+		PRIMARY KEY(device_id, sensor_type));`)
 	if err != nil {
 		return nil, err
 	}
@@ -258,6 +347,8 @@ func (s *Store) InsertReading(deviceID, key, sensorType, data string) error {
 		return ErrBadKey
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	// Evaluasi SEBELUM Begin: EffectiveThresholds query DB, koneksi SQLite tunggal (1) akan deadlock di dalam TX.
+	level, msg := EvaluateWith(sensorType, data, s.EffectiveThresholds(deviceID))
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -267,7 +358,7 @@ func (s *Store) InsertReading(deviceID, key, sensorType, data string) error {
 		deviceID, sensorType, data, now); err != nil {
 		return err
 	}
-	if level, msg := EvaluateWith(sensorType, data, s.Thresholds()); level != "ok" {
+	if level != "ok" {
 		if _, err := tx.Exec(`INSERT INTO alerts(device_id,sensor_type,level,message,data,timestamp) VALUES(?,?,?,?,?,?)`,
 			deviceID, sensorType, level, msg, data, now); err != nil {
 			return err

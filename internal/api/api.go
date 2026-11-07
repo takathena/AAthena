@@ -35,6 +35,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /devices/form", a.createDeviceForm)
 	mux.HandleFunc("POST /devices/{id}/rotate", a.rotateKey)
 	mux.HandleFunc("POST /thresholds/form", a.calibrateForm)
+	mux.HandleFunc("POST /devices/{id}/calibrate", a.calibrateDeviceForm)
+	mux.HandleFunc("POST /devices/{id}/calibrate/clear", a.calibrateDeviceClear)
 	mux.HandleFunc("GET /devices", a.listDevices)
 	mux.HandleFunc("POST /data", a.ingest)
 	mux.HandleFunc("GET /devices/{id}/history", a.history)
@@ -226,6 +228,8 @@ type dashRow struct {
 	History   []store.Reading
 	Status    string // ok | warning | danger (dari data terakhir)
 	StatusMsg string
+	Th        store.Thresholds // ambang efektif device ini
+	Custom    bool             // true = kalibrasi sendiri, false = ikut global
 }
 
 type dashPage struct {
@@ -236,7 +240,20 @@ type dashPage struct {
 	Saved  string
 }
 
-// calibrateForm: simpan kalibrasi ambang dari dashboard (Fase 4).
+// parseThresholdForm membaca 4 angka ambang dari form; ok=false bila bukan angka.
+func parseThresholdForm(r *http.Request) (t store.Thresholds, ok bool) {
+	get := func(k string) (float64, bool) {
+		v, err := strconv.ParseFloat(r.FormValue(k), 64)
+		return v, err == nil
+	}
+	tw, ok1 := get("temp_warn")
+	td, ok2 := get("temp_danger")
+	sw, ok3 := get("smoke_warn")
+	sd, ok4 := get("smoke_danger")
+	return store.Thresholds{TempWarn: tw, TempDanger: td, SmokeWarn: sw, SmokeDanger: sd}, ok1 && ok2 && ok3 && ok4
+}
+
+// calibrateForm: simpan kalibrasi global dari dashboard (Fase 4).
 func (a *API) calibrateForm(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "form tidak valid", 400)
@@ -246,19 +263,61 @@ func (a *API) calibrateForm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "admin token salah", 401)
 		return
 	}
-	get := func(k string) (float64, bool) {
-		v, err := strconv.ParseFloat(r.FormValue(k), 64)
-		return v, err == nil
-	}
-	tw, ok1 := get("temp_warn")
-	td, ok2 := get("temp_danger")
-	sw, ok3 := get("smoke_warn")
-	sd, ok4 := get("smoke_danger")
-	if !ok1 || !ok2 || !ok3 || !ok4 {
+	t, ok := parseThresholdForm(r)
+	if !ok {
 		http.Error(w, "semua ambang harus berupa angka", 400)
 		return
 	}
-	if err := a.S.SetThresholds(store.Thresholds{TempWarn: tw, TempDanger: td, SmokeWarn: sw, SmokeDanger: sd}); err != nil {
+	if err := a.S.SetThresholds(t); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	http.Redirect(w, r, "/?saved=kalibrasi", http.StatusSeeOther)
+}
+
+// calibrateDeviceForm: simpan kalibrasi khusus satu device (Fase 5, menimpa global).
+func (a *API) calibrateDeviceForm(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form tidak valid", 400)
+		return
+	}
+	if !a.adminOK(r.FormValue("admin_token")) {
+		http.Error(w, "admin token salah", 401)
+		return
+	}
+	t, ok := parseThresholdForm(r)
+	if !ok {
+		http.Error(w, "semua ambang harus berupa angka", 400)
+		return
+	}
+	if err := a.S.SetDeviceThresholds(id, t); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.Error(w, "device tidak ditemukan", 404)
+			return
+		}
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	http.Redirect(w, r, "/?saved=kalibrasi", http.StatusSeeOther)
+}
+
+// calibrateDeviceClear: hapus kalibrasi device → kembali ikut global.
+func (a *API) calibrateDeviceClear(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form tidak valid", 400)
+		return
+	}
+	if !a.adminOK(r.FormValue("admin_token")) {
+		http.Error(w, "admin token salah", 401)
+		return
+	}
+	if err := a.S.ClearDeviceThresholds(id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.Error(w, "device tidak ditemukan", 404)
+			return
+		}
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -305,7 +364,16 @@ code{background:var(--card);padding:.1rem .3rem} .muted{color:var(--muted);font-
 <form method="post" action="/devices/{{.Device.DeviceID}}/rotate" style="margin:.4rem 0 1rem">
 <input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
 <button type="submit">Generate API key baru</button>
-<span class="muted">Key lama langsung mati — pakai ini bila key hilang.</span></form>{{end}}
+<span class="muted">Key lama langsung mati — pakai ini bila key hilang.</span></form>
+<p class="muted">Kalibrasi device ini: {{if .Custom}}<b>sendiri</b> (global tidak dipakai){{else}}<b>ikut global</b>{{end}} — DHT22 normal &lt; {{.Th.TempWarn}}°C, warning s.d. {{.Th.TempDanger}}°C, danger ≥ {{.Th.TempDanger}}°C · SMOKE normal &lt; {{.Th.SmokeWarn}} ppm, warning s.d. {{.Th.SmokeDanger}} ppm, danger ≥ {{.Th.SmokeDanger}} ppm.</p>
+<form method="post" action="/devices/{{.Device.DeviceID}}/calibrate" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem">
+<label>Suhu warning <input name="temp_warn" type="number" step="0.5" value="{{.Th.TempWarn}}" style="width:4rem" required> danger <input name="temp_danger" type="number" step="0.5" value="{{.Th.TempDanger}}" style="width:4rem" required></label>
+<label>Asap warning <input name="smoke_warn" type="number" step="1" value="{{.Th.SmokeWarn}}" style="width:4rem" required> danger <input name="smoke_danger" type="number" step="1" value="{{.Th.SmokeDanger}}" style="width:4rem" required></label>
+<input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
+<button type="submit">Set kalibrasi device</button></form>
+{{if .Custom}}<form method="post" action="/devices/{{.Device.DeviceID}}/calibrate/clear" style="margin-bottom:1rem">
+<input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
+<button type="submit">Hapus → ikut global lagi</button></form>{{end}}{{end}}
 <h2>Alert terbaru</h2>
 {{if not .Alerts}}<p class="muted">Belum ada alert. Ambang: DHT22 suhu ≥30°C warning / ≥35°C danger; SMOKE ≥100 ppm warning / ≥200 ppm danger.</p>{{end}}
 <table><tr><th>Waktu</th><th>Device</th><th>Level</th><th>Sensor</th><th>Pesan</th><th>Data</th></tr>
@@ -341,8 +409,9 @@ func (a *API) dashboard(w http.ResponseWriter, r *http.Request) {
 	alerts, _ := a.S.ListAlerts(20)
 	th := a.S.Thresholds()
 	for i := range rows {
+		rows[i].Th, rows[i].Custom = a.S.DeviceCalibration(rows[i].Device.DeviceID)
 		if rows[i].Latest != nil {
-			rows[i].Status, rows[i].StatusMsg = store.EvaluateWith(rows[i].Latest.SensorType, rows[i].Latest.Data, th)
+			rows[i].Status, rows[i].StatusMsg = store.EvaluateWith(rows[i].Latest.SensorType, rows[i].Latest.Data, rows[i].Th)
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
