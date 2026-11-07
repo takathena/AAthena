@@ -55,7 +55,9 @@ Docker (VPS):
 
 ```bash
 cp .env.example .env   # isi ADMIN_TOKEN yang kuat
+mkdir -p data && chown 10001:10001 data   # volume harus bisa ditulis user container
 docker compose up -d --build
+# Di Debian tanpa plugin compose, perintahnya: docker-compose up -d --build
 curl http://<IP-VPS>:8080/health
 ```
 
@@ -64,3 +66,5 @@ ESP32: arahkan `API_URL` ke `http://<IP-VPS>:8080/data`.
 ## Roadmap
 
 - **Fase 2 — Alert:** ambang batas per sensor (suhu/asap), status warning/danger, riwayat alert. Sengaja belum dibuat di MVP.
+
+Dokumentasi lengkap Fase 1 (arsitektur, API, cara cek, troubleshooting): [docs/FASE1.md](docs/FASE1.md).
