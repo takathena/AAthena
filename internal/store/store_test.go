@@ -48,3 +48,28 @@ func TestAlertFase2(t *testing.T) {
 		t.Fatalf("harus 1 alert danger, got %+v err=%v", rows, err)
 	}
 }
+
+// Fase 3: rotate key — key lama mati, key baru bisa ingest.
+func TestRotateKey(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "iot.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := s.CreateDevice("ESP32-002", "Gudang")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := s.RotateKey("ESP32-002")
+	if err != nil || fresh == old || fresh == "" {
+		t.Fatalf("rotate harus hasilkan key baru, got %q err=%v", fresh, err)
+	}
+	if err := s.InsertReading("ESP32-002", old, "DHT22", `{"temperature":25}`); err == nil {
+		t.Fatal("key lama harus sudah mati setelah rotate")
+	}
+	if err := s.InsertReading("ESP32-002", fresh, "DHT22", `{"temperature":25}`); err != nil {
+		t.Fatalf("key baru harus bisa ingest: %v", err)
+	}
+	if _, err := s.RotateKey("tidak-ada"); err == nil {
+		t.Fatal("rotate device tak ada harus error")
+	}
+}

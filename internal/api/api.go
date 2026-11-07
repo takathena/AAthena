@@ -6,7 +6,9 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"iot-go/internal/store"
 )
@@ -30,6 +32,8 @@ func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", a.dashboard)
 	mux.HandleFunc("POST /devices", a.createDevice)
+	mux.HandleFunc("POST /devices/form", a.createDeviceForm)
+	mux.HandleFunc("POST /devices/{id}/rotate", a.rotateKey)
 	mux.HandleFunc("GET /devices", a.listDevices)
 	mux.HandleFunc("POST /data", a.ingest)
 	mux.HandleFunc("GET /devices/{id}/history", a.history)
@@ -49,8 +53,10 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
+func (a *API) adminOK(token string) bool { return a.AdminTok == "" || token == a.AdminTok }
+
 func (a *API) createDevice(w http.ResponseWriter, r *http.Request) {
-	if a.AdminTok != "" && r.Header.Get("X-Admin-Token") != a.AdminTok {
+	if !a.adminOK(r.Header.Get("X-Admin-Token")) {
 		bad(w, 401, "admin token salah")
 		return
 	}
@@ -75,6 +81,58 @@ func (a *API) createDevice(w http.ResponseWriter, r *http.Request) {
 		// api_key hanya dikembalikan di sini, sekali saja.
 		writeJSON(w, 201, map[string]string{"device_id": in.DeviceID, "api_key": key})
 	}
+}
+
+// createDeviceForm: tambah device langsung dari dashboard (form HTML, tanpa JS).
+func (a *API) createDeviceForm(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form tidak valid", 400)
+		return
+	}
+	if !a.adminOK(r.FormValue("admin_token")) {
+		http.Error(w, "admin token salah", 401)
+		return
+	}
+	id, name := r.FormValue("device_id"), r.FormValue("name")
+	if id == "" || name == "" || len(id) > 64 || !validID(id) {
+		http.Error(w, "device_id/name wajib & valid (huruf, angka, -_ saja)", 400)
+		return
+	}
+	key, err := a.S.CreateDevice(id, name)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	http.Redirect(w, r, "/?new_key="+url.QueryEscape(key), http.StatusSeeOther)
+}
+
+// rotateKey: generate api_key baru bila key hilang. Support JSON (header) & form dashboard.
+func (a *API) rotateKey(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	token := r.Header.Get("X-Admin-Token")
+	isForm := strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded")
+	if isForm {
+		r.ParseForm()
+		token = r.FormValue("admin_token")
+	}
+	if !a.adminOK(token) {
+		bad(w, 401, "admin token salah")
+		return
+	}
+	key, err := a.S.RotateKey(id)
+	if errors.Is(err, store.ErrNotFound) {
+		bad(w, 404, "device tidak ditemukan")
+		return
+	}
+	if err != nil {
+		bad(w, 500, "internal error")
+		return
+	}
+	if isForm {
+		http.Redirect(w, r, "/?new_key="+url.QueryEscape(key), http.StatusSeeOther)
+		return
+	}
+	writeJSON(w, 200, map[string]string{"device_id": id, "api_key": key})
 }
 
 func validID(s string) bool {
@@ -172,6 +230,7 @@ type dashRow struct {
 type dashPage struct {
 	Rows   []dashRow
 	Alerts []store.Alert
+	NewKey string // api_key baru dari form/rotate, tampil sekali di banner
 }
 
 var dashTpl = template.Must(template.New("dash").Parse(`<!doctype html>
@@ -190,12 +249,23 @@ code{background:var(--card);padding:.1rem .3rem} .muted{color:var(--muted);font-
 </style></head>
 <body><header><h1>iot-go</h1><button id="t" type="button">Tema: <span id="cur">…</span></button></header>
 <p class="muted">Refresh otomatis 30 detik.</p>
-{{if not .Rows}}<p>Belum ada device. Buat via <code>POST /devices</code>.</p>{{end}}
+{{if .NewKey}}<p style="background:var(--card);padding:.6rem;border-radius:6px">API key baru — salin sekarang, tidak bisa dilihat lagi:<br><code>{{.NewKey}}</code></p>{{end}}
+<h2>Tambah device</h2>
+<form method="post" action="/devices/form" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">
+<input name="device_id" placeholder="device_id (ESP32-001)" required>
+<input name="name" placeholder="nama (Ruang Server)" required>
+<input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
+<button type="submit">Tambah</button></form>
+{{if not .Rows}}<p>Belum ada device. Isi form di atas atau via <code>POST /devices</code>.</p>{{end}}
 {{range .Rows}}<h2>{{.Device.DeviceID}} — {{.Device.Name}}</h2>
 <table><tr><th>Status</th><th>Terakhir terlihat</th><th>Sensor</th><th>Data</th><th>Waktu data</th></tr>
 <tr><td><span class="badge {{.Status}}">{{.Status}}</span>{{if .StatusMsg}}<div class="muted">{{.StatusMsg}}</div>{{end}}</td><td>{{.Device.LastSeen}}</td>{{with .Latest}}<td>{{.SensorType}}</td><td><code>{{.Data}}</code></td><td>{{.Timestamp}}</td>{{else}}<td colspan="3">belum ada data</td>{{end}}</tr></table>
 <h3>Riwayat (10 terakhir)</h3><table><tr><th>Waktu</th><th>Sensor</th><th>Data</th></tr>
-{{range .History}}<tr><td>{{.Timestamp}}</td><td>{{.SensorType}}</td><td><code>{{.Data}}</code></td></tr>{{end}}</table>{{end}}
+{{range .History}}<tr><td>{{.Timestamp}}</td><td>{{.SensorType}}</td><td><code>{{.Data}}</code></td></tr>{{end}}</table>
+<form method="post" action="/devices/{{.Device.DeviceID}}/rotate" style="margin:.4rem 0 1rem">
+<input name="admin_token" type="password" placeholder="ADMIN_TOKEN" required>
+<button type="submit">Generate API key baru</button>
+<span class="muted">Key lama langsung mati — pakai ini bila key hilang.</span></form>{{end}}
 <h2>Alert terbaru</h2>
 {{if not .Alerts}}<p class="muted">Belum ada alert. Ambang: DHT22 suhu ≥30°C warning / ≥35°C danger; SMOKE ≥100 ppm warning / ≥200 ppm danger.</p>{{end}}
 <table><tr><th>Waktu</th><th>Device</th><th>Level</th><th>Sensor</th><th>Pesan</th><th>Data</th></tr>
@@ -230,5 +300,5 @@ func (a *API) dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	alerts, _ := a.S.ListAlerts(20)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	dashTpl.Execute(w, dashPage{Rows: rows, Alerts: alerts})
+	dashTpl.Execute(w, dashPage{Rows: rows, Alerts: alerts, NewKey: r.URL.Query().Get("new_key")})
 }

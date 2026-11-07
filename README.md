@@ -66,5 +66,6 @@ ESP32: arahkan `API_URL` ke `http://<IP-VPS>:8080/data`.
 ## Roadmap
 
 - **Fase 2 — Alert (selesai):** ambang batas per sensor (DHT22 suhu ≥30/≥35°C, SMOKE ≥100/≥200 ppm), status warning/danger di dashboard, riwayat alert `GET /alerts`. Detail: [docs/FASE2.md](docs/FASE2.md).
+- **Fase 3 — Kelola device dari dashboard (selesai):** tambah device via form di `GET /`, generate API key baru bila key hilang (`POST /devices/{id}/rotate`, key lama langsung mati). Detail: [docs/FASE3.md](docs/FASE3.md).
 
 Dokumentasi lengkap Fase 1 (arsitektur, API, cara cek, troubleshooting): [docs/FASE1.md](docs/FASE1.md).

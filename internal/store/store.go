@@ -128,6 +128,19 @@ func (s *Store) CreateDevice(id, name string) (string, error) {
 	return key, nil
 }
 
+// RotateKey membuat api_key baru (Fase 3: key lama hilang). Key lama langsung mati.
+func (s *Store) RotateKey(id string) (string, error) {
+	key := NewKey()
+	res, err := s.db.Exec(`UPDATE devices SET api_key_hash=? WHERE device_id=?`, HashKey(key), id)
+	if err != nil {
+		return "", err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return "", ErrNotFound
+	}
+	return key, nil
+}
+
 func (s *Store) ListDevices() ([]Device, error) {
 	rows, err := s.db.Query(`SELECT device_id,name,COALESCE(last_seen,''),created_at FROM devices ORDER BY device_id`)
 	if err != nil {
