@@ -83,6 +83,38 @@ def read_sensors():
     return data
 
 
+def _post_https(url, body):
+    """POST manual via socket+TLS — urequests MicroPython tidak support https://.
+
+    Cocok untuk domain di balik Cloudflare Tunnel (edge selalu https).
+    """
+    import socket
+    import ssl
+    rest = url[8:]  # buang https://
+    if "/" in rest:
+        hostport, path = rest.split("/", 1)
+        path = "/" + path
+    else:
+        hostport, path = rest, "/data"
+    if ":" in hostport:
+        host, port = hostport.rsplit(":", 1)
+        port = int(port)
+    else:
+        host, port = hostport, 443
+    s = socket.socket()
+    s.connect((host, port))
+    try:
+        s = ssl.wrap_socket(s, server_hostname=host, cert_reqs=ssl.CERT_NONE)
+    except TypeError:
+        s = ssl.wrap_socket(s, server_hostname=host)
+    req = ("POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n"
+           "Content-Length: %d\r\nConnection: close\r\n\r\n" % (path, host, len(body))) + body
+    s.send(req.encode())
+    resp = s.recv(2048).decode()
+    s.close()
+    return int(resp.split(" ")[1])  # status code, mis. "HTTP/1.1 200 OK"
+
+
 def send_data(data, sensor_type):
     payload = {
         "device_id": DEVICE_ID,
@@ -90,14 +122,19 @@ def send_data(data, sensor_type):
         "sensor_type": sensor_type,
         "data": data,
     }
+    body = ujson.dumps(payload)
     try:
-        r = urequests.post(API_URL, data=ujson.dumps(payload),
-                           headers={"Content-Type": "application/json"})
-        print("[HTTP] %s -> %s" % (sensor_type, r.status_code))
-        if r.status_code == 401:
+        if API_URL.startswith("https://"):
+            status = _post_https(API_URL, body)
+        else:
+            r = urequests.post(API_URL, data=body,
+                               headers={"Content-Type": "application/json"})
+            status = r.status_code
+            r.close()
+        print("[HTTP] %s -> %s" % (sensor_type, status))
+        if status == 401:
             print("[! ] API key salah — generate key baru dari dashboard")
-        r.close()
-        return r.status_code == 200
+        return status == 200
     except Exception as e:
         print("[HTTP] Gagal kirim: %s" % e)
         return False
