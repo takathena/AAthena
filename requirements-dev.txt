@@ -1,6 +1,0 @@
-# Dependensi pengembangan dan CI (tidak dipakai image produksi).
-# Pasang dengan: pip install -r requirements-dev.txt
--r requirements.txt
-
-pytest>=8.0
-ruff>=0.6

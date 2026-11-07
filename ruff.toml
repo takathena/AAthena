@@ -1,7 +1,0 @@
-# Lint sengaja sempit: tangkap kesalahan nyata (undefined name, import tak terpakai,
-# error sintaks), bukan gaya penulisan.
-target-version = "py311"
-extend-exclude = ["venv", ".venv", "esp32"]
-
-[lint]
-select = ["E9", "F"]
