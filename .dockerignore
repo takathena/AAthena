@@ -1,0 +1,6 @@
+.git
+graphify-out
+data
+.env
+docs
+*.db

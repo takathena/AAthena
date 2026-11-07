@@ -33,6 +33,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /devices", a.listDevices)
 	mux.HandleFunc("POST /data", a.ingest)
 	mux.HandleFunc("GET /devices/{id}/history", a.history)
+	mux.HandleFunc("GET /alerts", a.alerts)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
@@ -142,10 +143,35 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, rows)
 }
 
+func (a *API) alerts(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		} else {
+			bad(w, 400, "limit harus 1-1000")
+			return
+		}
+	}
+	rows, err := a.S.ListAlerts(limit)
+	if err != nil {
+		bad(w, 500, "internal error")
+		return
+	}
+	writeJSON(w, 200, rows)
+}
+
 type dashRow struct {
-	Device  store.Device
-	Latest  *store.Reading
-	History []store.Reading
+	Device    store.Device
+	Latest    *store.Reading
+	History   []store.Reading
+	Status    string // ok | warning | danger (dari data terakhir)
+	StatusMsg string
+}
+
+type dashPage struct {
+	Rows   []dashRow
+	Alerts []store.Alert
 }
 
 var dashTpl = template.Must(template.New("dash").Parse(`<!doctype html>
@@ -159,15 +185,21 @@ header{display:flex;justify-content:space-between;align-items:center}
 button{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:.35rem .8rem;cursor:pointer}
 table{width:100%;border-collapse:collapse}td,th{border:1px solid var(--border);padding:.4rem .6rem;text-align:left;font-size:.9rem}
 code{background:var(--card);padding:.1rem .3rem} .muted{color:var(--muted);font-size:.85rem}
+.badge{display:inline-block;padding:.1rem .45rem;border-radius:999px;font-size:.75rem;font-weight:700}
+.ok{background:#e6f4ea;color:#137333}.warning{background:#fef7e0;color:#b06000}.danger{background:#fce8e6;color:#a50e0e}
 </style></head>
 <body><header><h1>iot-go</h1><button id="t" type="button">Tema: <span id="cur">…</span></button></header>
 <p class="muted">Refresh otomatis 30 detik.</p>
-{{if not .}}<p>Belum ada device. Buat via <code>POST /devices</code>.</p>{{end}}
-{{range .}}<h2>{{.Device.DeviceID}} — {{.Device.Name}}</h2>
-<table><tr><th>Terakhir terlihat</th><th>Sensor</th><th>Data</th><th>Waktu data</th></tr>
-<tr><td>{{.Device.LastSeen}}</td>{{with .Latest}}<td>{{.SensorType}}</td><td><code>{{.Data}}</code></td><td>{{.Timestamp}}</td>{{else}}<td colspan="3">belum ada data</td>{{end}}</tr></table>
+{{if not .Rows}}<p>Belum ada device. Buat via <code>POST /devices</code>.</p>{{end}}
+{{range .Rows}}<h2>{{.Device.DeviceID}} — {{.Device.Name}}</h2>
+<table><tr><th>Status</th><th>Terakhir terlihat</th><th>Sensor</th><th>Data</th><th>Waktu data</th></tr>
+<tr><td><span class="badge {{.Status}}">{{.Status}}</span>{{if .StatusMsg}}<div class="muted">{{.StatusMsg}}</div>{{end}}</td><td>{{.Device.LastSeen}}</td>{{with .Latest}}<td>{{.SensorType}}</td><td><code>{{.Data}}</code></td><td>{{.Timestamp}}</td>{{else}}<td colspan="3">belum ada data</td>{{end}}</tr></table>
 <h3>Riwayat (10 terakhir)</h3><table><tr><th>Waktu</th><th>Sensor</th><th>Data</th></tr>
 {{range .History}}<tr><td>{{.Timestamp}}</td><td>{{.SensorType}}</td><td><code>{{.Data}}</code></td></tr>{{end}}</table>{{end}}
+<h2>Alert terbaru</h2>
+{{if not .Alerts}}<p class="muted">Belum ada alert. Ambang: DHT22 suhu ≥30°C warning / ≥35°C danger; SMOKE ≥100 ppm warning / ≥200 ppm danger.</p>{{end}}
+<table><tr><th>Waktu</th><th>Device</th><th>Level</th><th>Sensor</th><th>Pesan</th><th>Data</th></tr>
+{{range .Alerts}}<tr><td>{{.Timestamp}}</td><td>{{.DeviceID}}</td><td><span class="badge {{.Level}}">{{.Level}}</span></td><td>{{.SensorType}}</td><td>{{.Message}}</td><td><code>{{.Data}}</code></td></tr>{{end}}</table>
 <script>
 const root=document.documentElement,cur=document.getElementById('cur');
 function apply(t){root.dataset.theme=t;cur.textContent=t;localStorage.setItem('theme',t)}
@@ -189,12 +221,14 @@ func (a *API) dashboard(w http.ResponseWriter, r *http.Request) {
 	rows := make([]dashRow, 0, len(devs))
 	for _, d := range devs {
 		h, _ := a.S.History(d.DeviceID, 10)
-		row := dashRow{Device: d, History: h}
+		row := dashRow{Device: d, History: h, Status: "ok"}
 		if len(h) > 0 {
 			row.Latest = &h[0]
+			row.Status, row.StatusMsg = store.Evaluate(h[0].SensorType, h[0].Data)
 		}
 		rows = append(rows, row)
 	}
+	alerts, _ := a.S.ListAlerts(20)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	dashTpl.Execute(w, rows)
+	dashTpl.Execute(w, dashPage{Rows: rows, Alerts: alerts})
 }
