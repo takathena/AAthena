@@ -3678,74 +3678,6 @@
     transition: color 0.2s var(--ease);
 }
 
-/* Legend */
-.ring-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-    max-width: 220px;
-}
-
-.ring-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 7px 10px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    color: var(--text-3);
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.15s var(--ease), color 0.15s var(--ease),
-                border-color 0.15s var(--ease);
-}
-
-.ring-legend-item:hover {
-    background: var(--surface-2);
-    color: var(--text-2);
-}
-
-.ring-legend-item.active {
-    background: var(--surface-2);
-    border-color: var(--hairline);
-    color: var(--text);
-}
-
-.ring-legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    transition: transform 0.2s var(--ease);
-}
-.ring-legend-item.active .ring-legend-dot {
-    transform: scale(1.25);
-    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 15%, transparent);
-}
-
-.ring-legend-text {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.ring-legend-value {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-    color: var(--text);
-}
-
 /* Responsive */
 @media (max-width: 480px) {
     .ring-wrap { width: 140px; height: 140px; }
@@ -3906,15 +3838,17 @@
 }
 .bento-tile:focus-visible { outline: 2px solid var(--text-3); outline-offset: 2px; }
 .bento-tile:active { background: var(--surface-2); }
-.overview-grid > .bento-map { grid-column: span 7; }
-.overview-grid > .bento-graph { grid-column: span 5; }
+.overview-grid > .bento-map { grid-column: span 6; padding: 12px; gap: 8px; }
+.overview-grid > .bento-graph { grid-column: span 6; }
 .bento-tile-sub { font-size: 11.5px; color: var(--text-3); }
 
-/* Peta bento: Leaflet instans kedua (non-interaktif, klik tile -> section map) */
+/* Peta bento: Leaflet instans kedua (non-interaktif, klik tile -> section map)
+   Besar, 4:3 — tinggi ikut lebar kolom (span 6), bukan strip memanjang. */
 .bento-map-wrap {
     position: relative;
-    flex: 1;
-    min-height: 110px;
+    flex: none;
+    width: 100%;
+    aspect-ratio: 4 / 3;
     border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--bg-subtle);
@@ -3924,7 +3858,6 @@
 #mapBento {
     width: 100%;
     height: 100%;
-    min-height: 110px;
     background: var(--bg-subtle);
     pointer-events: none;
 }
@@ -3934,7 +3867,6 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    min-height: 110px;
     padding: 16px;
     text-align: center;
     font-size: 12px;
@@ -3959,8 +3891,8 @@
     .overview-grid > .ring-card { grid-column: span 6; grid-row: span 1; min-height: 300px; }
     .overview-grid > .nx-metrics--2 { grid-column: span 6; grid-row: span 1; }
     .overview-grid > .activity-card { grid-column: 1 / -1; grid-row: span 1; max-height: 320px; }
-    .overview-grid > .bento-map { grid-column: span 7; }
-    .overview-grid > .bento-graph { grid-column: span 5; }
+    .overview-grid > .bento-map { grid-column: span 6; }
+    .overview-grid > .bento-graph { grid-column: span 6; }
 }
 
 @media (max-width: 768px) {
@@ -3973,8 +3905,7 @@
         grid-row: auto;
         min-height: 0;
     }
-    .overview-grid > .bento-map,
-    .overview-grid > .bento-graph { min-height: 132px; }
+    .overview-grid > .bento-graph { min-height: 240px; }
     .activity-card { max-height: 320px; }
     .ring-card { padding: 16px; }
 }

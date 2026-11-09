@@ -498,16 +498,17 @@
 
     function _bindRingEvents() {
         if (RING.bound) return;
-        const legend = document.getElementById('ringLegend');
-        if (!legend) return;
         RING.bound = true;
 
-        // Klik legend = set aktif
-        legend.querySelectorAll('.ring-legend-item').forEach(btn => {
-            btn.addEventListener('click', () => _ringSetActive(btn.dataset.metric));
-            btn.addEventListener('mouseenter', () => _ringSetActive(btn.dataset.metric));
-        });
-        legend.addEventListener('mouseleave', _ringClearHighlight);
+        // Legend opsional (dihapus dari HTML); hover ring SVG tetap jalan
+        const legend = document.getElementById('ringLegend');
+        if (legend) {
+            legend.querySelectorAll('.ring-legend-item').forEach(btn => {
+                btn.addEventListener('click', () => _ringSetActive(btn.dataset.metric));
+                btn.addEventListener('mouseenter', () => _ringSetActive(btn.dataset.metric));
+            });
+            legend.addEventListener('mouseleave', _ringClearHighlight);
+        }
 
         // Hover di ring SVG → highlight ring itu juga
         document.querySelectorAll('.ring-progress').forEach(r => {
