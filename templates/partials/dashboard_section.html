@@ -32,39 +32,6 @@
     </section>
 
     <div class="overview-grid">
-<div class="ring-card">
-    <div class="bento-head">
-        <span class="bento-title"><i class="fa-solid fa-circle-notch"></i> Ringkasan Perangkat</span>
-        <button type="button" class="bento-go" data-goto="devices" aria-label="Buka perangkat">→</button>
-    </div>
-    <div class="ring-wrap">
-        <svg class="ring-svg" viewBox="0 0 160 160" width="112" height="112" aria-hidden="true">
-            <!-- Outer: Total (r=68, C=427.26) -->
-            <circle class="ring-track" cx="80" cy="80" r="68"/>
-            <circle class="ring-progress ring-total" id="ringTotal"
-                    cx="80" cy="80" r="68"
-                    stroke-dasharray="427.26" stroke-dashoffset="427.26"
-                    data-ring="total"/>
-            <!-- Middle: Online (r=54, C=339.29) -->
-            <circle class="ring-track" cx="80" cy="80" r="54"/>
-            <circle class="ring-progress ring-online" id="ringOnline"
-                    cx="80" cy="80" r="54"
-                    stroke-dasharray="339.29" stroke-dashoffset="339.29"
-                    data-ring="online"/>
-            <!-- Inner: Sehat (r=40, C=251.33) -->
-            <circle class="ring-track" cx="80" cy="80" r="40"/>
-            <circle class="ring-progress ring-healthy" id="ringHealthy"
-                    cx="80" cy="80" r="40"
-                    stroke-dasharray="251.33" stroke-dashoffset="251.33"
-                    data-ring="healthy"/>
-        </svg>
-        <div class="ring-center">
-            <div class="ring-value" id="ringValue">0</div>
-            <div class="ring-label" id="ringLabel">Total</div>
-        </div>
-    </div>
-</div>
-
         <div class="nx-metrics nx-metrics--2">
 
             <div class="nx-metric-card clickable" data-goto="devices" data-filter="all">

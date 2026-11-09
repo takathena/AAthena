@@ -454,7 +454,6 @@
    CARDS
    ========================================================== */
 .section-card,
-.ring-card,
 .stat-card,
 .chart-card,
 .activity-card,
@@ -514,14 +513,6 @@
 @media (max-width: 768px) { .overview-grid { grid-template-columns: 1fr; } }
 
 /* ---------- Ring card ---------- */
-.ring-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  gap: 8px;
-}
 .ring-wrap {
   position: relative;
   width: 112px;
@@ -3585,16 +3576,6 @@
 /* ============================================================
    RING GAUGE — Multi-ring (replace single ring)
    ============================================================ */
-.ring-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
-    gap: 8px;
-    min-height: 0;
-}
-
 .ring-wrap {
     position: relative;
     width: 112px;
@@ -3684,15 +3665,6 @@
     .ring-value { font-size: 20px; }
 }
 
-/* Empty state (0 total) — semua ring abu-abu */
-.ring-card.is-empty .ring-progress {
-    stroke: var(--surface-3) !important;
-    opacity: 0.5;
-    filter: none;
-}
-.ring-card.is-empty .ring-value {
-    color: var(--text-3);
-}
 /* ============================================================
    BENTO OVERVIEW GRID (dashboard)
    ============================================================ */
@@ -3704,14 +3676,8 @@
     align-items: stretch;
 }
 
-.overview-grid > .ring-card {
-    grid-column: span 3;
-    grid-row: span 2;
-    min-height: 160px;
-}
-
 .overview-grid > .nx-metrics--2 {
-    grid-column: span 6;
+    grid-column: span 9;
     grid-row: span 2;
     margin-bottom: 0;
     height: 100%;
@@ -3758,18 +3724,6 @@
 .overview-grid .nx-metric-card.clickable:focus-visible::after {
     opacity: 1;
     transform: translateX(0);
-}
-
-/* Ring card isi penuh */
-.ring-card {
-    height: 100%;
-    min-height: 0;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
 }
 
 /* ---------- Bento shared ---------- */
@@ -3888,7 +3842,6 @@
 }
 
 @media (max-width: 1280px) {
-    .overview-grid > .ring-card { grid-column: span 6; grid-row: span 1; min-height: 160px; }
     .overview-grid > .nx-metrics--2 { grid-column: span 6; grid-row: span 1; }
     .overview-grid > .activity-card { grid-column: 1 / -1; grid-row: span 1; max-height: 320px; }
     .overview-grid > .bento-map { grid-column: span 6; }
@@ -3896,7 +3849,6 @@
 }
 
 @media (max-width: 768px) {
-    .overview-grid > .ring-card,
     .overview-grid > .nx-metrics--2,
     .overview-grid > .activity-card,
     .overview-grid > .bento-map,
@@ -3907,7 +3859,6 @@
     }
     .overview-grid > .bento-graph { min-height: 240px; }
     .activity-card { max-height: 320px; }
-    .ring-card { padding: 10px; }
 }
 
 @media (max-width: 480px) {
