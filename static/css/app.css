@@ -3831,7 +3831,7 @@
     position: relative;
     flex: 1;
     min-height: 110px;
-    pointer-events: none;
+    pointer-events: auto;
 }
 .bento-chart-wrap canvas {
     position: absolute;

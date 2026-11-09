@@ -784,6 +784,8 @@
                 return { label: info.label, unit: info.unit || '', data: vals, borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: color, pointHoverBorderColor: colors.pointBorderColor, pointHoverBorderWidth: 2, borderWidth: 1.8, spanGaps: true };
             });
             if (state.bentoChart) { try { state.bentoChart.destroy(); } catch (e) {} state.bentoChart = null; }
+            canvas.addEventListener('click', e => e.stopPropagation());
+            canvas.addEventListener('pointerdown', e => e.stopPropagation());
             state.bentoChart = new Chart(canvas.getContext('2d'), {
                 type: 'line',
                 data: { labels, datasets },
