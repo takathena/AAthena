@@ -3705,13 +3705,13 @@
 }
 
 .overview-grid > .ring-card {
-    grid-column: span 4;
+    grid-column: span 3;
     grid-row: span 2;
-    min-height: 200px;
+    min-height: 160px;
 }
 
 .overview-grid > .nx-metrics--2 {
-    grid-column: span 5;
+    grid-column: span 6;
     grid-row: span 2;
     margin-bottom: 0;
     height: 100%;
@@ -3764,7 +3764,7 @@
 .ring-card {
     height: 100%;
     min-height: 0;
-    padding: 12px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -3888,7 +3888,7 @@
 }
 
 @media (max-width: 1280px) {
-    .overview-grid > .ring-card { grid-column: span 6; grid-row: span 1; min-height: 200px; }
+    .overview-grid > .ring-card { grid-column: span 6; grid-row: span 1; min-height: 160px; }
     .overview-grid > .nx-metrics--2 { grid-column: span 6; grid-row: span 1; }
     .overview-grid > .activity-card { grid-column: 1 / -1; grid-row: span 1; max-height: 320px; }
     .overview-grid > .bento-map { grid-column: span 6; }
@@ -3907,7 +3907,7 @@
     }
     .overview-grid > .bento-graph { min-height: 240px; }
     .activity-card { max-height: 320px; }
-    .ring-card { padding: 12px; }
+    .ring-card { padding: 10px; }
 }
 
 @media (max-width: 480px) {
