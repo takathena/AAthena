@@ -681,8 +681,8 @@
         }
         // Instans kedua interaktif (klik tile luar map tetap -> section map via data-goto)
         state.mapBento = L.map('mapBento', {
-            zoomControl: false, scrollWheelZoom: false, dragging: true,
-            doubleClickZoom: false, boxZoom: false, keyboard: true, tap: false,
+            zoomControl: true, scrollWheelZoom: true, dragging: true,
+            doubleClickZoom: true, boxZoom: true, keyboard: true, tap: false,
             attributionControl: true,
         }).setView([-7.2, 110.4], 7);
         el.closest('.bento-map-wrap')?.addEventListener('click', e => e.stopPropagation());
