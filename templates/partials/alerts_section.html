@@ -2,22 +2,9 @@
 
     <div class="nx-metrics nx-metrics--4">
 
-        <div class="nx-metric-card">
+        <div class="nx-metric-card clickable" data-alert-filter="status:all">
             <div class="nx-metric-head">
                 <span class="nx-metric-title">Total Aktif</span>
-                <div class="nx-metric-menu">
-                    <button class="nx-metric-menu-btn" type="button" aria-label="Menu">
-                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                    <div class="nx-metric-menu__list">
-                        <button class="nx-metric-menu__item" data-action="filter-status" data-key="statTotalActive" data-value="all">
-                            <i class="fa-regular fa-eye"></i> Lihat semua
-                        </button>
-                        <button class="nx-metric-menu__item" data-action="copy" data-key="statTotalActive">
-                            <i class="fa-regular fa-copy"></i> Salin nilai
-                        </button>
-                    </div>
-                </div>
             </div>
             <div class="nx-metric-body">
                 <div class="nx-metric-value" id="statTotalActive" data-value="statTotalActive">0</div>
@@ -31,22 +18,9 @@
             </div>
         </div>
 
-        <div class="nx-metric-card">
+        <div class="nx-metric-card clickable" data-alert-filter="severity:danger">
             <div class="nx-metric-head">
                 <span class="nx-metric-title">Bahaya</span>
-                <div class="nx-metric-menu">
-                    <button class="nx-metric-menu-btn" type="button" aria-label="Menu">
-                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                    <div class="nx-metric-menu__list">
-                        <button class="nx-metric-menu__item" data-action="filter-severity" data-key="statDanger" data-value="danger">
-                            <i class="fa-solid fa-filter"></i> Filter bahaya
-                        </button>
-                        <button class="nx-metric-menu__item" data-action="copy" data-key="statDanger">
-                            <i class="fa-regular fa-copy"></i> Salin nilai
-                        </button>
-                    </div>
-                </div>
             </div>
             <div class="nx-metric-body">
                 <div class="nx-metric-value crit" id="statDanger" data-value="statDanger">0</div>
@@ -60,22 +34,9 @@
             </div>
         </div>
 
-        <div class="nx-metric-card">
+        <div class="nx-metric-card clickable" data-alert-filter="severity:warning">
             <div class="nx-metric-head">
                 <span class="nx-metric-title">Peringatan</span>
-                <div class="nx-metric-menu">
-                    <button class="nx-metric-menu-btn" type="button" aria-label="Menu">
-                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                    <div class="nx-metric-menu__list">
-                        <button class="nx-metric-menu__item" data-action="filter-severity" data-key="statWarning" data-value="warning">
-                            <i class="fa-solid fa-filter"></i> Filter peringatan
-                        </button>
-                        <button class="nx-metric-menu__item" data-action="copy" data-key="statWarning">
-                            <i class="fa-regular fa-copy"></i> Salin nilai
-                        </button>
-                    </div>
-                </div>
             </div>
             <div class="nx-metric-body">
                 <div class="nx-metric-value warn" id="statWarning" data-value="statWarning">0</div>
@@ -89,22 +50,9 @@
             </div>
         </div>
 
-        <div class="nx-metric-card">
+        <div class="nx-metric-card clickable" data-alert-filter="severity:info">
             <div class="nx-metric-head">
                 <span class="nx-metric-title">Info</span>
-                <div class="nx-metric-menu">
-                    <button class="nx-metric-menu-btn" type="button" aria-label="Menu">
-                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                    <div class="nx-metric-menu__list">
-                        <button class="nx-metric-menu__item" data-action="filter-severity" data-key="statInfo" data-value="info">
-                            <i class="fa-solid fa-filter"></i> Filter info
-                        </button>
-                        <button class="nx-metric-menu__item" data-action="copy" data-key="statInfo">
-                            <i class="fa-regular fa-copy"></i> Salin nilai
-                        </button>
-                    </div>
-                </div>
             </div>
             <div class="nx-metric-body">
                 <div class="nx-metric-value info" id="statInfo" data-value="statInfo">0</div>

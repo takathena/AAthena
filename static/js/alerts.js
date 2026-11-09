@@ -969,6 +969,15 @@
             loadAlerts();
         });
 
+        document.querySelectorAll('.nx-metric-card[data-alert-filter]').forEach(card => {
+            card.addEventListener('click', () => {
+                const [type, value] = (card.dataset.alertFilter || '').split(':');
+                const ddId = type === 'status' ? 'alertStatusDropdown' : 'alertSeverityDropdown';
+                const item = document.querySelector(`#${ddId} .ios-dropdown-item[data-value="${value}"]`);
+                if (item) item.click();
+            });
+        });
+
         bindIOSDropdown('alertSeverityDropdown', (value) => {
             state.severity = value || '';
             loadAlerts();
