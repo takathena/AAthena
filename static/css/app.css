@@ -3796,7 +3796,7 @@
 .overview-grid > .bento-graph { grid-column: span 6; grid-row: span 2; }
 .bento-tile-sub { font-size: 11.5px; color: var(--text-3); }
 
-/* Peta bento: Leaflet instans kedua (non-interaktif, klik tile -> section map)
+/* Peta bento: Leaflet instans kedua (interaktif, klik di luar map -> section map)
    Besar, 4:3 — tinggi ikut lebar kolom (span 6), bukan strip memanjang. */
 .bento-map-wrap {
     position: relative;
@@ -3813,7 +3813,6 @@
     width: 100%;
     height: 100%;
     background: var(--bg-subtle);
-    pointer-events: none;
 }
 #mapBento .leaflet-container { font-family: inherit; }
 .bento-map-empty {

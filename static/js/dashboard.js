@@ -679,12 +679,13 @@
                 return;
             }
         }
-        // Instans kedua, non-interaktif (klik tile -> section map via data-goto)
+        // Instans kedua interaktif (klik tile luar map tetap -> section map via data-goto)
         state.mapBento = L.map('mapBento', {
-            scrollWheelZoom: false, dragging: false, zoomControl: false,
-            doubleClickZoom: false, boxZoom: false, keyboard: false,
-            attributionControl: false, tap: false,
+            zoomControl: true, scrollWheelZoom: true, dragging: true,
+            doubleClickZoom: true, boxZoom: true, keyboard: true,
+            attributionControl: true,
         }).setView([-2.5489, 118.0149], 5);
+        el.closest('.bento-map-wrap')?.addEventListener('click', e => e.stopPropagation());
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapBento);
         registerMapInstance(state.mapBento);
         loadMarkers(state.mapBento, false, 'bento');
