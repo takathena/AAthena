@@ -698,8 +698,10 @@
         const pts = state.devices
             .filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0))
             .map(d => [d.latitude, d.longitude]);
-        if (pts.length > 1) state.mapBento.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
-        else if (pts.length === 1) state.mapBento.setView(pts[0], 11);
+        if (pts.length === 1) {
+            const [lat, lng] = pts[0];
+            state.mapBento.fitBounds(L.latLngBounds([lat - 0.05, lng - 0.05], [lat + 0.05, lng + 0.05]), { padding: [12, 12] });
+        } else if (pts.length > 1) state.mapBento.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
         else state.mapBento.setView([-2.5489, 118.0149], 5);
     }
 
@@ -735,91 +737,6 @@
                 ctx.restore();
             },
         };
-    }
-
-    // Pan/zoom manual (fallback bila chartjs-plugin-zoom tidak terdaftar).
-    // Wheel = zoom di sekitar indeks hover, drag = pan, dblclick = reset.
-    // Klik hasil drag / klik area legend tidak boleh memicu tile data-goto.
-    function bentoBindPanZoom(chart, canvas) {
-        bentoUnbindPanZoom(canvas);
-        const total = chart.data.labels.length;
-        const range = () => {
-            const s = chart.scales.x;
-            return {
-                min: typeof s.min === 'number' ? s.min : 0,
-                max: typeof s.max === 'number' ? s.max : total - 1,
-            };
-        };
-        const apply = (min, max) => {
-            const span = Math.max(4, Math.min(total - 1, max - min));
-            let m = Math.max(0, Math.min(total - 1 - span, Math.round(min)));
-            chart.options.scales.x.min = m;
-            chart.options.scales.x.max = m + span;
-            chart.update('none');
-        };
-        const reset = () => {
-            chart.options.scales.x.min = undefined;
-            chart.options.scales.x.max = undefined;
-            chart.update();
-        };
-        const onWheel = (e) => {
-            if (total < 6) return;
-            e.preventDefault();
-            const r = range();
-            const idx = Math.max(0, Math.min(total - 1, Math.round(chart.scales.x.getValueForPixel(e.offsetX))));
-            const span = r.max - r.min;
-            const next = Math.max(4, Math.min(total - 1, span * (e.deltaY > 0 ? 1.25 : 0.8)));
-            apply(idx - (next * (idx - r.min)) / Math.max(1, span), idx - (next * (idx - r.min)) / Math.max(1, span) + next);
-        };
-        let drag = null;
-        const onDown = (e) => {
-            drag = { x: e.offsetX, min: range().min, max: range().max, moved: 0 };
-            canvas.style.cursor = 'grabbing';
-        };
-        const onMove = (e) => {
-            if (!drag) return;
-            const width = Math.max(1, chart.chartArea.right - chart.chartArea.left);
-            const perPx = (drag.max - drag.min) / width;
-            const shift = Math.round((e.offsetX - drag.x) * perPx);
-            drag.moved = Math.max(drag.moved, Math.abs(e.offsetX - drag.x));
-            apply(drag.min - shift, drag.max - shift);
-        };
-        const onUp = () => {
-            if (drag && drag.moved > 4) canvas.__bentoDragged = true;
-            drag = null;
-            canvas.style.cursor = '';
-        };
-        const onDbl = (e) => { e.preventDefault(); reset(); };
-        const onClick = (e) => {
-            const leg = chart.legend;
-            const onLegend = leg && typeof leg.top === 'number' ? e.offsetY <= leg.top + leg.height : false;
-            if (canvas.__bentoDragged || onLegend) {
-                canvas.__bentoDragged = false;
-                e.stopPropagation();
-                e.preventDefault();
-            }
-        };
-        canvas.addEventListener('wheel', onWheel, { passive: false });
-        canvas.addEventListener('pointerdown', onDown);
-        canvas.addEventListener('pointermove', onMove);
-        canvas.addEventListener('pointerup', onUp);
-        canvas.addEventListener('pointercancel', onUp);
-        canvas.addEventListener('dblclick', onDbl);
-        canvas.addEventListener('click', onClick, true);
-        canvas.__bentoPanZoom = { onWheel, onDown, onMove, onUp, onDbl, onClick };
-    }
-
-    function bentoUnbindPanZoom(canvas) {
-        const h = canvas && canvas.__bentoPanZoom;
-        if (!h) return;
-        canvas.removeEventListener('wheel', h.onWheel);
-        canvas.removeEventListener('pointerdown', h.onDown);
-        canvas.removeEventListener('pointermove', h.onMove);
-        canvas.removeEventListener('pointerup', h.onUp);
-        canvas.removeEventListener('pointercancel', h.onUp);
-        canvas.removeEventListener('dblclick', h.onDbl);
-        canvas.removeEventListener('click', h.onClick, true);
-        canvas.__bentoPanZoom = null;
     }
 
     async function loadBentoChart() {
@@ -872,25 +789,16 @@
                 const vals = usedTs.map(ts => { const c = byTs[ts][key]; return c ? c.sum / c.n : null; });
                 return { label: info.label, unit: info.unit || '', data: vals, borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: color, pointHoverBorderColor: colors.pointBorderColor, pointHoverBorderWidth: 2, borderWidth: 1.8, spanGaps: true };
             });
-            bentoUnbindPanZoom(canvas);
             if (state.bentoChart) { try { state.bentoChart.destroy(); } catch (e) {} state.bentoChart = null; }
-            // chartjs-plugin-zoom dipakai bila benar-benar terdaftar; selain itu fallback manual di bawah.
-            let zoomPlugin = null;
-            try {
-                if (window.ChartZoom) zoomPlugin = window.ChartZoom;
-                else if (Chart.registry && Chart.registry.plugins && typeof Chart.registry.plugins.get === 'function') zoomPlugin = Chart.registry.plugins.get('zoom') || null;
-            } catch (e) { zoomPlugin = null; }
-            const chartPlugins = [bentoCrosshairPlugin(colors.legendColor + '66')];
-            if (zoomPlugin) chartPlugins.push(zoomPlugin);
             state.bentoChart = new Chart(canvas.getContext('2d'), {
                 type: 'line',
                 data: { labels, datasets },
-                plugins: chartPlugins,
+                plugins: [bentoCrosshairPlugin(colors.legendColor + '66')],
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     animation: { duration: 300, easing: 'easeOutQuart' },
-                    onHover: (e, els) => { canvas.style.cursor = els.length ? 'crosshair' : 'grab'; },
+                    onHover: (e, els) => { canvas.style.cursor = els.length ? 'crosshair' : ''; },
                     plugins: {
                         legend: {
                             labels: { color: colors.legendColor, font: { size: 10, family: CHART_FONT, weight: '500' }, usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 10 },
@@ -904,7 +812,6 @@
                             onLeave: (e) => { e.native.target.style.cursor = ''; },
                         },
                         tooltip: {
-                            enabled: true,
                             backgroundColor: colors.tooltipBg,
                             titleColor: colors.tooltipTitleColor,
                             bodyColor: colors.tooltipBodyColor,
@@ -930,10 +837,8 @@
                                     const num = Number(v);
                                     return ` ${item.dataset.label}: ${Number.isFinite(num) ? num.toLocaleString('id-ID', { maximumFractionDigits: 1 }) : v}${unit ? ' ' + unit : ''}`;
                                 },
-                                footer: (items) => `${items.length} sensor · ${ids.length} perangkat (rata-rata)`,
                             },
                         },
-                        ...(zoomPlugin ? { zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, drag: { enabled: true }, mode: 'x', pinch: { enabled: true } }, limits: { x: { min: 0, max: labels.length - 1 } } } } : {}),
                     },
                     scales: {
                         x: { grid: { color: colors.gridColor, drawBorder: false, drawTicks: false }, border: { display: false }, ticks: { color: colors.labelColor, font: { size: 9.5, family: CHART_FONT }, maxTicksLimit: 6, autoSkip: true } },
@@ -941,7 +846,6 @@
                     },
                 },
             });
-            if (!zoomPlugin) bentoBindPanZoom(state.bentoChart, canvas);
             // Sub: nilai terbaru per sensor, gabungan semua perangkat
             const last = usedTs[usedTs.length - 1];
             const parts = keys.map(k => {
@@ -950,7 +854,7 @@
                 const avg = c.sum / c.n;
                 return `${info ? info.label : k} ${avg.toFixed(1)}${info && info.unit ? ' ' + info.unit : ''}`;
             }).filter(Boolean);
-            if (sub) sub.textContent = parts.length ? parts.join(' · ') + ` · ${ids.length} perangkat · scroll zoom · drag geser · 2× klik reset` : 'Grafik sensor real-time';
+            if (sub) sub.textContent = parts.length ? parts.join(' · ') + ` · ${ids.length} perangkat` : 'Grafik sensor real-time';
         } catch (e) { console.error('[BentoChart]', e); if (sub) sub.textContent = 'Gagal memuat grafik sensor'; }
     }
 
