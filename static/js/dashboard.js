@@ -204,6 +204,15 @@
         if (!window.__nexusMaps.includes(map)) window.__nexusMaps.push(map);
     }
 
+    // Leaflet must re-measure after display/layout settles (banner toggle, resize, sidebar)
+    function invalidateMap(map) {
+        if (!map) return;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            try { map.invalidateSize(); } catch (e) {}
+        }));
+        setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 200);
+    }
+
     function getSectionFromHash() {
         const hash = (window.location.hash || '').replace('#', '').trim();
         const base = hash.split('/')[0];
@@ -264,7 +273,7 @@
                 if (state.mapFull) {
                     loadMarkers(state.mapFull, true);
                     renderMapDeviceList();
-                    state.mapFull.invalidateSize();
+                    invalidateMap(state.mapFull);
                     updateMapSelectedBanner();
                 } else {
                     renderMapDeviceList();
@@ -649,7 +658,7 @@
         registerMapInstance(state.mapFull);
         loadMarkers(state.mapFull, true);
         renderMapDeviceList();
-        try { state.mapFull.invalidateSize(); } catch (e) {}
+        invalidateMap(state.mapFull);
         updateMapSelectedBanner();
     }
 
@@ -782,6 +791,7 @@
             } else coordEl.textContent = 'Belum ada koordinat';
         }
         if (saveBtn) saveBtn.disabled = !(state.selectedLat != null && state.selectedLng != null && state.mapHasUnsavedChange);
+        if (state.mapFull) invalidateMap(state.mapFull);
     }
 
     function renderMapDeviceList() {
@@ -4074,6 +4084,7 @@
         window.addEventListener('resize', () => {
             clearTimeout(window.__nexusResizeTO);
             window.__nexusResizeTO = setTimeout(() => {
+                if (window.__nexusMaps) window.__nexusMaps.forEach(m => { try { m.invalidateSize(); } catch (e) {} });
                 clampChartsToCanvas();
                 resolveCollisions();
                 applyAllGeom();

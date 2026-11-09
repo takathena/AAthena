@@ -472,9 +472,17 @@ async function loadActivity(){
 }
 
 /* ===== Map ===== */
+// Leaflet must re-measure after display/layout settles
+function invalidateMap(){
+  if(!map) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    try{ map.invalidateSize(); }catch(e){}
+  }));
+  setTimeout(() => { try{ map.invalidateSize(); }catch(e){} }, 200);
+}
 function initMap(force){
   if(mapReady && !force){
-    if(map) setTimeout(() => map.invalidateSize(), 100);
+    invalidateMap();
     return;
   }
   if(force && map){ try{ map.remove(); }catch(e){} map = null; mapMarkers = {}; mapReady = false; }
@@ -488,9 +496,15 @@ function initMap(force){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
   map.on('click', e => { if(selDeviceId) placeMarker(e.latlng.lat, e.latlng.lng); });
   mapReady = true;
-  setTimeout(() => map.invalidateSize(), 150);
+  if(!window.__nexusMaps) window.__nexusMaps = [];
+  if(!window.__nexusMaps.includes(map)) window.__nexusMaps.push(map);
+  invalidateMap();
   loadMapMarkers(); renderMapList();
 }
+window.addEventListener('resize', () => {
+  clearTimeout(window.__mMapResizeTO);
+  window.__mMapResizeTO = setTimeout(() => { if(map) try{ map.invalidateSize(); }catch(e){} }, 150);
+});
 function resetMapView(){
   if(!map) return;
   map.flyTo(MAP_DEFAULT_CENTER, MAP_DEFAULT_ZOOM, {duration:.8});
@@ -585,8 +599,8 @@ function placeMarker(lat, lng){
 }
 function updateMapBanner(){
   const b = document.getElementById('mapBanner');
-  if(!selDeviceId){ b.classList.add('hidden'); return; }
-  const d = devices.find(x => x.device_id === selDeviceId); if(!d){ b.classList.add('hidden'); return; }
+  if(!selDeviceId){ b.classList.add('hidden'); invalidateMap(); return; }
+  const d = devices.find(x => x.device_id === selDeviceId); if(!d){ b.classList.add('hidden'); invalidateMap(); return; }
   const s = mapStyle(d);
   b.classList.remove('hidden');
   document.getElementById('mapBannerName').textContent = d.device_name;
@@ -596,6 +610,7 @@ function updateMapBanner(){
     ? `${selLat.toFixed(5)}, ${selLng.toFixed(5)}${mapDirty ? ' · belum disimpan' : ''}`
     : 'Belum ada koordinat';
   document.getElementById('mapSaveBtn').disabled = !(selLat != null && mapDirty);
+  invalidateMap();
 }
 function clearMapSel(){
   if(mapDirty && !confirm('Batalkan perubahan?')) return;
