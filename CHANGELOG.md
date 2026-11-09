@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Refactor bertahap (fondasi)
+
+Refactor tanpa mengubah perilaku API/DB. Semua endpoint dan schema tetap sama; hanya pemisahan tanggung jawab dan pembersihan import-time side effect.
+
+- **Config (`app/config.py`)**: helper `_env_bool/_env_int/_env_float/_env_str` terpusat; rule alert suhu diekstrak ke `_build_alert_rules()`, parser CORS ke `_parse_cors_origins()`. Nilai default dan perilaku parsing tetap sama.
+- **Application factory (`app/__init__.py`)**: `create_app()` dipecah menjadi `_apply_proxy_fix`, `_init_extensions`, `_register_static_cache_bust`, `_register_blueprints`, `_register_security_headers`, `_register_error_handlers`, `_register_health_routes`. Validasi config dipindah dari import-time (`sys.exit` saat `import app`) ke `create_app()` via `validate_config_or_exit()` — import modul tidak lagi memproses exit proses.
+- **Database (`app/database.py` + `app/migrations.py`)**: `database.py` 1028 baris → 132 baris (hanya koneksi + `init_db` runner). Seluruh `_migrate_v1.._migrate_v18` dan `_rebuild_fk_tables` pindah ke `app/migrations.py` + registry `MIGRATIONS`. `SCHEMA_VERSION`, `WIB_DEFAULT`, dan semua `_migrate_*` tetap bisa diimpor dari `app.database` (re-export).
+- **API helpers (`app/api.py` + `app/api_common.py`)**: helper bersama (`_clean_timestamp`, `validate_device_api_key`, `update_device_status`, `_alert_label`, `_detect_interval` + konstanta `AUTO_INTERVAL_*`, `_current_user_id`, `_validate_username`, `PURGE_TABLES`, `_parse_purge_request`, `_purge_where`, `_purge_preview`) dipindah ke `app/api_common.py` (243 baris). `api.py` 3199 → 2980 baris dan mengimpor ulang semua nama tersebut, sehingga 59 route dan import lama (`from app.api import ...`, monkeypatch `app.api.get_db_context`/`sqlite3` di tes) tetap jalan.
+- **Tahap berikutnya yang disarankan**: pecah route `api.py` per domain (`devices`, `alerts`, `attendance`, `users`, `system`, `ingest`) menjadi blueprint terpisah, dan ekstrak `dashboards.py` (955 baris) dengan pola yang sama.
+
+---
+
 ## V6.5.0
 
 Rilis yang menggabungkan perbaikan fase 1–5 (sebelumnya 6.0.0). Rincian teknis per fase ada di bagian bawah.

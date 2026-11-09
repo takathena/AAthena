@@ -661,15 +661,17 @@ Filter untuk `/api/v1/attendance/report` dan `/api/v1/attendance/export`:
 ```
 nexus-iot/
 ├── app/                          # Package aplikasi Flask
-│   ├── __init__.py               # App factory, security headers, error handlers
+│   ├── __init__.py               # App factory (helper terpisah), security headers, error handlers
 │   ├── alerts.py                 # Alert state machine
-│   ├── api.py                    # API routes v1
+│   ├── api.py                    # API routes v1 (59 route; helper di api_common.py)
+│   ├── api_common.py             # Helper bersama API (timestamp, device auth, purge)
 │   ├── auth.py                   # Login, session, decorator
 │   ├── background.py             # Background worker + file lock
 │   ├── chat.py                   # NEXUS AI chat + tool calling
-│   ├── config.py                 # Konfigurasi + validasi env
+│   ├── config.py                 # Konfigurasi + validasi env (helper _env_*)
 │   ├── dashboards.py             # Dashboard, tab, widget
-│   ├── database.py               # Layer SQLite + 16 migrations
+│   ├── database.py               # Layer SQLite koneksi + init runner (132 baris)
+│   ├── migrations.py             # Migrasi v1..v18 + registry MIGRATIONS
 │   ├── decorators.py             # Helper decorator
 │   ├── extensions.py             # CORS, CSRF, Limiter
 │   ├── logging_config.py         # Setup log rotating

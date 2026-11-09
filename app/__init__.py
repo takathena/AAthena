@@ -1,5 +1,7 @@
 """
 NEXUS IoT - Application Factory
+Refactor: create_app dipecah menjadi helper kecil; validasi config dipindah
+ke create_app() agar import app tidak lagi me-exit proses saat config buruk.
 """
 import os
 import sys
@@ -15,12 +17,15 @@ __version__ = '6.5.0'
 config = get_config()
 logger = setup_logging(config)
 
-try:
-    config.validate()
-    logger.info("Configuration validated")
-except ValueError as e:
-    print(str(e), file=sys.stderr)
-    sys.exit(1)
+
+def validate_config_or_exit():
+    """Validasi config; gagal -> cetak pesan dan SystemExit(1). Dipanggil create_app()."""
+    try:
+        config.validate()
+        logger.info("Configuration validated")
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        raise SystemExit(1) from e
 
 
 def warn_if_insecure_cookie(app_config, env=None, log=None):
@@ -37,29 +42,16 @@ def warn_if_insecure_cookie(app_config, env=None, log=None):
     return False
 
 
-def create_app(config_override=None):
-    app = Flask(__name__, template_folder='../templates', static_folder='../static')
-    app.config.from_object(config)
-
-    if config_override:
-        app.config.update(config_override)
-
-    warn_if_insecure_cookie(app.config)
-    from app.ratelimit import warn_if_memory_limiter_multiworker
-    warn_if_memory_limiter_multiworker(config.RATE_LIMIT_STORAGE)
-
-    # ✅ FIX Tier 1 #5: ProxyFix — dapat IP device asli di belakang Nginx
+def _apply_proxy_fix(app):
+    """ProxyFix — dapat IP device asli di belakang Nginx."""
     from werkzeug.middleware.proxy_fix import ProxyFix
     if not app.config.get('TESTING'):
         app.wsgi_app = ProxyFix(
-            app.wsgi_app,
-            x_for=1,
-            x_proto=1,
-            x_host=1,
-            x_port=1,
+            app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1,
         )
 
-    # CORS
+
+def _init_extensions(app):
     cors.init_app(app, resources={
         r"/api/*": {
             "origins": config.CORS_ORIGINS,
@@ -68,15 +60,13 @@ def create_app(config_override=None):
             "max_age": 3600,
         }
     })
-
     limiter.init_app(app)
     csrf.init_app(app)
-
     app.teardown_appcontext(close_db)
 
-    # Cache-busting: Nginx menyajikan /static/ dengan "immutable 30d". Tanpa versi di URL,
-    # browser terus memakai JS/CSS lama setelah update. Tambahkan ?v=<mtime> otomatis
-    # ke setiap url_for('static', ...) supaya URL berubah saat file berubah.
+
+def _register_static_cache_bust(app):
+    """Nginx menyajikan /static/ immutable 30d; tambahkan ?v=<mtime> agar URL berubah."""
     @app.url_defaults
     def _static_cache_bust(endpoint, values):
         if endpoint == 'static' and 'v' not in values:
@@ -89,28 +79,26 @@ def create_app(config_override=None):
                 except OSError:
                     pass
 
+
+def _register_blueprints(app):
     from app.auth import auth_bp
     from app.api import api_bp
     from app.views import views_bp
     from app.dashboards import dashboards_bp
+    from app.chat import chat_bp, llm_configured
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(views_bp)
-    app.register_blueprint(dashboards_bp)
-    from app.chat import chat_bp
-    app.register_blueprint(chat_bp)
-
-    from app.chat import llm_configured
+    for bp in (auth_bp, api_bp, views_bp, dashboards_bp, chat_bp):
+        app.register_blueprint(bp)
 
     @app.context_processor
     def inject_chat_enabled():
-        # N7: widget chat (tombol, FAB, panel) tidak dirender bila LLM belum dikonfigurasi.
+        # N7: widget chat tidak dirender bila LLM belum dikonfigurasi.
         return {'chat_enabled': llm_configured()}
-
 
     logger.info("CSRF: only /api/v1/data is exempt (device endpoint)")
 
+
+def _register_security_headers(app):
     @app.after_request
     def add_security_headers(response):
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -120,13 +108,11 @@ def create_app(config_override=None):
         response.headers['Permissions-Policy'] = (
             'geolocation=(), microphone=(), camera=(), payment=(), usb=()'
         )
-
         # HSTS hanya bila ENABLE_HSTS=True (bukan karena cookie Secure).
         if app.config.get('ENABLE_HSTS'):
             response.headers['Strict-Transport-Security'] = (
                 'max-age=31536000; includeSubDomains'
             )
-
         csp = (
             f"default-src 'self'; "
             f"script-src {config.CSP_SCRIPT_SRC}; "
@@ -143,17 +129,19 @@ def create_app(config_override=None):
             response.headers['Content-Security-Policy-Report-Only'] = csp
         else:
             response.headers['Content-Security-Policy'] = csp
-
         return response
 
-    def _error_response(status, api_error, title, message):
-        """JSON untuk endpoint API, halaman error HTML untuk route halaman."""
-        logger.info(f"HTTP {status} {request.method} {request.path}")
-        if request.path.startswith('/api/'):
-            return jsonify({'success': False, 'error': api_error}), status
-        return render_template('error.html', code=status,
-                               title=title, message=message), status
 
+def _error_response(status, api_error, title, message):
+    """JSON untuk endpoint API, halaman error HTML untuk route halaman."""
+    logger.info(f"HTTP {status} {request.method} {request.path}")
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': api_error}), status
+    return render_template('error.html', code=status,
+                           title=title, message=message), status
+
+
+def _register_error_handlers(app):
     @app.errorhandler(400)
     def bad_request(e):
         return _error_response(400, 'Bad request',
@@ -220,6 +208,8 @@ def create_app(config_override=None):
                                'Terjadi Kesalahan',
                                'Ada gangguan di server. Coba beberapa saat lagi.')
 
+
+def _register_health_routes(app):
     @app.route('/health')
     @limiter.exempt
     def health_check():
@@ -243,12 +233,34 @@ def create_app(config_override=None):
     def readiness_check():
         return jsonify({'status': 'ready'}), 200
 
+
+def create_app(config_override=None):
+    validate_config_or_exit()
+
+    app = Flask(__name__, template_folder='../templates', static_folder='../static')
+    app.config.from_object(config)
+
+    if config_override:
+        app.config.update(config_override)
+
+    warn_if_insecure_cookie(app.config)
+    from app.ratelimit import warn_if_memory_limiter_multiworker
+    warn_if_memory_limiter_multiworker(config.RATE_LIMIT_STORAGE)
+
+    _apply_proxy_fix(app)
+    _init_extensions(app)
+    _register_static_cache_bust(app)
+    _register_blueprints(app)
+    _register_security_headers(app)
+    _register_error_handlers(app)
+    _register_health_routes(app)
+
     if config.DEBUG:
         @app.before_request
         def log_request():
             logger.debug(f"{request.method} {request.path}")
 
-    # Restore yang tertunda diterapkan SEBELUM koneksi database mana pun dibuka.
+    # Restore tertunda diterapkan SEBELUM koneksi database mana pun dibuka.
     from app.database import _get_db_path
     from app.restore import apply_pending_restore
     try:
