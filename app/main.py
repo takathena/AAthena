@@ -106,16 +106,17 @@ async def lifespan(app: FastAPI):
     except ValueError as e:
         raise SystemExit(1) from e
     from app.database import init_db
-    import asyncio
-    await asyncio.to_thread(init_db)
+    init_result = init_db()
+    if init_result is not None:
+        await init_result
     if not config.TESTING:
         from app.background import start_background_tasks
-        await asyncio.to_thread(start_background_tasks)
+        await start_background_tasks()
     logger.info('Application ready (FastAPI)')
     yield
     try:
         from app.background import stop_background_tasks
-        await asyncio.to_thread(stop_background_tasks)
+        await stop_background_tasks()
     except Exception:
         pass
 
@@ -171,16 +172,15 @@ def create_app(config_override=None):
 
     @app.get('/health')
     async def health_check():
-        import asyncio
         from app.database import get_db_context, get_wib_time
 
-        def _check():
-            with get_db_context() as conn:
-                conn.execute('SELECT 1').fetchone()
+        async def _check():
+            async with get_db_context() as conn:
+                await (await conn.execute('SELECT 1')).fetchone()
             return True
 
         try:
-            await asyncio.to_thread(_check)
+            await _check()
             return JSONResponse({
                 'status': 'healthy',
                 'timestamp': get_wib_time().isoformat(),

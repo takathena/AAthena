@@ -15,7 +15,7 @@ import requests
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.deps import get_current_user, limiter, run_sync, safe_json, client_ip  # noqa: F401
+from app.deps import get_current_user, limiter, safe_json, client_ip  # noqa: F401
 
 logger = logging.getLogger('nexus')
 router = APIRouter(prefix='/api/v1', tags=['chat'])
@@ -86,11 +86,70 @@ def limit_tool_result(result):
     return text
 
 
+def _sync_is_admin(conn, user_id):
+    if not user_id:
+        return False
+    row = conn.execute('SELECT is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
+    return bool(row and row['is_admin'])
+
+
+def _sync_role_allows(role, minimum):
+    from app.deps import role_allows
+    return role_allows(role, minimum)
+
+
+def _sync_dashboard_role(conn, dashboard_id, user_id):
+    if not user_id or dashboard_id is None:
+        return 'owner' if (user_id and _sync_is_admin(conn, user_id)) else None
+    if _sync_is_admin(conn, user_id):
+        return 'owner'
+    row = conn.execute('SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,)).fetchone()
+    if not row:
+        return None
+    if row['user_id'] == user_id:
+        return 'owner'
+    m = conn.execute(
+        'SELECT role FROM dashboard_members WHERE dashboard_id = ? AND user_id = ?',
+        (dashboard_id, user_id)).fetchone()
+    return m['role'] if m else None
+
+
 def _chat_scope(conn, request, user_id):
-    from app.deps import resolve_scope
-    scope = resolve_scope(conn, request, user_id)
-    if scope['error']:
+    raw = request.headers.get('x-dashboard-id') or request.query_params.get('dashboard_id')
+    raw = (raw or '').strip().lower()
+    admin = _sync_is_admin(conn, user_id)
+    scope = {'user_id': user_id, 'is_admin': admin,
+             'dashboard_ids': None, 'dashboard_id': None, 'error': None}
+    if raw in ('', 'all', 'null', 'undefined', '0'):
+        if admin:
+            scope['dashboard_ids'] = None
+        else:
+            ids = set()
+            for r in conn.execute('SELECT id FROM dashboards WHERE user_id = ?', (user_id,)).fetchall():
+                ids.add(r['id'])
+            for r in conn.execute(
+                    'SELECT dashboard_id, role FROM dashboard_members WHERE user_id = ?', (user_id,)).fetchall():
+                if _sync_role_allows(r['role'], 'viewer'):
+                    ids.add(r['dashboard_id'])
+            scope['dashboard_ids'] = sorted(ids)
+        return scope
+    try:
+        did = int(raw)
+    except (TypeError, ValueError):
+        scope['error'] = ('dashboard_id tidak valid', 400)
         scope['dashboard_ids'] = []
+        return scope
+    role = _sync_dashboard_role(conn, did, user_id)
+    if role is None:
+        scope['error'] = ('Dashboard tidak ditemukan', 404)
+        scope['dashboard_ids'] = []
+        return scope
+    if not _sync_role_allows(role, 'viewer'):
+        scope['error'] = ('Peran tidak cukup', 403)
+        scope['dashboard_ids'] = []
+        return scope
+    scope['dashboard_ids'] = [did]
+    scope['dashboard_id'] = did
     return scope
 
 
@@ -142,12 +201,14 @@ def tool_get_active_alerts(request, user_id):
 
 def tool_get_device_history(request, user_id, device_id: str, hours: int = 24):
     from app.database import get_db_context, get_wib_time
-    from app.deps import device_role
     hours = max(1, min(int(hours), 168))
     since = get_wib_time() - timedelta(hours=hours)
     with get_db_context() as conn:
         row = conn.execute('SELECT dashboard_id FROM devices WHERE device_id = ?', (device_id,)).fetchone()
-        if not row or device_role(conn, row, user_id) is None:
+        if not row:
+            return {'error': 'Perangkat tidak ditemukan'}
+        _role = _sync_dashboard_role(conn, row['dashboard_id'], user_id) if row['dashboard_id'] is not None else ('owner' if _sync_is_admin(conn, user_id) else None)
+        if _role is None:
             return {'error': 'Perangkat tidak ditemukan'}
         scope_ids = _chat_scope(conn, request, user_id)['dashboard_ids']
         if scope_ids is not None and row['dashboard_id'] not in scope_ids:
@@ -286,7 +347,7 @@ def _run_tool_call(call, request, user_id):
 
 
 def _chat_loop(messages, request, user_id):
-    """Blocking LLM loop; return (payload, status). Jalankan via run_sync."""
+    """Blocking LLM loop; return (payload, status)."""
     from app.database import get_wib_time
     today_str = get_wib_time().strftime('%A, %d %B %Y')
     system_text = SYSTEM_PROMPT.format(today=today_str)
@@ -361,7 +422,7 @@ async def chat(request: Request):
     messages = sanitize_messages(payload.get('messages'))
     if not messages:
         return JSONResponse({'success': False, 'error': 'messages wajib diisi'}, status_code=400)
-    result, status = await run_sync(_chat_loop, messages, request, user['user_id'])
+    result, status = _chat_loop(messages, request, user['user_id'])
     wants_sse = ('text/event-stream' in (request.headers.get('accept') or '')
                  or request.query_params.get('stream') == '1')
     if wants_sse:
@@ -392,5 +453,5 @@ async def chat_health(request: Request):
             return {'success': False, 'configured': True, 'upstream_ok': False,
                     'error': f'Upstream offline: {type(e).__name__}'}, 503
 
-    body, code = await run_sync(_probe)
+    body, code = _probe()
     return JSONResponse(body, status_code=code)

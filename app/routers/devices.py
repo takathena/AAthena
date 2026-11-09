@@ -16,7 +16,7 @@ from app.deps import (get_current_user, load_device as _dl,
                       scope_error_response as _se, dashboard_in_sql,
                       device_in_sql)
 from app.deps import limiter
-from app.deps import run_sync, safe_json
+from app.deps import safe_json
 
 logger = logging.getLogger('nexus')
 router = APIRouter(prefix='/api/v1', tags=['devices'])
@@ -28,36 +28,36 @@ async def get_dashboard_data(request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope)
             dev_sql, dev_params = dashboard_in_sql(scope, 'dashboard_id')
             d_sql, d_params = dashboard_in_sql(scope, 'd.dashboard_id')
             al_sql, al_params = device_in_sql(scope, 'device_id')
-            counts = conn.execute(f'''
+            counts = await (await conn.execute(f'''
                 SELECT
                     COUNT(*) AS total,
                     SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) AS online,
                     SUM(CASE WHEN status = 'offline' THEN 1 ELSE 0 END) AS offline
                 FROM devices WHERE {dev_sql}
-            ''', dev_params).fetchone()
+            ''', dev_params)).fetchone()
             total = counts['total'] or 0
             online = counts['online'] or 0
             offline = counts['offline'] or 0
-            alert_rows = conn.execute(f'''
+            alert_rows = await (await conn.execute(f'''
                 SELECT severity, COUNT(*) AS count
                 FROM alerts
                 WHERE is_active = 1 AND alert_type != 'uid' AND {al_sql}
                 GROUP BY severity
-            ''', al_params).fetchall()
+            ''', al_params)).fetchall()
             alert_summary = {'danger': 0, 'warning': 0, 'info': 0, 'total': 0}
             for row in alert_rows:
                 if row['severity'] in alert_summary:
                     alert_summary[row['severity']] = row['count']
                 alert_summary['total'] += row['count']
-            rows = conn.execute(f'''
+            rows = await (await conn.execute(f'''
                 SELECT
                     d.dashboard_id, db.name AS dashboard_name,
                     COALESCE(NULLIF(u.display_name, ''), u.username) AS owner_name,
@@ -106,7 +106,7 @@ async def get_dashboard_data(request: Request):
                          WHEN a.severity = 'info' THEN 3
                          ELSE 4 END,
                     d.created_at DESC
-            ''', d_params).fetchall()
+            ''', d_params)).fetchall()
             device_list = []
             healthy_count = 0
             for row in rows:
@@ -155,7 +155,7 @@ async def get_dashboard_data(request: Request):
             'devices': device_list,
         }
 
-    err, data = await run_sync(_do)
+    err, data = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, **data})
@@ -168,19 +168,19 @@ async def get_devices_metrics_history(request: Request):
     user = get_current_user(request)
     hours = min(max(int(request.query_params.get('hours', '24') or 24), 1), 168)
 
-    def _do():
+    async def _do():
         since = get_wib_time() - timedelta(hours=hours)
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope), None
             dev_sql, dev_params = dashboard_in_sql(scope, 'dv.dashboard_id')
             st_sql, st_params = device_in_sql(scope, 'sl.device_id')
             al_sql, al_params = device_in_sql(scope, 'a.device_id')
-            all_devices = conn.execute(f'''
+            all_devices = await (await conn.execute(f'''
                 SELECT dv.device_id, dv.created_at, dv.status
                 FROM devices dv WHERE {dev_sql}
-            ''', dev_params).fetchall()
+            ''', dev_params)).fetchall()
             buckets = []
             cursor = since.replace(minute=0, second=0, microsecond=0)
             end = get_wib_time().replace(minute=0, second=0, microsecond=0)
@@ -198,7 +198,7 @@ async def get_devices_metrics_history(request: Request):
                 b_str = b.strftime('%Y-%m-%d %H:%M:%S')
                 cnt = sum(1 for d in all_devices if d['created_at'] and str(d['created_at']) <= b_str)
                 total_series.append(cnt)
-            log_rows = conn.execute(f'''
+            log_rows = await (await conn.execute(f'''
                 SELECT
                     strftime('%Y-%m-%d %H:00', sl.created_at) AS bucket,
                     sl.device_id,
@@ -207,7 +207,7 @@ async def get_devices_metrics_history(request: Request):
                 WHERE sl.created_at >= ?
                   AND sl.status IN ('online', 'offline')
                   AND {st_sql}
-            ''', [since] + st_params).fetchall()
+            ''', [since] + st_params)).fetchall()
             trans_map = {}
             for r in log_rows:
                 trans_map.setdefault(r['bucket'], {})[r['device_id']] = r['status']
@@ -241,7 +241,7 @@ async def get_devices_metrics_history(request: Request):
             for i in range(n):
                 online_series[i] = min(online_series[i], total_series[i])
             offline_series = [max(0, total_series[i] - online_series[i]) for i in range(n)]
-            alert_rows = conn.execute(f'''
+            alert_rows = await (await conn.execute(f'''
                 SELECT
                     strftime('%Y-%m-%d %H:00', a.created_at) AS bucket,
                     COUNT(*) AS n
@@ -250,7 +250,7 @@ async def get_devices_metrics_history(request: Request):
                   AND a.alert_type != 'uid'
                   AND {al_sql}
                 GROUP BY bucket
-            ''', [since] + al_params).fetchall()
+            ''', [since] + al_params)).fetchall()
             alert_map = {r['bucket']: r['n'] for r in alert_rows}
             alerts_series = [alert_map.get(b.strftime('%Y-%m-%d %H:00'), 0) for b in buckets]
         return None, {
@@ -262,7 +262,7 @@ async def get_devices_metrics_history(request: Request):
             'alerts': alerts_series,
         }
 
-    err, data = await run_sync(_do)
+    err, data = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, **data})
@@ -277,16 +277,16 @@ async def get_devices(request: Request):
     per_page = min(int(request.query_params.get('per_page', '100') or 100), 500)
     offset = (page - 1) * per_page
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope)
             scope_sql, scope_params = dashboard_in_sql(scope, 'dv.dashboard_id')
-            total = conn.execute(
+            total = (await (await conn.execute(
                 f'SELECT COUNT(*) FROM devices dv WHERE {scope_sql}', scope_params
-            ).fetchone()[0]
-            rows = conn.execute(f'''
+            )).fetchone())[0]
+            rows = await (await conn.execute(f'''
                 SELECT dv.*, db.name AS dashboard_name,
                        COALESCE(NULLIF(u.display_name, ''), u.username) AS owner_name
                 FROM devices dv
@@ -294,7 +294,7 @@ async def get_devices(request: Request):
                 LEFT JOIN users u ON u.id = db.user_id
                 WHERE {scope_sql}
                 ORDER BY dv.created_at DESC LIMIT ? OFFSET ?
-            ''', scope_params + [per_page, offset]).fetchall()
+            ''', scope_params + [per_page, offset])).fetchall()
         devices = []
         for device in rows:
             d = dict(device)
@@ -311,7 +311,7 @@ async def get_devices(request: Request):
             'total_pages': (total + per_page - 1) // per_page,
         }}
 
-    err, data = await run_sync(_do)
+    err, data = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, **data})
@@ -355,22 +355,22 @@ async def add_device(request: Request):
     alert_rules_json = json.dumps(alert_rules) if alert_rules else None
     offline_severity = data.get('offline_alert_severity', 'danger')
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'], 'editor')
             if scope['error']:
                 return _se(scope), None, None
-            dashboard_id, denied = _pw(conn, scope, requested_id=requested_dashboard,
+            dashboard_id, denied = await _pw(conn, scope, requested_id=requested_dashboard,
                                        minimum='editor')
             if denied:
                 return denied, None, None
-            existing = conn.execute(
+            existing = await (await conn.execute(
                 'SELECT device_id FROM devices WHERE device_id = ?',
-                (data['device_id'],)).fetchone()
+                (data['device_id'],))).fetchone()
             if existing:
                 return JSONResponse({'success': False, 'error': 'Device ID already exists'},
                                     status_code=400), None, None
-            conn.execute('''
+            await conn.execute('''
                 INSERT INTO devices
                 (device_id, device_name, device_type, location, description,
                  firmware_version,
@@ -387,10 +387,10 @@ async def add_device(request: Request):
                 alert_rules_json, offline_severity, get_wib_time(), interval_manual,
                 dashboard_id
             ))
-            conn.commit()
+            await conn.commit()
         return None, dashboard_id, None
 
-    err, dashboard_id, _ = await run_sync(_do)
+    err, dashboard_id, _ = await _do()
     if err is not None:
         return err
     logger.info(f"Device added: {data['device_id']}")
@@ -414,16 +414,16 @@ async def get_device_detail(device_id: str, request: Request):
     from app.utils import safe_json_loads
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            device, denied = _dl(conn, request, user['user_id'], device_id, 'viewer')
+    async def _do():
+        async with get_db_context() as conn:
+            device, denied = await _dl(conn, request, user['user_id'], device_id, 'viewer')
             if denied:
                 return denied, None
-            latest = conn.execute('''
+            latest = await (await conn.execute('''
                 SELECT * FROM sensor_data WHERE device_id = ?
                 ORDER BY timestamp DESC LIMIT 1
-            ''', (device_id,)).fetchone()
-            active_alerts = conn.execute('''
+            ''', (device_id,))).fetchone()
+            active_alerts = await (await conn.execute('''
                 SELECT * FROM alerts
                 WHERE device_id = ? AND is_active = 1 AND alert_type != 'uid'
                 ORDER BY
@@ -432,7 +432,7 @@ async def get_device_detail(device_id: str, request: Request):
                         WHEN 'info' THEN 3 ELSE 4
                     END,
                     created_at DESC
-            ''', (device_id,)).fetchall()
+            ''', (device_id,))).fetchall()
         device_info = dict(device)
         device_info.pop('api_key', None)
         device_info.pop('api_key_hash', None)
@@ -453,7 +453,7 @@ async def get_device_detail(device_id: str, request: Request):
         device_info['active_alerts'] = [dict(a) for a in active_alerts]
         return None, device_info
 
-    err, data = await run_sync(_do)
+    err, data = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'device': data})
@@ -470,16 +470,16 @@ async def get_device_history(device_id: str, request: Request):
     limit_q = min(int(request.query_params.get('limit', '500') or 500), 5000)
     since = get_wib_time() - timedelta(hours=hours)
 
-    def _do():
-        with get_db_context() as conn:
-            _, denied = _dl(conn, request, user['user_id'], device_id, 'viewer', 'device_id')
+    async def _do():
+        async with get_db_context() as conn:
+            _, denied = await _dl(conn, request, user['user_id'], device_id, 'viewer', 'device_id')
             if denied:
                 return denied, None
-            rows = conn.execute('''
+            rows = await (await conn.execute('''
                 SELECT * FROM sensor_data
                 WHERE device_id = ? AND timestamp >= ?
                 ORDER BY timestamp DESC LIMIT ?
-            ''', (device_id, since, limit_q)).fetchall()
+            ''', (device_id, since, limit_q))).fetchall()
         rows = list(reversed(rows))
         history = [{
             'sensor_type': item['sensor_type'],
@@ -490,7 +490,7 @@ async def get_device_history(device_id: str, request: Request):
         } for item in rows]
         return None, history
 
-    err, history = await run_sync(_do)
+    err, history = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'history': history, 'data_count': len(history)})
@@ -517,9 +517,9 @@ async def update_device(device_id: str, request: Request):
         if not is_valid:
             return JSONResponse({'success': False, 'error': err_msg}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            device, denied = _dl(conn, request, user['user_id'], device_id, 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            device, denied = await _dl(conn, request, user['user_id'], device_id, 'editor')
             if denied:
                 return denied
             if 'offline_timeout' in data:
@@ -576,7 +576,7 @@ async def update_device(device_id: str, request: Request):
                                                    device['offline_alert_severity']),
                 'alert_rules': alert_rules_json,
             }
-            conn.execute('''
+            await conn.execute('''
                 UPDATE devices SET
                     device_name = ?, device_type = ?, location = ?,
                     description = ?, firmware_version = ?,
@@ -593,10 +593,10 @@ async def update_device(device_id: str, request: Request):
                 updates['interval_manual'],
                 updates['offline_alert_severity'], updates['alert_rules'], device_id
             ))
-            conn.commit()
+            await conn.commit()
         return None
 
-    err = await run_sync(_do)
+    err = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True})
@@ -609,22 +609,22 @@ async def delete_device(device_id: str, request: Request):
     from app.deps import audit
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            _, denied = _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
+    async def _do():
+        async with get_db_context() as conn:
+            _, denied = await _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
             if denied:
                 return denied
-            audit(conn, request, user['user_id'], user['username'], 'device.delete',
+            await audit(conn, request, user['user_id'], user['username'], 'device.delete',
                   f'device_id={device_id}')
-            conn.execute('DELETE FROM sensor_data WHERE device_id = ?', (device_id,))
-            conn.execute('DELETE FROM alerts WHERE device_id = ?', (device_id,))
-            conn.execute('DELETE FROM alert_history WHERE device_id = ?', (device_id,))
-            conn.execute('DELETE FROM device_status_log WHERE device_id = ?', (device_id,))
-            conn.execute('DELETE FROM devices WHERE device_id = ?', (device_id,))
-            conn.commit()
+            await conn.execute('DELETE FROM sensor_data WHERE device_id = ?', (device_id,))
+            await conn.execute('DELETE FROM alerts WHERE device_id = ?', (device_id,))
+            await conn.execute('DELETE FROM alert_history WHERE device_id = ?', (device_id,))
+            await conn.execute('DELETE FROM device_status_log WHERE device_id = ?', (device_id,))
+            await conn.execute('DELETE FROM devices WHERE device_id = ?', (device_id,))
+            await conn.commit()
         return None
 
-    err = await run_sync(_do)
+    err = await _do()
     if err is not None:
         return err
     logger.info(f"Device deleted: {device_id}")
@@ -638,20 +638,20 @@ async def regenerate_api_key(device_id: str, request: Request):
     from app.utils import generate_api_key, hash_api_key
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            _, denied = _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
+    async def _do():
+        async with get_db_context() as conn:
+            _, denied = await _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
             if denied:
                 return denied, None
             new_key = generate_api_key()
             new_hash = hash_api_key(new_key)
-            conn.execute(
+            await conn.execute(
                 'UPDATE devices SET api_key = NULL, api_key_hash = ? WHERE device_id = ?',
                 (new_hash, device_id))
-            conn.commit()
+            await conn.commit()
         return None, new_key
 
-    err, new_key = await run_sync(_do)
+    err, new_key = await _do()
     if err is not None:
         return err
     logger.warning(f"API key regenerated for {device_id}")
@@ -668,7 +668,7 @@ async def get_device_alert_rules_endpoint(device_id: str, request: Request):
 
     async def _do():
         async with get_db_context() as conn:
-            device, denied = _dl(conn, request, user['user_id'], device_id, 'viewer',
+            device, denied = await _dl(conn, request, user['user_id'], device_id, 'viewer',
                                  'device_id, alert_rules')
             if denied:
                 return denied, None, None
@@ -676,22 +676,7 @@ async def get_device_alert_rules_endpoint(device_id: str, request: Request):
             is_custom = device['alert_rules'] is not None
         return None, rules, is_custom
 
-    async def _run():
-        # _dl butuh conn untuk load_device; berpindah agar karena get_device_alert_rules kini async
-        # buat wrapper agar _dl tetap sync via run_sync terpisah? gunakan direct:
-        from app.database import get_db_context as _gd
-        with _gd() as conn:
-            device, denied = _dl(conn, request, user['user_id'], device_id, 'viewer',
-                                 'device_id, alert_rules')
-            if denied:
-                return denied, None, None
-            is_custom = device['alert_rules'] is not None
-        from app.alerts import get_db_async
-        async with get_db_async() as aconn:
-            rules = await get_device_alert_rules(aconn, device_id)
-        return None, rules, is_custom
-
-    err, rules, is_custom = await _run()
+    err, rules, is_custom = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'device_id': device_id,
@@ -711,17 +696,17 @@ async def update_device_alert_rules_endpoint(device_id: str, request: Request):
     if not is_valid:
         return JSONResponse({'success': False, 'error': err_msg}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            _, denied = _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
+    async def _do():
+        async with get_db_context() as conn:
+            _, denied = await _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
             if denied:
                 return denied
-            conn.execute('UPDATE devices SET alert_rules = ? WHERE device_id = ?',
+            await conn.execute('UPDATE devices SET alert_rules = ? WHERE device_id = ?',
                          (json.dumps(payload), device_id))
-            conn.commit()
+            await conn.commit()
         return None
 
-    err = await run_sync(_do)
+    err = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'alert_rules': payload})
@@ -733,17 +718,17 @@ async def reset_device_alert_rules(device_id: str, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            _, denied = _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
+    async def _do():
+        async with get_db_context() as conn:
+            _, denied = await _dl(conn, request, user['user_id'], device_id, 'editor', 'device_id')
             if denied:
                 return denied
-            conn.execute('UPDATE devices SET alert_rules = NULL WHERE device_id = ?',
+            await conn.execute('UPDATE devices SET alert_rules = NULL WHERE device_id = ?',
                          (device_id,))
-            conn.commit()
+            await conn.commit()
         return None
 
-    err = await run_sync(_do)
+    err = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True})
@@ -756,15 +741,15 @@ async def get_device_status_history(device_id: str, request: Request):
     user = get_current_user(request)
     limit_q = min(int(request.query_params.get('limit', '100') or 100), 500)
 
-    def _do():
-        with get_db_context() as conn:
-            _, denied = _dl(conn, request, user['user_id'], device_id, 'viewer', 'device_id')
+    async def _do():
+        async with get_db_context() as conn:
+            _, denied = await _dl(conn, request, user['user_id'], device_id, 'viewer', 'device_id')
             if denied:
                 return denied, None
-            rows = conn.execute('''
+            rows = await (await conn.execute('''
                 SELECT status, reason, created_at FROM device_status_log
                 WHERE device_id = ? ORDER BY created_at DESC LIMIT ?
-            ''', (device_id, limit_q)).fetchall()
+            ''', (device_id, limit_q))).fetchall()
         history = []
         for r in rows:
             d = dict(r)
@@ -772,7 +757,7 @@ async def get_device_status_history(device_id: str, request: Request):
             history.append(d)
         return None, history
 
-    err, history = await run_sync(_do)
+    err, history = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'history': history, 'count': len(history)})
@@ -790,18 +775,18 @@ async def export_device_data(device_id: str, request: Request):
     limit_q = min(int(request.query_params.get('limit', '10000') or 10000), 50000)
     since = get_wib_time() - timedelta(hours=hours)
 
-    def _do():
-        with get_db_context() as conn:
-            device, denied = _dl(conn, request, user['user_id'], device_id, 'viewer',
+    async def _do():
+        async with get_db_context() as conn:
+            device, denied = await _dl(conn, request, user['user_id'], device_id, 'viewer',
                                  'device_name')
             if denied:
                 return denied, None, None
-            rows = conn.execute('''
+            rows = await (await conn.execute('''
                 SELECT sensor_type, data, wifi_ssid, uptime_seconds, timestamp
                 FROM sensor_data
                 WHERE device_id = ? AND timestamp >= ?
                 ORDER BY timestamp ASC LIMIT ?
-            ''', (device_id, since, limit_q)).fetchall()
+            ''', (device_id, since, limit_q))).fetchall()
         records = []
         all_keys = set()
         for item in rows:
@@ -818,7 +803,7 @@ async def export_device_data(device_id: str, request: Request):
             records.append(record)
         return None, device, (records, sorted(all_keys))
 
-    err, device, pack = await run_sync(_do)
+    err, device, pack = await _do()
     if err is not None:
         return err
     records, sorted_keys = pack
@@ -854,7 +839,7 @@ async def bulk_import_devices(request: Request):
     from app.schemas import BulkImportItem
     from app.utils import generate_api_key, hash_api_key
     from app.deps import require_admin
-    require_admin(request)
+    await require_admin(request)
     user = get_current_user(request)
     payload = await safe_json(request)
     if not payload or not isinstance(payload.get('devices'), list):
@@ -868,13 +853,13 @@ async def bulk_import_devices(request: Request):
                              f'Maksimal 200 device per import. Dikirim: {len(items)}'},
                             status_code=400)
 
-    def _do():
+    async def _do():
         created, skipped, errors = [], [], []
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'], 'editor')
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'], 'editor')
             if scope['error']:
                 return _se(scope), None, None, None
-            dashboard_id, denied = _pw(conn, scope, requested_id=payload.get('dashboard_id'),
+            dashboard_id, denied = await _pw(conn, scope, requested_id=payload.get('dashboard_id'),
                                        minimum='editor')
             if denied:
                 return denied, None, None, None
@@ -890,9 +875,9 @@ async def bulk_import_devices(request: Request):
                                    'error': str(err)})
                     continue
                 device_id = data['device_id']
-                existing = conn.execute(
+                existing = await (await conn.execute(
                     'SELECT device_id FROM devices WHERE device_id = ?', (device_id,)
-                ).fetchone()
+                )).fetchone()
                 if existing:
                     skipped.append({'row': idx + 1, 'device_id': device_id,
                                     'reason': 'Sudah ada'})
@@ -904,7 +889,7 @@ async def bulk_import_devices(request: Request):
                     device_type = (data.get('device_type') or '').strip()
                     if offline_timeout is None and 'rfid' in device_type.lower():
                         offline_timeout = 86400
-                    conn.execute('''
+                    await conn.execute('''
                         INSERT INTO devices
                         (device_id, device_name, device_type, location, description,
                          firmware_version,
@@ -930,10 +915,10 @@ async def bulk_import_devices(request: Request):
                                     'device_name': data['device_name'], 'api_key': api_key})
                 except Exception as e:
                     errors.append({'row': idx + 1, 'device_id': device_id, 'error': str(e)})
-            conn.commit()
+            await conn.commit()
         return None, created, skipped, errors
 
-    err, created, skipped, errors = await run_sync(_do)
+    err, created, skipped, errors = await _do()
     if err is not None:
         return err
     logger.info(f"Bulk import by user {user['user_id']}: "

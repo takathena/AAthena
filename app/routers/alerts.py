@@ -9,7 +9,7 @@ from app.api_common import _alert_label, _clean_timestamp
 from app.config import get_config
 from app.deps import (get_current_user, resolve_scope as _rs,
                       scope_error_response as _se, device_in_sql)
-from app.deps import limiter, run_sync, safe_json
+from app.deps import limiter, safe_json
 
 logger = logging.getLogger('nexus')
 router = APIRouter(prefix='/api/v1', tags=['alerts'])
@@ -23,23 +23,23 @@ async def get_alert_trend(request: Request):
     hours = min(int(request.query_params.get('hours', '24') or 24), 168)
     since = get_wib_time() - timedelta(hours=hours)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope), None
             scope_sql, scope_params = device_in_sql(scope, 'device_id')
-            rows = conn.execute(f'''
+            rows = await (await conn.execute(f'''
                 SELECT strftime('%Y-%m-%d %H:00', created_at) AS hour_bucket,
                        severity, COUNT(*) AS count
                 FROM alert_history
                 WHERE created_at >= ? AND action = 'created' AND {scope_sql}
                 GROUP BY hour_bucket, severity
                 ORDER BY hour_bucket ASC
-            ''', [since] + scope_params).fetchall()
+            ''', [since] + scope_params)).fetchall()
         return None, [dict(r) for r in rows]
 
-    err, trend = await run_sync(_do)
+    err, trend = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'trend': trend, 'range_hours': hours})
@@ -55,16 +55,16 @@ async def get_alerts(request: Request):
     device_id = request.query_params.get('device_id')
     limit = min(int(request.query_params.get('limit', '100') or 100), 500)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
         if scope['error']:
             return _se(scope), None
-        alerts = get_active_alerts(limit=limit, severity=severity,
+        alerts = await get_active_alerts(limit=limit, severity=severity,
                                    device_id=device_id, scope=scope)
         return None, alerts
 
-    err, alerts = await run_sync(_do)
+    err, alerts = await _do()
     if err is not None:
         return err
     for a in alerts:
@@ -82,14 +82,14 @@ async def get_alerts_history(request: Request):
     device_id = request.query_params.get('device_id')
     limit = min(int(request.query_params.get('limit', '200') or 200), 1000)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
         if scope['error']:
             return _se(scope), None
-        return None, get_alert_history(device_id, limit, scope=scope)
+        return None, await get_alert_history(device_id, limit, scope=scope)
 
-    err, history = await run_sync(_do)
+    err, history = await _do()
     if err is not None:
         return err
     for h in history:
@@ -103,24 +103,24 @@ async def get_alert_stats(request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope), None
             sc_sql, sc_params = device_in_sql(scope, 'device_id')
             sa_sql, sa_params = device_in_sql(scope, 'a.device_id')
             summary = {'danger': 0, 'warning': 0, 'info': 0, 'total': 0}
-            rows = conn.execute(f'''
+            rows = await (await conn.execute(f'''
                 SELECT severity, COUNT(*) as count
                 FROM alerts WHERE is_active = 1 AND alert_type != 'uid' AND {sc_sql}
                 GROUP BY severity
-            ''', sc_params).fetchall()
+            ''', sc_params)).fetchall()
             for r in rows:
                 if r['severity'] in summary:
                     summary[r['severity']] = r['count']
                 summary['total'] += r['count']
-            top_devices = conn.execute(f'''
+            top_devices = await (await conn.execute(f'''
                 SELECT a.device_id, d.device_name, COUNT(*) as alert_count,
                        SUM(CASE WHEN a.severity = 'danger' THEN 1 ELSE 0 END) as danger_count,
                        SUM(CASE WHEN a.severity = 'warning' THEN 1 ELSE 0 END) as warning_count
@@ -129,18 +129,18 @@ async def get_alert_stats(request: Request):
                 WHERE a.is_active = 1 AND a.alert_type != 'uid' AND {sa_sql}
                 GROUP BY a.device_id
                 ORDER BY alert_count DESC LIMIT 5
-            ''', sa_params).fetchall()
-            total_history = conn.execute(
+            ''', sa_params)).fetchall()
+            total_history = (await (await conn.execute(
                 f'SELECT COUNT(*) FROM alert_history WHERE {sc_sql}', sc_params
-            ).fetchone()[0]
-            active_count = conn.execute(
+            )).fetchone())[0]
+            active_count = (await (await conn.execute(
                 f"SELECT COUNT(*) FROM alerts WHERE is_active = 1 AND alert_type != 'uid' AND {sc_sql}",
                 sc_params
-            ).fetchone()[0]
+            )).fetchone())[0]
         return None, {'summary': summary, 'top_devices': [dict(r) for r in top_devices],
                       'total_history': total_history, 'active_count': active_count}
 
-    err, data = await run_sync(_do)
+    err, data = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, **data})
@@ -156,9 +156,9 @@ async def get_all_alerts(request: Request):
     device_id = request.query_params.get('device_id')
     limit = min(int(request.query_params.get('limit', '200') or 200), 1000)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope), None
             sh_sql, sh_params = device_in_sql(scope, 'h.device_id')
@@ -207,7 +207,7 @@ async def get_all_alerts(request: Request):
                 base_query += ' AND is_still_active = 0'
             base_query += ' ORDER BY created_at DESC LIMIT ?'
             params.append(limit)
-            rows = conn.execute(base_query, params).fetchall()
+            rows = await (await conn.execute(base_query, params)).fetchall()
         alerts = []
         for r in rows:
             d = dict(r)
@@ -217,7 +217,7 @@ async def get_all_alerts(request: Request):
             alerts.append(d)
         return None, alerts
 
-    err, alerts = await run_sync(_do)
+    err, alerts = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'alerts': alerts, 'count': len(alerts)})
@@ -230,14 +230,14 @@ async def acknowledge_alert_endpoint(alert_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'], 'editor')
         if scope['error']:
             return _se(scope), None
-        return None, acknowledge_alert(alert_id, scope=scope)
+        return None, await acknowledge_alert(alert_id, scope=scope)
 
-    err, success = await run_sync(_do)
+    err, success = await _do()
     if err is not None:
         return err
     if not success:
@@ -266,14 +266,14 @@ async def bulk_acknowledge(request: Request):
     if not ids:
         return JSONResponse({'success': False, 'error': 'Tidak ada ID valid'}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'], 'editor')
         if scope['error']:
             return _se(scope), None
-        return None, bulk_acknowledge_alerts(ids, scope=scope)
+        return None, await bulk_acknowledge_alerts(ids, scope=scope)
 
-    err, count = await run_sync(_do)
+    err, count = await _do()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'acknowledged': count})

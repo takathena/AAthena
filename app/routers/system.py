@@ -11,7 +11,7 @@ from app.api_common import (_clean_timestamp, _parse_purge_request, _purge_previ
                             _purge_where, PURGE_BATCH, PURGE_TABLES)
 from app.config import get_config
 from app.deps import (audit, get_current_user, limiter, require_admin,
-                      resolve_scope as _rs, run_sync, safe_json,
+                      resolve_scope as _rs, safe_json,
                       scope_error_response as _se, device_in_sql,
                       dashboard_in_sql as _dash_in_sql)
 
@@ -26,25 +26,25 @@ async def get_system_info(request: Request):
     from app.background import get_background_status
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            scope = _rs(conn, request, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            scope = await _rs(conn, request, user['user_id'])
             if scope['error']:
                 return _se(scope), None
             sd_sql, sd_params = _dash_in_sql(scope, 'dashboard_id')
             sv_sql, sv_params = device_in_sql(scope, 'device_id')
-            device_count = conn.execute(
-                f'SELECT COUNT(*) FROM devices WHERE {sd_sql}', sd_params).fetchone()[0]
-            sensor_count = conn.execute(
-                f'SELECT COUNT(*) FROM sensor_data WHERE {sv_sql}', sv_params).fetchone()[0]
-            alert_count = conn.execute(
+            device_count = (await (await conn.execute(
+                f'SELECT COUNT(*) FROM devices WHERE {sd_sql}', sd_params)).fetchone())[0]
+            sensor_count = (await (await conn.execute(
+                f'SELECT COUNT(*) FROM sensor_data WHERE {sv_sql}', sv_params)).fetchone())[0]
+            alert_count = (await (await conn.execute(
                 f"SELECT COUNT(*) FROM alerts WHERE is_active = 1 "
-                f"AND alert_type != 'uid' AND {sv_sql}", sv_params).fetchone()[0]
-            history_count = conn.execute(
-                f'SELECT COUNT(*) FROM alert_history WHERE {sv_sql}', sv_params).fetchone()[0]
+                f"AND alert_type != 'uid' AND {sv_sql}", sv_params)).fetchone())[0]
+            history_count = (await (await conn.execute(
+                f'SELECT COUNT(*) FROM alert_history WHERE {sv_sql}', sv_params)).fetchone())[0]
         return None, (device_count, sensor_count, alert_count, history_count)
 
-    err, counts = await run_sync(_do)
+    err, counts = await _do()
     if err is not None:
         return err
     device_count, sensor_count, alert_count, history_count = counts
@@ -77,10 +77,10 @@ async def get_system_info(request: Request):
 @router.post('/notifications/test')
 @limiter.limit('10 per minute')
 async def test_notification(request: Request):
-    require_admin(request)
+    await require_admin(request)
     try:
         from app.notifier import send_test_notification
-        results = send_test_notification()
+        results = await send_test_notification()
         channels = {k: r for k, r in results.items() if not k.startswith('_')}
         all_success = bool(channels) and all(r.get('success', False)
                                              for r in channels.values())
@@ -98,7 +98,7 @@ async def test_notification(request: Request):
 @router.post('/notifications/test-channel')
 @limiter.limit('10 per minute')
 async def test_notification_channel(request: Request):
-    require_admin(request)
+    await require_admin(request)
     payload = await safe_json(request) or {}
     channel = (payload.get('channel') or '').strip().lower()
     if channel not in ('telegram',):
@@ -106,7 +106,7 @@ async def test_notification_channel(request: Request):
             {'success': False, 'error': f'Channel "{channel}" tidak dikenal'}, status_code=400)
     try:
         from app.notifier import send_test_notification
-        results = send_test_notification()
+        results = await send_test_notification()
         ch_result = results.get(channel)
         if not ch_result:
             return JSONResponse({'success': False,
@@ -134,11 +134,11 @@ async def notification_config(request: Request):
 @router.post('/system/backup')
 @limiter.limit('5 per minute')
 async def trigger_backup(request: Request):
-    require_admin(request)
+    await require_admin(request)
     config = get_config()
     try:
         from app.background import create_backup_file
-        backup_path = create_backup_file(config.BACKUP_DIR, config.DB_PATH)
+        backup_path = await create_backup_file(config.BACKUP_DIR, config.DB_PATH)
         size_mb = os.path.getsize(backup_path) / (1024 * 1024)
         filename = os.path.basename(backup_path)
         logger.info(f"Manual backup created: {backup_path} ({size_mb:.2f} MB)")
@@ -156,7 +156,7 @@ async def trigger_backup(request: Request):
 @router.get('/system/backups')
 @limiter.limit(get_config().RATE_LIMIT_DEFAULT)
 async def list_backups(request: Request):
-    require_admin(request)
+    await require_admin(request)
     config = get_config()
     backups = []
     try:
@@ -194,7 +194,7 @@ async def list_backups(request: Request):
 @router.get('/system/backups/{filename:path}')
 @limiter.limit(get_config().RATE_LIMIT_DEFAULT)
 async def download_backup(filename: str, request: Request):
-    require_admin(request)
+    await require_admin(request)
     from werkzeug.utils import secure_filename
     safe_name = secure_filename(filename)
     if not safe_name or safe_name != filename or not safe_name.endswith('.db'):
@@ -215,7 +215,7 @@ async def download_backup(filename: str, request: Request):
 @router.delete('/system/backups/{filename:path}')
 @limiter.limit('20 per hour')
 async def delete_backup(filename: str, request: Request):
-    require_admin(request)
+    await require_admin(request)
     from werkzeug.utils import secure_filename
     from app.database import get_db_context
     safe_name = secure_filename(filename)
@@ -239,68 +239,68 @@ async def delete_backup(filename: str, request: Request):
     size = os.path.getsize(real_path)
     os.remove(real_path)
 
-    def _audit():
-        with get_db_context() as conn:
-            audit(conn, request, get_current_user(request)['user_id'],
+    async def _audit():
+        async with get_db_context() as conn:
+            await audit(conn, request, get_current_user(request)['user_id'],
                   get_current_user(request)['username'], 'backup.delete',
                   f'file={safe_name} size={size}')
-            conn.commit()
+            await conn.commit()
 
-    await run_sync(_audit)
+    await _audit()
     return JSONResponse({'success': True, 'filename': safe_name, 'freed_bytes': size})
 
 
 @router.post('/system/cleanup')
 @limiter.limit('5 per hour')
 async def trigger_cleanup(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from datetime import timedelta
     from app.database import get_db_context, get_wib_time
     user = get_current_user(request)
     config = get_config()
 
-    def _do():
+    async def _do():
         now = get_wib_time()
         cutoff_sensor = now - timedelta(days=config.DATA_RETENTION_DAYS)
         cutoff_history = now - timedelta(days=config.ALERT_HISTORY_RETENTION_DAYS)
         cutoff_log = now - timedelta(days=config.STATUS_LOG_RETENTION_DAYS)
-        with get_db_context() as conn:
+        async with get_db_context() as conn:
             total_deleted = 0
             results = {}
-            r = conn.execute('DELETE FROM sensor_data WHERE timestamp < ?',
+            r = await conn.execute('DELETE FROM sensor_data WHERE timestamp < ?',
                              (cutoff_sensor,))
             results['sensor_data'] = r.rowcount
             total_deleted += r.rowcount
-            r = conn.execute('DELETE FROM alert_history WHERE created_at < ?',
+            r = await conn.execute('DELETE FROM alert_history WHERE created_at < ?',
                              (cutoff_history,))
             results['alert_history'] = r.rowcount
             total_deleted += r.rowcount
-            r = conn.execute('DELETE FROM device_status_log WHERE created_at < ?',
+            r = await conn.execute('DELETE FROM device_status_log WHERE created_at < ?',
                              (cutoff_log,))
             results['device_status_log'] = r.rowcount
             total_deleted += r.rowcount
-            r = conn.execute(
+            r = await conn.execute(
                 '''DELETE FROM alerts
                    WHERE is_active = 0
                    AND updated_at IS NOT NULL
                    AND updated_at < ?''', (cutoff_history,))
             results['alerts_inactive'] = r.rowcount
             total_deleted += r.rowcount
-            conn.commit()
+            await conn.commit()
             if total_deleted > 1000:
                 try:
-                    conn.execute('VACUUM')
+                    await conn.execute('VACUUM')
                     logger.info("VACUUM completed after manual cleanup")
                 except Exception as ve:
                     logger.warning(f"VACUUM failed: {ve}")
-        with get_db_context() as audit_conn:
-            audit(audit_conn, request, user['user_id'], user['username'],
+        async with get_db_context() as audit_conn:
+            await audit(audit_conn, request, user['user_id'], user['username'],
                   'data.cleanup_retention', f'rows={total_deleted}')
-            audit_conn.commit()
+            await audit_conn.commit()
         return total_deleted, results
 
     try:
-        total_deleted, results = await run_sync(_do)
+        total_deleted, results = await _do()
         logger.info(f"Manual cleanup by user {user['user_id']}: {total_deleted} rows deleted")
         return JSONResponse({'success': True, 'total_deleted': total_deleted,
                              'details': {k: v for k, v in results.items() if v > 0},
@@ -316,17 +316,29 @@ async def trigger_cleanup(request: Request):
 @router.post('/system/data/preview')
 @limiter.limit('60 per hour')
 async def preview_data_purge(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from app.database import get_db_context
     spec, err = _parse_purge_request(await safe_json(request))
     if err:
         return JSONResponse({'success': False, 'error': err}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            return _purge_preview(conn, spec)
+    async def _do():
+        async with get_db_context() as conn:
+            result, total_rows, total_bytes = {}, 0, 0
+            for key in spec['tables']:
+                table, _, size_expr, _ = PURGE_TABLES[key]
+                where, params = _purge_where(key, spec)
+                row = await (await conn.execute(
+                    f'SELECT COUNT(*) AS n, COALESCE(SUM({size_expr}), COUNT(*) * 80) AS b '
+                    f'FROM {table} WHERE {where}', params
+                )).fetchone()
+                n, b = row['n'] or 0, int(row['b'] or 0)
+                result[key] = {'rows': n, 'estimated_bytes': b}
+                total_rows += n
+                total_bytes += b
+            return result, total_rows, total_bytes
 
-    tables, total_rows, total_bytes = await run_sync(_do)
+    tables, total_rows, total_bytes = await _do()
     return JSONResponse({
         'success': True, 'tables': tables, 'total_rows': total_rows,
         'estimated_bytes': total_bytes,
@@ -338,7 +350,7 @@ async def preview_data_purge(request: Request):
 @router.post('/system/data/delete')
 @limiter.limit('10 per hour')
 async def delete_data_range(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from app.database import get_db_context
     user = get_current_user(request)
     payload = await safe_json(request)
@@ -354,39 +366,39 @@ async def delete_data_range(request: Request):
     try:
         if payload.get('backup_first'):
             from app.background import create_backup_file
-            backup_path = create_backup_file(config.BACKUP_DIR, config.DB_PATH,
+            backup_path = await create_backup_file(config.BACKUP_DIR, config.DB_PATH,
                                              prefix='pre-delete')
             backup_name = os.path.basename(backup_path)
 
-        def _do():
+        async def _do():
             deleted = {}
-            with get_db_context() as conn:
+            async with get_db_context() as conn:
                 for key in spec['tables']:
                     table, _, _, _ = PURGE_TABLES[key]
                     where, params = _purge_where(key, spec)
                     total = 0
                     while True:
-                        r = conn.execute(
+                        r = await conn.execute(
                             f'DELETE FROM {table} WHERE rowid IN '
                             f'(SELECT rowid FROM {table} WHERE {where} LIMIT {PURGE_BATCH})',
                             params)
-                        conn.commit()
+                        await conn.commit()
                         total += r.rowcount
                         if r.rowcount < PURGE_BATCH:
                             break
                     deleted[key] = total
                 total_deleted = sum(deleted.values())
-                audit(conn, request, user['user_id'], user['username'], 'data.delete',
+                await audit(conn, request, user['user_id'], user['username'], 'data.delete',
                       json.dumps({'tables': spec['tables'], 'from': spec['start'],
                                   'to_exclusive': spec['end_exclusive'],
                                   'device_id': spec['device_id'],
                                   'dashboard_id': spec['dashboard_id'],
                                   'deleted': deleted, 'backup': backup_name},
                                  ensure_ascii=False))
-                conn.commit()
+                await conn.commit()
             return deleted, total_deleted
 
-        deleted, total_deleted = await run_sync(_do)
+        deleted, total_deleted = await _do()
         return JSONResponse({'success': True, 'deleted': deleted,
                              'total_deleted': total_deleted, 'backup': backup_name,
                              'message': f'{total_deleted} baris dihapus'})
@@ -400,7 +412,7 @@ async def delete_data_range(request: Request):
 @router.post('/system/vacuum')
 @limiter.limit('3 per hour')
 async def vacuum_database(request: Request):
-    require_admin(request)
+    await require_admin(request)
     import shutil
     from app.database import get_db_context
     user = get_current_user(request)
@@ -421,7 +433,7 @@ async def vacuum_database(request: Request):
             f'(butuh sekitar {needed // (1024 * 1024)} MB, tersedia '
             f'{free // (1024 * 1024)} MB).')}, status_code=409)
 
-    def _vacuum():
+    async def _vacuum():
         conn = sqlite3.connect(db_path, timeout=60.0)
         conn.isolation_level = None
         try:
@@ -432,7 +444,7 @@ async def vacuum_database(request: Request):
             conn.close()
 
     try:
-        await run_sync(_vacuum)
+        await _vacuum()
     except Exception as e:
         logger.error(f"VACUUM gagal: {e}", exc_info=True)
         return JSONResponse(
@@ -441,13 +453,13 @@ async def vacuum_database(request: Request):
             status_code=500)
     after = _size()
 
-    def _audit():
-        with get_db_context() as conn:
-            audit(conn, request, user['user_id'], user['username'], 'db.vacuum',
+    async def _audit():
+        async with get_db_context() as conn:
+            await audit(conn, request, user['user_id'], user['username'], 'db.vacuum',
                   f'before={before} after={after}')
-            conn.commit()
+            await conn.commit()
 
-    await run_sync(_audit)
+    await _audit()
     return JSONResponse({'success': True,
                          'before_mb': round(before / (1024 * 1024), 2),
                          'after_mb': round(after / (1024 * 1024), 2),
@@ -457,15 +469,15 @@ async def vacuum_database(request: Request):
 @router.get('/system/audit-log')
 @limiter.limit(get_config().RATE_LIMIT_DEFAULT)
 async def get_audit_log(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from app.database import get_db_context
     limit = min(int(request.query_params.get('limit', '50') or 50), 500)
 
-    def _do():
-        with get_db_context() as conn:
-            rows = conn.execute(
+    async def _do():
+        async with get_db_context() as conn:
+            rows = await (await conn.execute(
                 'SELECT id, username, action, detail, ip, created_at FROM audit_log '
-                'ORDER BY id DESC LIMIT ?', (limit,)).fetchall()
+                'ORDER BY id DESC LIMIT ?', (limit,))).fetchall()
         out = []
         for r in rows:
             d = dict(r)
@@ -473,7 +485,7 @@ async def get_audit_log(request: Request):
             out.append(d)
         return out
 
-    out = await run_sync(_do)
+    out = await _do()
     return JSONResponse({'success': True, 'entries': out})
 
 
@@ -484,13 +496,13 @@ async def get_global_alert_rules(request: Request):
     from app.database import get_db_context
     config = get_config()
 
-    def _do():
-        with get_db_context() as conn:
-            return conn.execute(
+    async def _do():
+        async with get_db_context() as conn:
+            return await (await conn.execute(
                 "SELECT value FROM user_settings WHERE key = 'global_alert_rules'"
-            ).fetchone()
+            )).fetchone()
 
-    row = await run_sync(_do)
+    row = await _do()
     custom_rules = None
     if row and row['value']:
         try:
@@ -507,7 +519,7 @@ async def get_global_alert_rules(request: Request):
 @router.put('/system/alert-rules')
 @limiter.limit('20 per minute')
 async def update_global_alert_rules(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from app.database import get_db_context, get_wib_time
     from app.utils import validate_alert_rules
     from app.alerts import invalidate_global_rules_cache
@@ -522,18 +534,18 @@ async def update_global_alert_rules(request: Request):
         return JSONResponse(
             {'success': False, 'error': 'Minimal 1 sensor rule'}, status_code=400)
     try:
-        def _do():
-            with get_db_context() as conn:
-                conn.execute('''
+        async def _do():
+            async with get_db_context() as conn:
+                await conn.execute('''
                     INSERT INTO user_settings (key, value, updated_at)
                     VALUES ('global_alert_rules', ?, ?)
                     ON CONFLICT(key) DO UPDATE SET
                         value = excluded.value,
                         updated_at = excluded.updated_at
                 ''', (json.dumps(payload), get_wib_time()))
-                conn.commit()
+                await conn.commit()
 
-        await run_sync(_do)
+        await _do()
         invalidate_global_rules_cache()
         logger.info("Global alert rules updated")
         return JSONResponse({'success': True, 'alert_rules': payload,
@@ -549,17 +561,17 @@ async def update_global_alert_rules(request: Request):
 @router.delete('/system/alert-rules')
 @limiter.limit('20 per minute')
 async def reset_global_alert_rules(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from app.database import get_db_context
     from app.alerts import invalidate_global_rules_cache
     try:
-        def _do():
-            with get_db_context() as conn:
-                conn.execute(
+        async def _do():
+            async with get_db_context() as conn:
+                await conn.execute(
                     "DELETE FROM user_settings WHERE key = 'global_alert_rules'")
-                conn.commit()
+                await conn.commit()
 
-        await run_sync(_do)
+        await _do()
         invalidate_global_rules_cache()
         logger.info("Global alert rules reset")
         return JSONResponse({'success': True,
@@ -575,7 +587,7 @@ async def reset_global_alert_rules(request: Request):
 @router.post('/system/restore')
 @limiter.limit('2 per hour')
 async def restore_database(request: Request):
-    require_admin(request)
+    await require_admin(request)
     from app.database import get_wib_time
     user = get_current_user(request)
     payload = await safe_json(request) or {}
@@ -602,13 +614,13 @@ async def restore_database(request: Request):
         return JSONResponse(
             {'success': False, 'error': 'File backup tidak ditemukan'}, status_code=404)
     try:
-        def _verify():
+        async def _verify():
             test_conn = sqlite3.connect(real_path, timeout=5.0)
             result = test_conn.execute('PRAGMA integrity_check').fetchone()
             test_conn.close()
             return result
 
-        result = await run_sync(_verify)
+        result = await _verify()
         if not result or result[0] != 'ok':
             return JSONResponse({'success': False, 'error':
                 f"File backup corrupt (integrity check: "
@@ -620,7 +632,7 @@ async def restore_database(request: Request):
     pre_restore_name = f"pre-restore-{get_wib_time().strftime('%Y%m%d_%H%M%S')}.db"
     pre_restore_path = os.path.join(config.BACKUP_DIR, pre_restore_name)
     try:
-        def _backup():
+        async def _backup():
             os.makedirs(config.BACKUP_DIR, exist_ok=True)
             src = sqlite3.connect(config.DB_PATH, timeout=30.0)
             dst = sqlite3.connect(pre_restore_path)
@@ -629,7 +641,7 @@ async def restore_database(request: Request):
             dst.close()
             src.close()
 
-        await run_sync(_backup)
+        await _backup()
         logger.info(f"Pre-restore backup saved: {pre_restore_path}")
     except Exception as e:
         logger.error(f"Restore: backup DB current gagal: {e}", exc_info=True)

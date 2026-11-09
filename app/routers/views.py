@@ -9,8 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import get_config
 from app.deps import (check_login_throttle, clear_login_failures, client_ip,
-                      get_current_user_html, limiter, record_login_failure,
-                      run_sync)
+                      get_current_user_html, limiter, record_login_failure)
 
 logger = logging.getLogger('nexus')
 router = APIRouter(tags=['views'])
@@ -40,26 +39,26 @@ def _tpl(request: Request, name: str, **context):
     return templates.TemplateResponse(request, name, context)
 
 
-def _default_dashboard(conn, user_id):
-    return conn.execute(
+async def _default_dashboard(conn, user_id):
+    return await (await conn.execute(
         'SELECT id, slug FROM dashboards WHERE user_id = ? '
-        'ORDER BY is_default DESC, id ASC LIMIT 1', (user_id,)).fetchone()
+        'ORDER BY is_default DESC, id ASC LIMIT 1', (user_id,))).fetchone()
 
 
-def _find_dashboard_by_slug(conn, slug, user_id):
+async def _find_dashboard_by_slug(conn, slug, user_id):
     from app.deps import get_dashboard_role
-    rows = conn.execute(
+    rows = await (await conn.execute(
         'SELECT * FROM dashboards WHERE slug = ? ORDER BY (user_id = ?) DESC, id ASC',
-        (slug, user_id)).fetchall()
+        (slug, user_id))).fetchall()
     for r in rows:
-        if get_dashboard_role(conn, r['id'], user_id):
+        if await get_dashboard_role(conn, r['id'], user_id):
             return r
     return None
 
 
-def _is_admin(conn, user_id):
-    from app.deps import is_admin_sync
-    return is_admin_sync(user_id)
+async def _is_admin(conn, user_id):
+    from app.deps import is_admin
+    return await is_admin(user_id)
 
 
 @router.get('/', response_class=HTMLResponse)
@@ -67,13 +66,13 @@ async def dashboard(request: Request):
     from app.database import get_db_context
     user = get_current_user_html(request)
 
-    def _do():
-        with get_db_context() as conn:
-            d = _default_dashboard(conn, user['user_id']) if user['user_id'] else None
-            admin = _is_admin(conn, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            d = await _default_dashboard(conn, user['user_id']) if user['user_id'] else None
+            admin = await _is_admin(conn, user['user_id'])
             return (d['id'] if d else ''), admin
 
-    dashboard_id, admin = await run_sync(_do)
+    dashboard_id, admin = await _do()
     return _tpl(request, 'dashboard.html', dashboard_slug=None, dashboard_id=dashboard_id,
                 view_all=False, is_admin=admin)
 
@@ -86,14 +85,14 @@ async def dashboard_by_slug(slug: str, request: Request):
     if not user['user_id']:
         raise _HE(401)
 
-    def _do():
-        with get_db_context() as conn:
-            dash = _find_dashboard_by_slug(conn, slug, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            dash = await _find_dashboard_by_slug(conn, slug, user['user_id'])
             if not dash:
                 return None, None
-            return dash, _is_admin(conn, user['user_id'])
+            return dash, await _is_admin(conn, user['user_id'])
 
-    dash, admin = await run_sync(_do)
+    dash, admin = await _do()
     if not dash:
         return HTMLResponse(
             '<!doctype html><html><head><meta charset="utf-8">'
@@ -111,14 +110,14 @@ async def dashboard_all(request: Request):
     from app.database import get_db_context
     user = get_current_user_html(request)
 
-    def _do():
-        with get_db_context() as conn:
-            if not _is_admin(conn, user['user_id']):
+    async def _do():
+        async with get_db_context() as conn:
+            if not await _is_admin(conn, user['user_id']):
                 return None, None
-            d = _default_dashboard(conn, user['user_id'])
+            d = await _default_dashboard(conn, user['user_id'])
             return d, True
 
-    d, admin = await run_sync(_do)
+    d, admin = await _do()
     if not admin:
         raise _HE(404)
     try:
@@ -137,12 +136,12 @@ async def mobile_dashboard(request: Request):
     from app.database import get_db_context
     user = get_current_user_html(request)
 
-    def _do():
-        with get_db_context() as conn:
-            d = _default_dashboard(conn, user['user_id']) if user['user_id'] else None
+    async def _do():
+        async with get_db_context() as conn:
+            d = await _default_dashboard(conn, user['user_id']) if user['user_id'] else None
             return d['id'] if d else ''
 
-    dashboard_id = await run_sync(_do)
+    dashboard_id = await _do()
     return _tpl(request, 'mobile.html', dashboard_id=dashboard_id)
 
 
@@ -155,14 +154,14 @@ async def device_detail(device_id: str, request: Request):
 # ==========================================
 # AUTH (login/logout)
 # ==========================================
-def _authenticate_sync(username: str, password: str):
-    """Cermin app/auth.py (hash users / seed .env). Dipanggil via run_sync."""
+async def _authenticate_sync(username: str, password: str):
+    """Cermin app/auth.py (hash users / seed .env)."""
     import hmac
     from werkzeug.security import check_password_hash, generate_password_hash
     from app.database import get_db_context
-    with get_db_context() as conn:
-        user = conn.execute(
-            'SELECT id, password_hash FROM users WHERE username = ?', (username,)).fetchone()
+    async with get_db_context() as conn:
+        user = await (await conn.execute(
+            'SELECT id, password_hash FROM users WHERE username = ?', (username,))).fetchone()
         if user:
             try:
                 if check_password_hash(user['password_hash'], password):
@@ -170,7 +169,7 @@ def _authenticate_sync(username: str, password: str):
             except Exception as e:
                 logger.error(f'Verifikasi password gagal: {e}')
             return None
-        total_users = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        total_users = (await (await conn.execute('SELECT COUNT(*) FROM users')).fetchone())[0]
         if total_users > 0:
             return None
         config = get_config()
@@ -183,11 +182,11 @@ def _authenticate_sync(username: str, password: str):
         if not (same_user and same_pass):
             return None
         try:
-            cur = conn.execute(
+            cur = await conn.execute(
                 "INSERT INTO users (username, password_hash, display_name, is_admin, role) "
                 "VALUES (?, ?, 'Administrator', 1, 'superadmin')",
                 (username, generate_password_hash(password)))
-            conn.commit()
+            await conn.commit()
             logger.info(f"Admin awal '{username}' dibuat dari .env (seed)")
             return cur.lastrowid
         except Exception as e:
@@ -240,7 +239,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
         return _tpl(request, 'login.html',
                     error=f'Terlalu banyak percobaan gagal. Coba lagi dalam {minutes} menit.')
 
-    user_id = await run_sync(_authenticate_sync, username, password)
+    user_id = await _authenticate_sync(username, password)
     if user_id:
         try:
             await clear_login_failures(username, ip)
@@ -253,7 +252,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
         session['username'] = username
         session['last_activity'] = time.time()
         try:
-            await run_sync(ensure_user_dashboard, user_id, username)
+            await ensure_user_dashboard(user_id, username)
         except Exception as e:
             logger.error(f'ensure_user_dashboard failed: {e}')
         resp = RedirectResponse(url='/', status_code=303)

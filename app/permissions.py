@@ -72,3 +72,34 @@ def set_user_permissions(conn, user_id, granted_by):
     conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
     return set()
 
+
+async def get_user_info_async(conn, user_id):
+    if not user_id:
+        return None
+    row = await (await conn.execute(
+        'SELECT id, is_admin, role FROM users WHERE id = ?', (user_id,)
+    )).fetchone()
+    if not row:
+        return None
+    return {
+        'id': row['id'],
+        'role': resolve_role(row['is_admin'], row['role']),
+        'is_admin': bool(row['is_admin']),
+    }
+
+
+async def explicit_permissions_async(conn, user_id):
+    rows = await (await conn.execute(
+        'SELECT permission FROM user_permissions WHERE user_id = ?', (user_id,)
+    )).fetchall()
+    return {r['permission'] for r in rows}
+
+
+async def effective_permissions_async(conn, user_id):
+    return set()
+
+
+async def set_user_permissions_async(conn, user_id, granted_by):
+    await conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
+    return set()
+

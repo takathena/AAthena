@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_config
 from app.deps import (audit, get_current_user, get_dashboard_role, limiter,
-                      role_allows, run_sync, safe_json)
+                      role_allows, safe_json)
 from app.utils import safe_json_loads
 
 logger = logging.getLogger('nexus')
@@ -48,8 +48,8 @@ def _forbidden(msg='Anda tidak punya izin untuk aksi ini'):
     return JSONResponse({'success': False, 'error': msg}, status_code=403)
 
 
-def _check_dashboard(conn, dashboard_id, user_id, minimum='viewer'):
-    role = get_dashboard_role(conn, dashboard_id, user_id)
+async def _check_dashboard(conn, dashboard_id, user_id, minimum='viewer'):
+    role = await get_dashboard_role(conn, dashboard_id, user_id)
     if role is None:
         return JSONResponse({'success': False, 'error': 'Dashboard not found'}, status_code=404)
     if not role_allows(role, minimum):
@@ -57,44 +57,44 @@ def _check_dashboard(conn, dashboard_id, user_id, minimum='viewer'):
     return None
 
 
-def _check_widget(conn, widget_id, user_id, minimum='editor'):
-    row = conn.execute('SELECT dashboard_id FROM widgets WHERE id = ?', (widget_id,)).fetchone()
+async def _check_widget(conn, widget_id, user_id, minimum='editor'):
+    row = await (await conn.execute('SELECT dashboard_id FROM widgets WHERE id = ?', (widget_id,))).fetchone()
     if not row:
         return JSONResponse({'success': False, 'error': 'Widget not found'}, status_code=404)
-    return _check_dashboard(conn, row['dashboard_id'], user_id, minimum)
+    return await _check_dashboard(conn, row['dashboard_id'], user_id, minimum)
 
 
-def _check_tab(conn, tab_id, user_id, minimum='editor'):
-    row = conn.execute('SELECT dashboard_id FROM analytics_tabs WHERE id = ?', (tab_id,)).fetchone()
+async def _check_tab(conn, tab_id, user_id, minimum='editor'):
+    row = await (await conn.execute('SELECT dashboard_id FROM analytics_tabs WHERE id = ?', (tab_id,))).fetchone()
     if not row:
         return JSONResponse({'success': False, 'error': 'Tab not found'}, status_code=404)
-    return _check_dashboard(conn, row['dashboard_id'], user_id, minimum)
+    return await _check_dashboard(conn, row['dashboard_id'], user_id, minimum)
 
 
-def _device_visible(conn, device_id, user_id):
+async def _device_visible(conn, device_id, user_id):
     if not device_id:
         return True
-    row = conn.execute('SELECT dashboard_id FROM devices WHERE device_id = ?', (device_id,)).fetchone()
+    row = await (await conn.execute('SELECT dashboard_id FROM devices WHERE device_id = ?', (device_id,))).fetchone()
     if not row:
         return False
     from app.deps import device_role
-    return device_role(conn, row, user_id) is not None
+    return await device_role(conn, row, user_id) is not None
 
 
-def _find_dashboard_by_slug(conn, slug, user_id):
-    rows = conn.execute(
+async def _find_dashboard_by_slug(conn, slug, user_id):
+    rows = await (await conn.execute(
         'SELECT * FROM dashboards WHERE slug = ? ORDER BY (user_id = ?) DESC, id ASC',
-        (slug, user_id)).fetchall()
+        (slug, user_id))).fetchall()
     for r in rows:
-        if get_dashboard_role(conn, r['id'], user_id):
+        if await get_dashboard_role(conn, r['id'], user_id):
             return r
     return None
 
 
-def _widgets_of(conn, dashboard_id):
-    rows = conn.execute(
+async def _widgets_of(conn, dashboard_id):
+    rows = await (await conn.execute(
         'SELECT * FROM widgets WHERE dashboard_id = ? ORDER BY grid_y ASC, grid_x ASC',
-        (dashboard_id,)).fetchall()
+        (dashboard_id,))).fetchall()
     out = []
     for w in rows:
         wd = dict(w)
@@ -103,9 +103,9 @@ def _widgets_of(conn, dashboard_id):
     return out
 
 
-def _telegram_payload(conn, dashboard_id):
+async def _telegram_payload(conn, dashboard_id):
     from app import workspace as ws
-    cfg = ws.get_dashboard_telegram(conn, dashboard_id)
+    cfg = await ws.get_dashboard_telegram(conn, dashboard_id)
     config = get_config()
     fallback = bool(config.NOTIFY_ENABLED and config.TELEGRAM_ENABLED
                     and config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID)
@@ -118,12 +118,12 @@ def _telegram_payload(conn, dashboard_id):
     }
 
 
-def _purge_dashboard(conn, dashboard_id):
-    conn.execute('DELETE FROM widgets WHERE dashboard_id = ?', (dashboard_id,))
-    conn.execute('DELETE FROM analytics_tabs WHERE dashboard_id = ?', (dashboard_id,))
-    conn.execute('DELETE FROM dashboard_members WHERE dashboard_id = ?', (dashboard_id,))
-    conn.execute('DELETE FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))
-    conn.execute('DELETE FROM dashboards WHERE id = ?', (dashboard_id,))
+async def _purge_dashboard(conn, dashboard_id):
+    await conn.execute('DELETE FROM widgets WHERE dashboard_id = ?', (dashboard_id,))
+    await conn.execute('DELETE FROM analytics_tabs WHERE dashboard_id = ?', (dashboard_id,))
+    await conn.execute('DELETE FROM dashboard_members WHERE dashboard_id = ?', (dashboard_id,))
+    await conn.execute('DELETE FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))
+    await conn.execute('DELETE FROM dashboards WHERE id = ?', (dashboard_id,))
 
 
 # ==========================================
@@ -136,20 +136,20 @@ async def list_dashboards(request: Request):
     user = get_current_user(request)
     user_id, username = user['user_id'], user['username']
 
-    def _do():
-        with get_db_context() as conn:
-            rows = conn.execute(_LIST_SQL, {'uid': user_id}).fetchall()
+    async def _do():
+        async with get_db_context() as conn:
+            rows = await (await conn.execute(_LIST_SQL, {'uid': user_id})).fetchall()
         if not rows:
             try:
                 from app.deps import ensure_user_dashboard
-                ensure_user_dashboard(user_id, username)
-                with get_db_context() as conn:
-                    rows = conn.execute(_LIST_SQL, {'uid': user_id}).fetchall()
+                await ensure_user_dashboard(user_id, username)
+                async with get_db_context() as conn:
+                    rows = await (await conn.execute(_LIST_SQL, {'uid': user_id})).fetchall()
             except Exception as e:
                 logger.error(f'Auto-create dashboard failed: {e}')
         return [dict(r) for r in rows]
 
-    rows = await run_sync(_do)
+    rows = await _do()
     return JSONResponse({'success': True, 'dashboards': rows})
 
 
@@ -170,28 +170,28 @@ async def create_dashboard(request: Request):
         slug_input = re.sub(r'[^a-z0-9\-]+', '-', name.lower()).strip('-') or 'dashboard'
     slug_input = slug_input[:60]
 
-    def _find_free():
-        with get_db_context() as conn:
+    async def _find_free():
+        async with get_db_context() as conn:
             s = slug_input
             base, i = s, 2
-            while conn.execute('SELECT 1 FROM dashboards WHERE slug = ?', (s,)).fetchone():
+            while await (await conn.execute('SELECT 1 FROM dashboards WHERE slug = ?', (s,))).fetchone():
                 s = f'{base}-{i}'
                 i += 1
             return s
-    slug_final = await run_sync(_find_free)
+    slug_final = await _find_free()
 
-    def _insert():
-        with get_db_context() as conn:
-            cur = conn.execute(
+    async def _insert():
+        async with get_db_context() as conn:
+            cur = await conn.execute(
                 'INSERT INTO dashboards (slug, name, description, icon, is_default, user_id, created_at, updated_at) '
                 'VALUES (?, ?, ?, ?, 0, ?, ?, ?)',
                 (slug_final, name, data.get('description', ''),
                  data.get('icon', 'fa-chart-line'), user_id,
                  get_wib_time(), get_wib_time()))
-            conn.commit()
+            await conn.commit()
             return cur.lastrowid
 
-    new_id = await run_sync(_insert)
+    new_id = await _insert()
     logger.info(f'Dashboard created: id={new_id} user={user_id} slug={slug_final}')
     return JSONResponse({'success': True, 'id': new_id, 'slug': slug_final}, status_code=201)
 
@@ -202,16 +202,16 @@ async def get_dashboard_detail(dashboard_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
             if denied:
                 return denied, None, None
-            dash = dict(conn.execute('SELECT * FROM dashboards WHERE id = ?', (dashboard_id,)).fetchone())
-            dash['role'] = get_dashboard_role(conn, dashboard_id, user['user_id'])
-            return None, dash, _widgets_of(conn, dashboard_id)
+            dash = dict(await (await conn.execute('SELECT * FROM dashboards WHERE id = ?', (dashboard_id,))).fetchone())
+            dash['role'] = await get_dashboard_role(conn, dashboard_id, user['user_id'])
+            return None, dash, await _widgets_of(conn, dashboard_id)
 
-    denied, dash, widgets = await run_sync(_do)
+    denied, dash, widgets = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'dashboard': dash, 'widgets': widgets})
@@ -223,16 +223,16 @@ async def get_dashboard_by_slug(slug: str, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            dash = _find_dashboard_by_slug(conn, slug, user['user_id'])
+    async def _do():
+        async with get_db_context() as conn:
+            dash = await _find_dashboard_by_slug(conn, slug, user['user_id'])
             if not dash:
                 return JSONResponse({'success': False, 'error': 'Dashboard not found'}, status_code=404), None, None
             d = dict(dash)
-            d['role'] = get_dashboard_role(conn, dash['id'], user['user_id'])
-            return None, d, _widgets_of(conn, dash['id'])
+            d['role'] = await get_dashboard_role(conn, dash['id'], user['user_id'])
+            return None, d, await _widgets_of(conn, dash['id'])
 
-    denied, d, widgets = await run_sync(_do)
+    denied, d, widgets = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'dashboard': d, 'widgets': widgets})
@@ -245,20 +245,20 @@ async def update_dashboard(dashboard_id: int, request: Request):
     user = get_current_user(request)
     data = await safe_json(request) or {}
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied
-            conn.execute(
+            await conn.execute(
                 'UPDATE dashboards SET name = COALESCE(?, name), description = COALESCE(?, description), '
                 'icon = COALESCE(?, icon), updated_at = ? WHERE id = ?',
                 (data.get('name'), data.get('description'), data.get('icon'),
                  get_wib_time(), dashboard_id))
-            conn.commit()
+            await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True})
@@ -270,23 +270,23 @@ async def set_default_dashboard(dashboard_id: int, request: Request):
     from app.database import get_db_context, get_wib_time
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
             if denied:
                 return denied
-            dash = conn.execute('SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,)).fetchone()
+            dash = await (await conn.execute('SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,))).fetchone()
             if dash['user_id'] != user['user_id']:
                 return _forbidden('Hanya dashboard milik sendiri yang bisa dijadikan default')
             now = get_wib_time()
-            conn.execute('UPDATE dashboards SET is_default = 0, updated_at = ? WHERE user_id = ? AND is_default = 1',
+            await conn.execute('UPDATE dashboards SET is_default = 0, updated_at = ? WHERE user_id = ? AND is_default = 1',
                          (now, user['user_id']))
-            conn.execute('UPDATE dashboards SET is_default = 1, updated_at = ? WHERE id = ?',
+            await conn.execute('UPDATE dashboards SET is_default = 1, updated_at = ? WHERE id = ?',
                          (now, dashboard_id))
-            conn.commit()
+            await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     logger.info(f"Dashboard {dashboard_id} set as default for user {user['user_id']}")
@@ -299,16 +299,16 @@ async def delete_dashboard(dashboard_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied
-            dash = conn.execute('SELECT id, is_default FROM dashboards WHERE id = ?', (dashboard_id,)).fetchone()
+            dash = await (await conn.execute('SELECT id, is_default FROM dashboards WHERE id = ?', (dashboard_id,))).fetchone()
             if dash['is_default']:
                 return JSONResponse({'success': False, 'error': 'Dashboard default tidak bisa dihapus'}, status_code=400)
-            device_count = conn.execute(
-                'SELECT COUNT(*) FROM devices WHERE dashboard_id = ?', (dashboard_id,)).fetchone()[0]
+            device_count = (await (await conn.execute(
+                'SELECT COUNT(*) FROM devices WHERE dashboard_id = ?', (dashboard_id,))).fetchone())[0]
             if device_count:
                 return JSONResponse({
                     'success': False,
@@ -317,13 +317,13 @@ async def delete_dashboard(dashboard_id: int, request: Request):
                               'supaya data sensor tidak hilang tanpa disengaja.'),
                     'device_count': device_count,
                 }, status_code=409)
-            _purge_dashboard(conn, dashboard_id)
-            audit(conn, request, user['user_id'], user['username'], 'dashboard.delete',
+            await _purge_dashboard(conn, dashboard_id)
+            await audit(conn, request, user['user_id'], user['username'], 'dashboard.delete',
                   f'dashboard_id={dashboard_id}')
-            conn.commit()
+            await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     logger.info(f"Dashboard deleted: id={dashboard_id} user={user['user_id']}")
@@ -339,21 +339,21 @@ async def list_members(dashboard_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied, None, None
-            owner = conn.execute(
+            owner = await (await conn.execute(
                 'SELECT u.id, u.username, u.display_name FROM dashboards d '
-                'JOIN users u ON u.id = d.user_id WHERE d.id = ?', (dashboard_id,)).fetchone()
-            rows = conn.execute(
+                'JOIN users u ON u.id = d.user_id WHERE d.id = ?', (dashboard_id,))).fetchone()
+            rows = await (await conn.execute(
                 'SELECT m.user_id, m.role, m.created_at, u.username, u.display_name '
                 'FROM dashboard_members m JOIN users u ON u.id = m.user_id '
-                'WHERE m.dashboard_id = ? ORDER BY u.username', (dashboard_id,)).fetchall()
+                'WHERE m.dashboard_id = ? ORDER BY u.username', (dashboard_id,))).fetchall()
             return None, (dict(owner) if owner else None), [dict(r) for r in rows]
 
-    denied, owner, members = await run_sync(_do)
+    denied, owner, members = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'owner': owner, 'members': members})
@@ -373,27 +373,27 @@ async def upsert_member(dashboard_id: int, request: Request):
     if not username:
         return JSONResponse({'success': False, 'error': 'Username wajib diisi'}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied, None, None
-            target = conn.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
+            target = await (await conn.execute('SELECT id, username FROM users WHERE username = ?', (username,))).fetchone()
             if not target:
                 return JSONResponse({'success': False, 'error': 'User tidak ditemukan'}, status_code=404), None, None
-            dash = conn.execute('SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,)).fetchone()
+            dash = await (await conn.execute('SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,))).fetchone()
             if target['id'] == dash['user_id']:
                 return JSONResponse({'success': False, 'error': 'User itu sudah menjadi pemilik dashboard'}, status_code=400), None, None
-            conn.execute(
+            await conn.execute(
                 'INSERT INTO dashboard_members (dashboard_id, user_id, role, created_at) VALUES (?, ?, ?, ?) '
                 'ON CONFLICT (dashboard_id, user_id) DO UPDATE SET role = excluded.role',
                 (dashboard_id, target['id'], role, get_wib_time()))
-            audit(conn, request, user['user_id'], user['username'], 'dashboard.member.set',
+            await audit(conn, request, user['user_id'], user['username'], 'dashboard.member.set',
                   f"dashboard_id={dashboard_id} user={target['username']} role={role}")
-            conn.commit()
+            await conn.commit()
             return None, target['id'], role
 
-    denied, target_id, out_role = await run_sync(_do)
+    denied, target_id, out_role = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'user_id': target_id, 'role': out_role})
@@ -405,25 +405,25 @@ async def remove_member(dashboard_id: int, member_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
+    async def _do():
+        async with get_db_context() as conn:
             if member_id == user['user_id']:
-                if get_dashboard_role(conn, dashboard_id, user['user_id']) is None:
+                if await get_dashboard_role(conn, dashboard_id, user['user_id']) is None:
                     return JSONResponse({'success': False, 'error': 'Dashboard not found'}, status_code=404), 0
             else:
-                denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+                denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
                 if denied:
                     return denied, 0
-            r = conn.execute(
+            r = await conn.execute(
                 'DELETE FROM dashboard_members WHERE dashboard_id = ? AND user_id = ?',
                 (dashboard_id, member_id))
             if r.rowcount:
-                audit(conn, request, user['user_id'], user['username'], 'dashboard.member.remove',
+                await audit(conn, request, user['user_id'], user['username'], 'dashboard.member.remove',
                       f'dashboard_id={dashboard_id} user_id={member_id}')
-            conn.commit()
+            await conn.commit()
             return None, r.rowcount
 
-    denied, count = await run_sync(_do)
+    denied, count = await _do()
     if denied:
         return denied
     if not count:
@@ -440,14 +440,14 @@ async def get_dashboard_telegram_config(dashboard_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied, None
-            return None, _telegram_payload(conn, dashboard_id)
+            return None, await _telegram_payload(conn, dashboard_id)
 
-    denied, payload = await run_sync(_do)
+    denied, payload = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'telegram': payload})
@@ -468,13 +468,13 @@ async def set_dashboard_telegram_config(dashboard_id: int, request: Request):
     if not chat_id or not CHAT_ID_RE.match(chat_id):
         return JSONResponse({'success': False, 'error': 'Chat ID tidak valid (angka, atau @namachannel)'}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied, None
-            existing = conn.execute(
-                'SELECT bot_token_enc FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,)).fetchone()
+            existing = await (await conn.execute(
+                'SELECT bot_token_enc FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))).fetchone()
             if new_token:
                 try:
                     token_enc = ws.encrypt_token(new_token)
@@ -488,18 +488,18 @@ async def set_dashboard_telegram_config(dashboard_id: int, request: Request):
                 token_enc = existing['bot_token_enc']
             else:
                 return JSONResponse({'success': False, 'error': 'Token bot wajib diisi'}, status_code=400), None
-            conn.execute(
+            await conn.execute(
                 'INSERT INTO dashboard_telegram (dashboard_id, bot_token_enc, chat_id, enabled, updated_at) '
                 'VALUES (?, ?, ?, ?, ?) ON CONFLICT (dashboard_id) DO UPDATE SET '
                 'bot_token_enc = excluded.bot_token_enc, chat_id = excluded.chat_id, '
                 'enabled = excluded.enabled, updated_at = excluded.updated_at',
                 (dashboard_id, token_enc, chat_id, enabled, get_wib_time()))
-            audit(conn, request, user['user_id'], user['username'], 'dashboard.telegram.set',
+            await audit(conn, request, user['user_id'], user['username'], 'dashboard.telegram.set',
                   f'dashboard_id={dashboard_id} enabled={enabled} token_changed={bool(new_token)}')
-            conn.commit()
-            return None, _telegram_payload(conn, dashboard_id)
+            await conn.commit()
+            return None, await _telegram_payload(conn, dashboard_id)
 
-    denied, payload = await run_sync(_do)
+    denied, payload = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'telegram': payload})
@@ -511,18 +511,18 @@ async def delete_dashboard_telegram_config(dashboard_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied
-            conn.execute('DELETE FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))
-            audit(conn, request, user['user_id'], user['username'], 'dashboard.telegram.delete',
+            await conn.execute('DELETE FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))
+            await audit(conn, request, user['user_id'], user['username'], 'dashboard.telegram.delete',
                   f'dashboard_id={dashboard_id}')
-            conn.commit()
+            await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True})
@@ -535,21 +535,21 @@ async def test_dashboard_telegram(dashboard_id: int, request: Request):
     from app import workspace as ws
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'owner')
             if denied:
                 return denied, None
-            return None, ws.get_dashboard_telegram(conn, dashboard_id)
+            return None, await ws.get_dashboard_telegram(conn, dashboard_id)
 
-    denied, cfg = await run_sync(_do)
+    denied, cfg = await _do()
     if denied:
         return denied
     if not cfg or not cfg['token'] or not cfg['chat_id']:
         return JSONResponse({'success': False, 'error': 'Telegram dashboard ini belum dikonfigurasi'}, status_code=400)
     from app.notifier import send_test_notification
     try:
-        result = await run_sync(send_test_notification, token=cfg['token'], chat_id=cfg['chat_id'])
+        result = await send_test_notification(token=cfg['token'], chat_id=cfg['chat_id'])
     except Exception as e:
         logger.error(f"Test Telegram dashboard gagal: {type(e).__name__}")
         return JSONResponse({'success': False, 'error': 'Gagal mengirim pesan tes'}, status_code=500)
@@ -568,19 +568,19 @@ async def list_analytics_tabs(dashboard_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
             if denied:
                 return denied, None
-            rows = conn.execute(
+            rows = await (await conn.execute(
                 'SELECT t.*, COUNT(w.id) AS widget_count FROM analytics_tabs t '
                 'LEFT JOIN widgets w ON w.analytics_tab_id = t.id '
                 'WHERE t.dashboard_id = ? GROUP BY t.id ORDER BY t.position ASC, t.id ASC',
-                (dashboard_id,)).fetchall()
+                (dashboard_id,))).fetchall()
             return None, [dict(r) for r in rows]
 
-    denied, tabs = await run_sync(_do)
+    denied, tabs = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'tabs': tabs})
@@ -596,24 +596,24 @@ async def create_analytics_tab(dashboard_id: int, request: Request):
     if not name:
         return JSONResponse({'success': False, 'error': 'Nama tab wajib diisi'}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'editor')
             if denied:
                 return denied, None, None
-            row = conn.execute(
+            row = await (await conn.execute(
                 'SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM analytics_tabs WHERE dashboard_id = ?',
-                (dashboard_id,)).fetchone()
+                (dashboard_id,))).fetchone()
             next_pos = row['next_pos']
-            cur = conn.execute(
+            cur = await conn.execute(
                 'INSERT INTO analytics_tabs (dashboard_id, name, icon, position, created_at, updated_at) '
                 'VALUES (?, ?, ?, ?, ?, ?)',
                 (dashboard_id, name, data.get('icon', 'fa-chart-line'), next_pos,
                  get_wib_time(), get_wib_time()))
-            conn.commit()
+            await conn.commit()
             return None, cur.lastrowid, next_pos
 
-    denied, new_id, next_pos = await run_sync(_do)
+    denied, new_id, next_pos = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'id': new_id, 'name': name, 'position': next_pos, 'widget_count': 0}, status_code=201)
@@ -626,9 +626,9 @@ async def update_analytics_tab(tab_id: int, request: Request):
     user = get_current_user(request)
     data = await safe_json(request) or {}
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_tab(conn, tab_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_tab(conn, tab_id, user['user_id'], 'editor')
             if denied:
                 return denied
             fields, params = [], []
@@ -640,11 +640,11 @@ async def update_analytics_tab(tab_id: int, request: Request):
                 fields.append('updated_at = ?')
                 params.append(get_wib_time())
                 params.append(tab_id)
-                conn.execute(f'UPDATE analytics_tabs SET {", ".join(fields)} WHERE id = ?', params)
-                conn.commit()
+                await conn.execute(f'UPDATE analytics_tabs SET {", ".join(fields)} WHERE id = ?', params)
+                await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True})
@@ -656,17 +656,17 @@ async def delete_analytics_tab(tab_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_tab(conn, tab_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_tab(conn, tab_id, user['user_id'], 'editor')
             if denied:
                 return denied
-            conn.execute('DELETE FROM widgets WHERE analytics_tab_id = ?', (tab_id,))
-            conn.execute('DELETE FROM analytics_tabs WHERE id = ?', (tab_id,))
-            conn.commit()
+            await conn.execute('DELETE FROM widgets WHERE analytics_tab_id = ?', (tab_id,))
+            await conn.execute('DELETE FROM analytics_tabs WHERE id = ?', (tab_id,))
+            await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True})
@@ -678,14 +678,14 @@ async def list_tab_widgets(dashboard_id: int, tab_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'viewer')
             if denied:
                 return denied, None
-            rows = conn.execute(
+            rows = await (await conn.execute(
                 'SELECT * FROM widgets WHERE dashboard_id = ? AND analytics_tab_id = ? '
-                'ORDER BY grid_y ASC, grid_x ASC', (dashboard_id, tab_id)).fetchall()
+                'ORDER BY grid_y ASC, grid_x ASC', (dashboard_id, tab_id))).fetchall()
             out = []
             for w in rows:
                 wd = dict(w)
@@ -693,7 +693,7 @@ async def list_tab_widgets(dashboard_id: int, tab_id: int, request: Request):
                 out.append(wd)
             return None, out
 
-    denied, widgets = await run_sync(_do)
+    denied, widgets = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'widgets': widgets})
@@ -717,20 +717,20 @@ async def create_widget(dashboard_id: int, request: Request):
     except (ValueError, TypeError):
         tab_id_int = None
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'editor')
             if denied:
                 return denied, None
-            if not _device_visible(conn, data.get('device_id'), user['user_id']):
+            if not await _device_visible(conn, data.get('device_id'), user['user_id']):
                 return JSONResponse({'success': False, 'error': 'Perangkat tidak ditemukan'}, status_code=400), None
             if tab_id_int is not None:
-                tab = conn.execute(
+                tab = await (await conn.execute(
                     'SELECT id FROM analytics_tabs WHERE id = ? AND dashboard_id = ?',
-                    (tab_id_int, dashboard_id)).fetchone()
+                    (tab_id_int, dashboard_id))).fetchone()
                 if not tab:
                     return JSONResponse({'success': False, 'error': 'Tab tidak ditemukan'}, status_code=400), None
-            cur = conn.execute(
+            cur = await conn.execute(
                 'INSERT INTO widgets (dashboard_id, widget_type, title, device_id, config, '
                 'grid_x, grid_y, grid_w, grid_h, analytics_tab_id, created_at, updated_at) '
                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -739,10 +739,10 @@ async def create_widget(dashboard_id: int, request: Request):
                  int(data.get('grid_x', 0)), int(data.get('grid_y', 0)),
                  int(data.get('grid_w', 2)), int(data.get('grid_h', 2)),
                  tab_id_int, get_wib_time(), get_wib_time()))
-            conn.commit()
+            await conn.commit()
             return None, cur.lastrowid
 
-    denied, wid = await run_sync(_do)
+    denied, wid = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'id': wid}, status_code=201)
@@ -755,12 +755,12 @@ async def update_widget(widget_id: int, request: Request):
     user = get_current_user(request)
     data = await safe_json(request) or {}
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_widget(conn, widget_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_widget(conn, widget_id, user['user_id'], 'editor')
             if denied:
                 return denied
-            if 'device_id' in data and not _device_visible(conn, data.get('device_id'), user['user_id']):
+            if 'device_id' in data and not await _device_visible(conn, data.get('device_id'), user['user_id']):
                 return JSONResponse({'success': False, 'error': 'Perangkat tidak ditemukan'}, status_code=400)
             fields, params = [], []
             for col in ('title', 'device_id', 'widget_type', 'grid_x', 'grid_y', 'grid_w', 'grid_h'):
@@ -774,11 +774,11 @@ async def update_widget(widget_id: int, request: Request):
                 fields.append('updated_at = ?')
                 params.append(get_wib_time())
                 params.append(widget_id)
-                conn.execute(f'UPDATE widgets SET {", ".join(fields)} WHERE id = ?', params)
-                conn.commit()
+                await conn.execute(f'UPDATE widgets SET {", ".join(fields)} WHERE id = ?', params)
+                await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True})
@@ -790,16 +790,16 @@ async def delete_widget(widget_id: int, request: Request):
     from app.database import get_db_context
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_widget(conn, widget_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_widget(conn, widget_id, user['user_id'], 'editor')
             if denied:
                 return denied
-            conn.execute('DELETE FROM widgets WHERE id = ?', (widget_id,))
-            conn.commit()
+            await conn.execute('DELETE FROM widgets WHERE id = ?', (widget_id,))
+            await conn.commit()
         return None
 
-    denied = await run_sync(_do)
+    denied = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True})
@@ -815,9 +815,9 @@ async def save_dashboard_layout(dashboard_id: int, request: Request):
     if not isinstance(layout, list):
         return JSONResponse({'success': False, 'error': 'layout harus array'}, status_code=400)
 
-    def _do():
-        with get_db_context() as conn:
-            denied = _check_dashboard(conn, dashboard_id, user['user_id'], 'editor')
+    async def _do():
+        async with get_db_context() as conn:
+            denied = await _check_dashboard(conn, dashboard_id, user['user_id'], 'editor')
             if denied:
                 return denied, 0
             now = get_wib_time()
@@ -830,17 +830,17 @@ async def save_dashboard_layout(dashboard_id: int, request: Request):
                 wid = item.get('id')
                 if not wid:
                     continue
-                result = conn.execute(
+                result = await conn.execute(
                     'UPDATE widgets SET grid_x = ?, grid_y = ?, grid_w = ?, grid_h = ?, updated_at = ? '
                     'WHERE id = ? AND dashboard_id = ?',
                     (int(item.get('x', 0)), int(item.get('y', 0)),
                      int(item.get('w', 2)), int(item.get('h', 2)), now, wid, dashboard_id))
                 if result.rowcount > 0:
                     updated += 1
-            conn.commit()
+            await conn.commit()
             return None, updated
 
-    denied, updated = await run_sync(_do)
+    denied, updated = await _do()
     if denied:
         return denied
     return JSONResponse({'success': True, 'updated': updated})
