@@ -489,19 +489,6 @@
         updateBulkBar();
     }
 
-    function updateFilterInfo() {
-        const infoEl = $('alertFilterInfo');
-        if (!infoEl) return;
-        if (!state.dateStart && !state.dateEnd) {
-            infoEl.textContent = '';
-            return;
-        }
-        const parts = [];
-        if (state.dateStart) parts.push(`dari ${state.dateStart}`);
-        if (state.dateEnd) parts.push(`sampai ${state.dateEnd}`);
-        infoEl.textContent = `Filter aktif: ${parts.join(' ')}`;
-    }
-
     function renderAlerts() {
         const container = $('alertsList');
         if (!container) return;
@@ -753,7 +740,6 @@
         state.dateStart = startEl ? startEl.value : '';
         state.dateEnd = endEl ? endEl.value : '';
         applyFilter();
-        updateFilterInfo();
     }
 
     function clearDateFilter() {
@@ -761,7 +747,6 @@
         state.dateStart = '';
         state.dateEnd = '';
         applyFilter();
-        updateFilterInfo();
     }
 
     // ==========================================
@@ -989,18 +974,22 @@
             loadAlerts();
         });
 
-        // Date range picker untuk alert
+        // Date range picker untuk alert (css/js lazy saat section dibuka)
         const drpEl = document.getElementById('alertDateRange');
-        if (drpEl && window.NexusDateRangePicker) {
+        const makeAlertDRP = () => {
+            if (!drpEl || !window.NexusDateRangePicker) return;
             state.alertDRP = new window.NexusDateRangePicker.DateRangePicker(drpEl, {
                 placeholder: 'Filter tanggal...',
                 onChange: (start, end) => {
                     state.dateStart = start || '';
                     state.dateEnd = end || '';
                     applyFilter();
-                    updateFilterInfo();
                 }
             });
+        };
+        if (window.NexusDateRangePicker) makeAlertDRP();
+        else if (window.NexusLazy && typeof window.NexusLazy.loadDateRange === 'function') {
+            window.NexusLazy.loadDateRange().then(makeAlertDRP).catch(() => {});
         }
 
         const refreshBtn = $('refreshAlertsBtn');

@@ -25,7 +25,7 @@
     }
   }
 
-  // data-needs="editor" atau "owner admin" atau "perm:attendance.view" (salah satu cocok = tampil)
+  // data-needs="editor" atau "owner admin" atau "perm:foo.view" (salah satu cocok = tampil)
   function allowed(spec, ctx) {
     return String(spec).split(/[\s,]+/).filter(Boolean)
       .some(function (t) { return satisfies(t, ctx); });
@@ -67,6 +67,17 @@
       if (!trigger || m !== trigger.parentElement) m.classList.remove('nx-open');
     });
     if (trigger) trigger.parentElement.classList.toggle('nx-open');
+  });
+
+  // ---------- Kontrol yang belum siap dipakai ----------
+  // Elemen dengan aria-disabled="true" tetap terlihat (fitur ada, tapi belum
+  // dikonfigurasi) dan memberi penjelasan saat diklik, bukan diam saja.
+  document.addEventListener('click', function (e) {
+    const el = e.target.closest('[aria-disabled="true"][data-hint]');
+    if (!el) return;
+    e.preventDefault();
+    const msg = el.getAttribute('data-hint');
+    if (typeof global.showToast === 'function') global.showToast(msg, 'warning');
   });
 
   global.NexusUI = {

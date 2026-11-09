@@ -1,10 +1,11 @@
 # NEXUS IoT Platform
 
-Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan Raspberry Pi. Menyediakan dashboard web, peta interaktif, analitik multi-chart yang bisa di-drag, sistem alert berjenjang dengan notifikasi Telegram, absensi berbasis RFID, dan asisten AI yang terhubung langsung ke database.
+Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan Raspberry Pi. Menyediakan dashboard web, peta interaktif, analitik multi-chart yang bisa di-drag, sistem alert berjenjang dengan notifikasi Telegram, dan asisten AI yang terhubung langsung ke database.
 
-![Version](https://img.shields.io/badge/version-6.5.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-3.1.3-000000?style=flat-square&logo=flask&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.162.2-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Uvicorn](https://img.shields.io/badge/Uvicorn-0.54.0-499848?style=flat-square&logo=uvicorn&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&logo=sqlite&logoColor=white)
 ![Gunicorn](https://img.shields.io/badge/Gunicorn-23.0.0-499848?style=flat-square&logo=gunicorn&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
@@ -46,7 +47,7 @@ Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan R
 
 NEXUS adalah aplikasi server tunggal yang menerima data sensor dari perangkat IoT melalui HTTP POST, menyimpannya di SQLite (mode WAL), lalu menyajikannya lewat dashboard web dan API JSON. Sistem mendukung banyak pengguna, banyak dashboard per pengguna, banyak tab analitik per dashboard, dan layout chart yang dapat diatur bebas oleh pengguna (drag dan resize).
 
-Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx sebagai reverse proxy, Docker Compose, rate limiting, CSRF protection, hashing API key, background task terkoordinasi via file lock, auto-backup database, dan retensi data per kategori.
+Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn multi-worker dengan UvicornWorker), Nginx sebagai reverse proxy, Docker Compose, rate limiting, CSRF protection, hashing API key, background task terkoordinasi via file lock, auto-backup database, dan retensi data per kategori.
 
 ---
 
@@ -75,15 +76,6 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 - Bulk acknowledge dan mark-all-visible
 - Notifikasi Telegram dengan deduplikasi 60 detik dan retry 3x
 
-### Absensi RFID
-
-- Registrasi kartu dengan UID
-- Deteksi otomatis tap terakhir yang belum terdaftar
-- Laporan harian (check-in dan check-out per UID)
-- Riwayat tap dengan filter tanggal
-- Export CSV
-- Deduplikasi tap dalam window 30 detik
-
 ### Multi-User
 
 - Autentikasi session dengan idle timeout terpisah dari lifetime
@@ -95,14 +87,14 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 
 - Chat panel terintegrasi yang bisa minimize
 - Mendukung endpoint OpenAI-compatible (OpenRouter, Ollama, vLLM, Hermes)
-- Function calling dengan 7 tool yang query langsung ke database
+- Function calling dengan 4 tool yang query langsung ke database
 - Markdown rendering dengan subset aman (XSS-protected)
 - Health check upstream LLM otomatis
 
 ### Operasional
 
 - Auto-backup database SQLite tiap 24 jam
-- Retensi data per kategori: sensor 30d, history 90d, status log 30d, attendance 365d
+- Retensi data per kategori: sensor 30d, history 90d, status log 30d
 - VACUUM otomatis jika cleanup menghapus lebih dari 1000 baris
 - Rotating log file dengan batas 10 MB x 5 file
 - Background task hanya dijalankan oleh satu worker via file lock
@@ -115,14 +107,15 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 | Layer | Teknologi | Versi |
 |-------|-----------|-------|
 | Bahasa | Python | 3.11 |
-| Web Framework | Flask | 3.1.3 |
+| Web Framework | FastAPI | 0.162.2 |
 | WSGI Server | Gunicorn | 23.0.0 |
+| ASGI Server | Uvicorn | 0.54.0 |
 | Database | SQLite (WAL mode) | Bawaan Python 3.11 |
-| Templating | Jinja2 | 3.1.6 |
-| Form / CSRF | Flask-WTF / WTForms | 1.2.2 / 3.1.2 |
-| Rate Limiting | Flask-Limiter | 3.5.0 |
-| CORS | Flask-CORS | 6.0.5 |
-| Validasi | Marshmallow | 3.22.0 |
+| Templating | Jinja2 (via FastAPI) | 3.1.6 |
+| Form / CSRF | Starlette Session + CSRF double-submit | 1.10.0 |
+| Rate Limiting | SlowAPI | 0.1.10 |
+| CORS | Starlette CORSMiddleware | 1.10.0 |
+| Validasi | Pydantic | 2.14.3 |
 | HTTP Client | Requests | 2.32.3 |
 | Config Loader | python-dotenv | 1.2.3 |
 | WSGI Utilities | Werkzeug | 3.1.8 |
@@ -147,19 +140,19 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 
 ```
                     +-------------------+
-                    |   ESP32 / RFID    |
+                    |   ESP32           |
                     |   (HTTP POST)     |
                     +---------+---------+
                               |
                               v
                     +---------+---------+
-                    |    Nginx :5008    |
+                    |   Nginx :4455/:443  |
                     |  (reverse proxy)  |
                     +---------+---------+
                               |
                               v
                     +---------+---------+
-                    |  Flask + Gunicorn |
+                    | FastAPI + Uvicorn   |
                     |    :5000          |
                     +----+---------+----+
                          |         |
@@ -186,10 +179,9 @@ Alur request:
 1. Perangkat mengirim JSON ke `POST /api/v1/data` dengan `device_id` dan `api_key`.
 2. Server memverifikasi API key (SHA-256 hash, timing-safe compare).
 3. Data disimpan ke `sensor_data`, status device di-set online, dan interval kirim di-auto-detect.
-4. Jika `sensor_type` adalah RFID, UID dicatat ke tabel `attendance` dengan deduplikasi 30 detik.
-5. Alert rules dievaluasi terhadap data sensor, dan jika perlu alert dibuat atau diupdate.
-6. Background worker (hanya satu dari N worker) memeriksa device offline tiap `CHECK_INTERVAL` detik.
-7. Browser mengakses dashboard, yang memanggil API via fetch dengan CSRF token.
+4. Alert rules dievaluasi terhadap data sensor, dan jika perlu alert dibuat atau diupdate.
+5. Background worker (hanya satu dari N worker) memeriksa device offline tiap `CHECK_INTERVAL` detik.
+6. Browser mengakses dashboard, yang memanggil API via fetch dengan CSRF token.
 
 ---
 
@@ -199,7 +191,7 @@ Alur request:
 
 - Docker Engine 20.10 atau lebih baru
 - Docker Compose v2
-- Port 5008 (atau `NGINX_PORT` yang di-set) tersedia
+- Port 4455 (atau `NGINX_PORT` yang di-set) dan 443 tersedia
 - Minimal 512 MB RAM, 1 GB disarankan
 - Minimal 500 MB disk untuk aplikasi + ruang untuk database dan backup
 
@@ -248,7 +240,7 @@ chown -R 1000:1000 database logs backup
 docker compose up -d --build
 ```
 
-Akses di `http://localhost:5008`.
+Akses di `http://localhost:4455`.
 
 Cek status container:
 
@@ -291,11 +283,10 @@ Semua variabel dibaca dari file `.env` di root proyek. Nilai default ada di `app
 
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
-| `HOST` | `0.0.0.0` | Bind address Flask |
-| `PORT` | `5000` | Port Flask (internal; di Docker tetap 5000, Nginx meneruskan ke sini) |
-| `FLASK_ENV` | `production` | `production`, `development`, atau `testing` |
-| `DEBUG` | `False` | Mode debug Flask |
-| `NGINX_PORT` | `5008` | Port publik Nginx. Dashboard dan firmware ESP32 mengakses lewat port ini |
+| `HOST` | `0.0.0.0` | Bind address FastAPI |
+| `PORT` | `5000` | Port internal FastAPI/uvicorn (di Docker tetap 5000, Nginx meneruskan ke sini) |
+| `DEBUG` | `False` | Mode debug FastAPI/uvicorn |
+| `NGINX_PORT` | `4455` | Port publik Nginx (HTTP). Dashboard dan firmware ESP32 mengakses lewat port ini; HTTPS di `443` |
 | `WEB_CONCURRENCY` | `2` | Jumlah worker Gunicorn (Docker). Dibaca Gunicorn dan dipakai untuk peringatan rate limit |
 
 ### Keamanan
@@ -337,7 +328,6 @@ Semua opsional. Kalau tidak diisi, pakai default dari `app/config.py`.
 | `DATA_RETENTION_DAYS` | `30` | Retensi data sensor |
 | `ALERT_HISTORY_RETENTION_DAYS` | `90` | Retensi riwayat alert |
 | `STATUS_LOG_RETENTION_DAYS` | `30` | Retensi log status device |
-| `ATTENDANCE_RETENTION_DAYS` | `365` | Retensi data absensi |
 
 ### Backup
 
@@ -363,7 +353,7 @@ Semua opsional. Kalau tidak diisi, pakai default dari `app/config.py`.
 
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
-| `CORS_ORIGINS` | `http://localhost:5000` (contoh `.env.example`: `http://localhost:5008`) | Origin yang diizinkan, pisah dengan koma. `*` ditolak |
+| `CORS_ORIGINS` | `http://localhost:5000` (contoh `.env.example`: `http://localhost:4455`) | Origin yang diizinkan, pisah dengan koma. `*` ditolak |
 
 ### Rate Limiting
 
@@ -446,7 +436,7 @@ Pada deployment multi-container, `NEXUS_LOCK_DIR` harus menunjuk ke volume yang 
 ```python
 WIFI_SSID = "NamaWiFi"
 WIFI_PASSWORD = "PasswordWiFi"
-API_URL = "http://IP-SERVER:5008/api/v1/data"   # port Nginx (NGINX_PORT); 5000 hanya jika menjalankan Flask langsung
+API_URL = "http://IP-SERVER:4455/api/v1/data"   # port Nginx (NGINX_PORT); 5000 hanya jika menjalankan FastAPI langsung
 DEVICE_ID = "ESP32-001"
 API_KEY = "api-key-dari-dashboard"
 ```
@@ -484,25 +474,10 @@ screen /dev/ttyUSB0 115200
 }
 ```
 
-### Format Payload RFID
-
-```json
-{
-  "device_id": "RFID-01",
-  "api_key": "your-api-key",
-  "sensor_type": "RFID",
-  "wifi_ssid": "NamaWiFi",
-  "uptime_seconds": 3600,
-  "data": {
-    "uid": "0x010dd605"
-  }
-}
-```
-
 ### Contoh dengan curl
 
 ```bash
-curl -X POST http://localhost:5008/api/v1/data   # via Nginx; dev langsung ke Flask: :5000 \
+curl -X POST http://localhost:4455/api/v1/data   # via Nginx; dev langsung ke FastAPI: :5000 \
   -H "Content-Type: application/json" \
   -d '{
     "device_id": "ESP32-001",
@@ -602,27 +577,6 @@ Filter untuk `/api/v1/alerts/all`:
 - `device_id`: string
 - `limit`: integer, maksimum 1000
 
-### Cardholders dan Attendance
-
-| Method | Endpoint | Auth | Keterangan |
-|--------|----------|------|------------|
-| GET | `/api/v1/cardholders` | Session | List semua cardholder |
-| POST | `/api/v1/cardholders` | Session | Registrasi kartu baru |
-| DELETE | `/api/v1/cardholders/<uid>` | Session | Hapus kartu |
-| GET | `/api/v1/attendance` | Session | Riwayat tap |
-| GET | `/api/v1/attendance/report` | Session | Laporan harian (check-in/out) |
-| GET | `/api/v1/attendance/stats` | Session | Statistik hari ini |
-| GET | `/api/v1/attendance/today` | Session | Siapa yang hadir hari ini |
-| GET | `/api/v1/attendance/unregistered` | Session | Kartu belum terdaftar |
-| GET | `/api/v1/attendance/last-unknown` | Session | Tap terakhir yang belum dikenal |
-| GET | `/api/v1/attendance/export` | Session | Export CSV |
-
-Filter untuk `/api/v1/attendance/report` dan `/api/v1/attendance/export`:
-
-- `start`: `YYYY-MM-DD`
-- `end`: `YYYY-MM-DD`
-- `uid`: string
-
 ### Chat AI
 
 | Method | Endpoint | Auth | Keterangan |
@@ -660,23 +614,25 @@ Filter untuk `/api/v1/attendance/report` dan `/api/v1/attendance/export`:
 
 ```
 nexus-iot/
-├── app/                          # Package aplikasi Flask
-│   ├── __init__.py               # App factory, security headers, error handlers
+├── app/                          # Package aplikasi FastAPI
+│   ├── __init__.py               # Shim versi (dari app/main.py)
+│   ├── main.py                   # App factory FastAPI: CORS, CSP/HSTS, Session, CSRF, error handlers, /health
+│   ├── deps.py                   # Dependensi FastAPI: auth/session, workspace scope, throttle
+│   ├── routers/                  # Route FastAPI per domain: ingest, devices, alerts, dashboards, users, system, chat, views
 │   ├── alerts.py                 # Alert state machine
-│   ├── api.py                    # API routes v1
-│   ├── auth.py                   # Login, session, decorator
+│   ├── api_common.py             # Helper bersama API (timestamp, device auth, purge)
 │   ├── background.py             # Background worker + file lock
-│   ├── chat.py                   # NEXUS AI chat + tool calling
-│   ├── config.py                 # Konfigurasi + validasi env
-│   ├── dashboards.py             # Dashboard, tab, widget
-│   ├── database.py               # Layer SQLite + 16 migrations
-│   ├── decorators.py             # Helper decorator
-│   ├── extensions.py             # CORS, CSRF, Limiter
+│   ├── config.py                 # Konfigurasi + validasi env (helper _env_*)
+│   ├── database.py               # Layer SQLite koneksi + init runner
+│   ├── migrations.py             # Migrasi v1..v19 + registry MIGRATIONS
 │   ├── logging_config.py         # Setup log rotating
+│   ├── login_throttle.py         # Throttle login gagal
 │   ├── notifier.py               # Dispatcher Telegram
+│   ├── permissions.py            # Peran dan izin
+│   ├── restore.py                # Restore database tertunda
+│   ├── schemas.py                # Schema Pydantic
 │   ├── utils.py                  # Helper: hash, lock, validator
-│   ├── validators.py             # Marshmallow schema
-│   └── views.py                  # Web routes HTML
+│   └── workspace.py              # Scope multi-dashboard
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                # Lint + pytest di GitHub Actions
@@ -700,7 +656,6 @@ nexus-iot/
 │       ├── alert_rules_builder.js
 │       ├── alerts.js
 │       ├── api.js
-│       ├── attendance.js
 │       ├── chat.js
 │       ├── dashboard.js
 │       ├── dashboard_store.js
@@ -720,7 +675,6 @@ nexus-iot/
 │   ├── mobile.html               # Layout mobile
 │   └── partials/
 │       ├── alerts_section.html
-│       ├── attendance_section.html
 │       ├── chat_panel.html
 │       ├── dashboard_section.html
 │       ├── devices_section.html
@@ -862,13 +816,9 @@ Chat panel terintegrasi yang memanggil LLM melalui API OpenAI-compatible. Menduk
 
 | Tool | Deskripsi | Parameter |
 |------|-----------|-----------|
-| `get_present_today` | Karyawan yang sudah absen hari ini | - |
-| `get_absent_today` | Karyawan terdaftar yang belum absen | - |
-| `get_attendance_range` | Laporan absensi rentang tanggal | `start_date`, `end_date` |
 | `get_devices_status` | Status semua device | - |
 | `get_active_alerts` | Alert yang sedang aktif | - |
 | `get_device_history` | Riwayat sensor device | `device_id`, `hours` |
-| `get_cardholders` | Semua karyawan terdaftar | - |
 
 ### Alur
 
@@ -914,9 +864,9 @@ Jika `LLM_API_KEY` kosong, fitur chat dianggap belum dikonfigurasi: tombol/panel
 - Dari klien hanya pesan `role` `user`/`assistant` dengan `content` berupa string yang diteruskan; field lain dibuang. Maksimum 10 pesan terakhir, tiap pesan dipotong ke 4000 karakter.
 - Hasil tool dibatasi maksimum 100 baris per daftar dan 20 KB JSON; bila dipotong, hasil memuat `truncated: true`.
 - LLM boleh memanggil tool hingga 3 putaran (maksimum 5 panggilan per putaran), lalu wajib memberi jawaban teks.
-- System prompt menegaskan bahwa isi data (nama device, karyawan, pesan alert) adalah data, bukan instruksi.
+- System prompt menegaskan bahwa isi data (nama device, pesan alert) adalah data, bukan instruksi.
 - Detail error internal hanya dicatat di log; klien menerima pesan generik.
-- Semua user yang login dapat memakai chat, termasuk tool absensi. Pembatasan tool absensi hanya untuk admin belum diterapkan (keputusan pemilik; lihat CHANGELOG).
+- Semua user yang login dapat memakai chat.
 
 ---
 
@@ -944,7 +894,6 @@ Menghapus data berdasarkan retensi:
 | `sensor_data` | `DATA_RETENTION_DAYS` |
 | `alert_history` | `ALERT_HISTORY_RETENTION_DAYS` |
 | `device_status_log` | `STATUS_LOG_RETENTION_DAYS` |
-| `attendance` | `ATTENDANCE_RETENTION_DAYS` |
 | `alerts` (yang tidak aktif) | `ALERT_HISTORY_RETENTION_DAYS` |
 
 Jika total baris yang dihapus melebihi 1000, `VACUUM` dijalankan untuk mengembalikan ruang ke OS.
@@ -976,7 +925,7 @@ Worker yang tidak mendapat lock **tidak berhenti**: ia mencoba lagi tiap 30 deti
 
 ## Database dan Migrations
 
-Database: SQLite dengan mode WAL. Schema saat ini versi 16.
+Database: SQLite dengan mode WAL. Schema saat ini versi 19.
 
 ### Tabel
 
@@ -989,8 +938,6 @@ Database: SQLite dengan mode WAL. Schema saat ini versi 16.
 | `alerts` | Alert aktif |
 | `alert_history` | Riwayat perubahan alert |
 | `device_status_log` | Log perubahan status device |
-| `attendance` | Tap RFID |
-| `cardholders` | Kartu terdaftar |
 | `dashboards` | Dashboard per pengguna |
 | `analytics_tabs` | Tab analitik per dashboard |
 | `widgets` | Widget chart per tab |
@@ -1007,8 +954,6 @@ Daftar migrasi:
 |-------|-----------|
 | 1 | Tabel inti: devices, sensor_data, alerts |
 | 2 | Kolom `last_ip` dan `firmware_version` |
-| 3 | Tabel `cardholders` dan `attendance` |
-| 4 | Perbaikan foreign key pada `attendance` |
 | 5 | Kolom offline timeout, expected interval, alert rules; tabel `alert_history`, `device_status_log`, `user_settings` |
 | 6 | Index tambahan untuk performa query alert |
 | 7 | Standardisasi timezone ke naive WIB |
@@ -1052,9 +997,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Akses publik di port `NGINX_PORT` (default 5008). Port Flask tidak ter-expose ke host, hanya ke network internal Docker.
+Akses publik di port `NGINX_PORT` (default 4455) dan `443` (HTTPS). Port internal FastAPI/uvicorn (5000) tidak ter-expose ke host, hanya ke network internal Docker.
 
-**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container Flask (Nginx tetap menyajikan `./static`). Perubahan kode butuh build ulang:
+**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container FastAPI (Nginx tetap menyajikan `./static`). Rilis v2.0.0 diterbitkan sebagai image `nexus-refactor-nexus-iot:2.0.0` (tag Docker dari `nexus-refactor-nexus-iot:latest`, sesuai git tag `v2.0.0`). Perubahan kode butuh build ulang:
 
 ```bash
 git pull
@@ -1095,7 +1040,7 @@ User=nexus
 Group=nexus
 WorkingDirectory=/opt/nexus-iot
 Environment="PATH=/opt/nexus-iot/venv/bin"
-ExecStart=/opt/nexus-iot/venv/bin/gunicorn -w 4 -k gthread --threads 4 -b 127.0.0.1:5000 run:app
+ExecStart=/opt/nexus-iot/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:5000 run:app
 Restart=always
 RestartSec=5
 
@@ -1151,7 +1096,7 @@ server {
 }
 ```
 
-Catatan: aplikasi menggunakan `ProxyFix` middleware sehingga `request.remote_addr` dan scheme (`http` atau `https`) tetap akurat di belakang reverse proxy.
+Catatan: aplikasi membaca `X-Forwarded-For` di belakang reverse proxy (lihat `app/deps.py:client_ip`) sehingga IP asli klien tetap tercatat.
 
 ### HTTPS
 
@@ -1257,7 +1202,7 @@ Aplikasi mengirim header berikut pada setiap response:
 
 ### Input Validation
 
-- Payload device divalidasi dengan Marshmallow schema: panjang string, regex untuk Device ID, range untuk integer.
+- Payload device divalidasi dengan Pydantic schema (`app/schemas.py`): panjang string, regex untuk Device ID, range untuk integer.
 - Alert rules divalidasi sebelum disimpan: struktur object, min lebih kecil dari max, nilai numerik.
 - SQL injection dicegah dengan parameterized query di semua layer database.
 - XSS dicegah dengan escaping di template Jinja2 dan di JavaScript (fungsi `escapeHtml`).
@@ -1316,7 +1261,7 @@ Solusi:
 
 ```bash
 docker compose logs nexus-iot | tail -50
-curl -v http://localhost:5008/health
+curl -v http://localhost:4455/health
 ```
 
 Jika `/health` mengembalikan 503, cek file log untuk detail error.
@@ -1392,9 +1337,9 @@ Pastikan endpoint upstream berjalan dan API key valid.
 
 Gejala: user dari IP berbeda dianggap IP yang sama.
 
-Penyebab: Nginx tidak mengirim header `X-Forwarded-For`, atau `ProxyFix` tidak dikonfigurasi.
+Penyebab: Nginx tidak mengirim header `X-Forwarded-For`.
 
-Solusi: pastikan Nginx mengirim header `X-Real-IP` dan `X-Forwarded-For`, dan pastikan aplikasi menggunakan `ProxyFix` (sudah aktif secara default di `app/__init__.py`).
+Solusi: pastikan Nginx mengirim header `X-Real-IP` dan `X-Forwarded-For`; aplikasi membaca IP dari header tersebut (`app/deps.py:client_ip`).
 
 ### Memory usage terus naik
 
@@ -1427,7 +1372,7 @@ Ringkasan perilaku yang sengaja diubah pada perbaikan V6.5 dan perlu diketahui o
 
 Semua route yang **mengubah** data adalah admin-only dan dijaga di backend (JSON `403` untuk non-admin):
 tambah/ubah/hapus device, regenerate API key, ubah/reset alert rules per device, Bulk Import,
-tambah/hapus pemegang kartu (cardholder), tes notifikasi, serta manajemen user/backup/restore/cleanup/global rules.
+tes notifikasi, serta manajemen user/backup/restore/cleanup/global rules.
 Request `GET` (baca) tetap terbuka untuk semua user yang login. Tombol terkait disembunyikan di UI untuk non-admin,
 tetapi backend adalah sumber kebenaran.
 
@@ -1456,11 +1401,10 @@ log start memuat peringatan (gunakan hanya di jaringan tepercaya tanpa HTTPS).
 - Auto-detect hanya untuk device non-manual: butuh minimal 5 data terakhir, selisih < 2 detik diabaikan, hasil tidak di bawah 10 detik, dan hanya menulis bila berubah > 20%.
 - Menyimpan form edit dengan nilai yang sama dengan hasil auto-detect tidak mengubah mode.
 
-### Payload `/api/v1/data` (M1) dan UID kartu (N4)
+### Payload `/api/v1/data` (M1)
 
 - Body maksimal `DATA_MAX_BYTES` (default 8192 byte), lebih dari itu HTTP 413.
 - `data` harus object datar, maks 32 key (`[a-zA-Z0-9_]{1,32}`); nilai berupa angka finite, boolean, atau string maks 64 karakter. `sensor_type` memakai `[A-Za-z0-9_-]{1,32}`.
-- UID RFID wajib string heksadesimal 4-32 karakter (boleh awalan `0x`, pemisah `:` atau `-`), mis. `0x010dd605`. Huruf besar/kecil dipertahankan apa adanya.
 - Ekspor CSV menetralkan sel berawalan `= + - @` (diberi awalan `'`).
 
 ---
@@ -1492,7 +1436,7 @@ Dependensi dev tidak dipasang di image Docker (`Dockerfile` hanya memasang `requ
 
 ### Versi
 
-Versi aplikasi didefinisikan satu kali di `app/__init__.py` (`__version__`) dan dipakai oleh `/health`, `/system/info` (kartu **Versi Aplikasi** di UI), serta dicek oleh tes terhadap badge README dan judul CHANGELOG.
+Versi aplikasi didefinisikan satu kali di `app/main.py` (`__version__`) dan dipakai oleh `/health`, `/system/info` (kartu **Versi Aplikasi** di UI), serta dicek oleh tes terhadap badge README dan judul CHANGELOG.
 Saat menaikkan versi: ubah `__version__`, badge di README, dan tambahkan judul `## V<versi>` di CHANGELOG, lalu jalankan `make test`.
 
 ---

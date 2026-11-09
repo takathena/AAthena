@@ -4,7 +4,7 @@ import json
 import pytest
 import requests
 
-from app import chat
+from app.routers import chat
 
 
 class _Resp:
@@ -114,8 +114,9 @@ def test_system_prompt_marks_data_as_untrusted(user_client, llm):
 
 def test_tool_result_with_500_rows_is_truncated(user_client, llm, monkeypatch):
     rows = [{'nama': f'Karyawan {i}', 'uid': f'{i:08X}'} for i in range(500)]
-    monkeypatch.setitem(chat.TOOL_MAP, 'get_devices_status',
-                        lambda: {'total': 500, 'devices': rows})
+    monkeypatch.setattr(
+        chat, 'tool_get_devices_status',
+        lambda request, user_id: {'total': 500, 'devices': rows})
     llm.script = [_tool_call(), _text('selesai')]
     resp = _send(user_client, [{'role': 'user', 'content': 'status?'}])
     assert resp.status_code == 200
@@ -140,9 +141,9 @@ def test_small_tool_result_untouched():
 
 
 def test_tool_error_detail_not_leaked(user_client, llm, monkeypatch):
-    def boom():
+    def boom(request, user_id):
         raise RuntimeError('SECRET-DB-DETAIL')
-    monkeypatch.setitem(chat.TOOL_MAP, 'get_devices_status', boom)
+    monkeypatch.setattr(chat, 'tool_get_devices_status', boom)
     llm.script = [_tool_call(), _text('maaf')]
     resp = _send(user_client, [{'role': 'user', 'content': 'status?'}])
     assert resp.status_code == 200
@@ -153,7 +154,9 @@ def test_tool_error_detail_not_leaked(user_client, llm, monkeypatch):
 # ---------- M4: loop tool ----------
 
 def test_up_to_three_tool_rounds_then_final_answer(user_client, llm, monkeypatch):
-    monkeypatch.setitem(chat.TOOL_MAP, 'get_devices_status', lambda: {'total': 0})
+    monkeypatch.setattr(
+        chat, 'tool_get_devices_status',
+        lambda request, user_id: {'total': 0})
     llm.script = [_tool_call(call_id='a'), _tool_call(call_id='b'),
                   _tool_call(call_id='c'), _text('jawaban akhir')]
     resp = _send(user_client, [{'role': 'user', 'content': 'status?'}])
@@ -164,7 +167,9 @@ def test_up_to_three_tool_rounds_then_final_answer(user_client, llm, monkeypatch
 
 
 def test_tool_loop_is_bounded(user_client, llm, monkeypatch):
-    monkeypatch.setitem(chat.TOOL_MAP, 'get_devices_status', lambda: {'total': 0})
+    monkeypatch.setattr(
+        chat, 'tool_get_devices_status',
+        lambda request, user_id: {'total': 0})
     # LLM yang terus meminta tool: setelah 3 putaran, request terakhir tanpa tools.
     llm.script = [_tool_call(call_id=str(i)) for i in range(10)]
     resp = _send(user_client, [{'role': 'user', 'content': 'status?'}])
@@ -176,8 +181,9 @@ def test_tool_loop_is_bounded(user_client, llm, monkeypatch):
 
 def test_too_many_calls_in_one_round_are_capped(user_client, llm, monkeypatch):
     seen = []
-    monkeypatch.setitem(chat.TOOL_MAP, 'get_devices_status',
-                        lambda: seen.append(1) or {'total': 0})
+    monkeypatch.setattr(
+        chat, 'tool_get_devices_status',
+        lambda request, user_id: seen.append(1) or {'total': 0})
     many = {'choices': [{'message': {'role': 'assistant', 'content': '', 'tool_calls': [
         {'id': str(i), 'function': {'name': 'get_devices_status', 'arguments': '{}'}}
         for i in range(12)]}}]}

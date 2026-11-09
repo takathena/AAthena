@@ -1,6 +1,8 @@
 """
 NEXUS IoT - Workspace (dashboard = ruang kerja)
 
+Async FastAPI murni:
+
 Satu sumber kebenaran untuk:
   - peran per dashboard (owner / editor / viewer) + admin yang selalu bebas,
   - lingkup data (scope) sebuah request: dashboard mana yang sedang dilihat,
@@ -13,14 +15,19 @@ Aturan akses:
   editor : anggota. Boleh menambah/ubah/hapus perangkat, widget, tab, kartu.
   viewer : anggota. Hanya melihat.
   admin  : (users.is_admin) diperlakukan sebagai owner di semua dashboard.
+
+DB lewat `get_db_async()` (aiosqlite), dengan PRAGMA yang sama seperti
+`get_db_context` sync di app/database.py: WAL + busy_timeout=30000
+(plus synchronous NORMAL, foreign_keys ON, temp_store MEMORY,
+cache_size -64000).
 """
 import base64
 import hashlib
 import logging
+import os
+from contextlib import asynccontextmanager
 
-from flask import g, jsonify, request, session
-
-from app.database import get_db_context, get_wib_time
+import aiosqlite
 
 logger = logging.getLogger('nexus')
 
@@ -29,44 +36,81 @@ MEMBER_ROLES = ('viewer', 'editor')
 
 
 # ==========================================
+# DB ASYNC (aiosqlite, PRAGMA sama dengan app/database.py)
+# ==========================================
+def _db_path():
+    from app.config import Config
+    return Config.DB_PATH
+
+
+async def _configure_async_conn(conn):
+    conn.row_factory = aiosqlite.Row
+    await conn.execute('PRAGMA journal_mode=WAL')
+    await conn.execute('PRAGMA synchronous=NORMAL')
+    await conn.execute('PRAGMA foreign_keys=ON')
+    await conn.execute('PRAGMA busy_timeout=30000')
+    await conn.execute('PRAGMA temp_store=MEMORY')
+    await conn.execute('PRAGMA cache_size=-64000')
+    return conn
+
+
+@asynccontextmanager
+async def get_db_async():
+    """Pengganti `get_db_context` sync berbasis aiosqlite."""
+    db_path = _db_path()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = await aiosqlite.connect(
+        db_path, timeout=30.0, isolation_level='DEFERRED')
+    await _configure_async_conn(conn)
+    try:
+        yield conn
+    finally:
+        await conn.close()
+
+
+async def _one(conn, sql, params=()):
+    return await (await conn.execute(sql, params)).fetchone()
+
+
+async def _all(conn, sql, params=()):
+    return await (await conn.execute(sql, params)).fetchall()
+
+
+async def _exec(conn, sql, params=()):
+    return await conn.execute(sql, params)
+
+
+# ==========================================
 # USER / ADMIN
 # ==========================================
-def current_user_id():
-    return session.get('user_id')
-
-
-def is_admin_user(conn, user_id):
+async def is_admin_user(conn, user_id):
     if not user_id:
         return False
-    cache = g.setdefault('_nx_admin_cache', {})
-    if user_id not in cache:
-        row = conn.execute(
-            'SELECT is_admin FROM users WHERE id = ?', (user_id,)
-        ).fetchone()
-        cache[user_id] = bool(row and row['is_admin'])
-    return cache[user_id]
+    row = await _one(
+        conn, 'SELECT is_admin FROM users WHERE id = ?', (user_id,))
+    return bool(row and row['is_admin'])
 
 
 # ==========================================
 # PERAN
 # ==========================================
-def get_dashboard_role(conn, dashboard_id, user_id):
+async def get_dashboard_role(conn, dashboard_id, user_id):
     """Return 'owner' | 'editor' | 'viewer' | None."""
     if not user_id or dashboard_id is None:
-        return 'owner' if (user_id and is_admin_user(conn, user_id)) else None
-    if is_admin_user(conn, user_id):
+        return 'owner' if (user_id and await is_admin_user(conn, user_id)) else None
+    if await is_admin_user(conn, user_id):
         return 'owner'
-    row = conn.execute(
-        'SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,)
-    ).fetchone()
+    row = await _one(
+        conn, 'SELECT user_id FROM dashboards WHERE id = ?', (dashboard_id,))
     if not row:
         return None
     if row['user_id'] == user_id:
         return 'owner'
-    m = conn.execute(
+    m = await _one(
+        conn,
         'SELECT role FROM dashboard_members WHERE dashboard_id = ? AND user_id = ?',
-        (dashboard_id, user_id)
-    ).fetchone()
+        (dashboard_id, user_id),
+    )
     return m['role'] if m else None
 
 
@@ -74,26 +118,22 @@ def role_allows(role, minimum):
     return bool(role) and ROLE_RANK.get(role, 0) >= ROLE_RANK[minimum]
 
 
-def can_access_dashboard(conn, dashboard_id, user_id, minimum='viewer'):
-    return role_allows(get_dashboard_role(conn, dashboard_id, user_id), minimum)
-
-
-def accessible_dashboard_ids(conn, user_id, minimum='viewer'):
+async def accessible_dashboard_ids(conn, user_id, minimum='viewer'):
     """Daftar id dashboard yang boleh diakses dengan peran minimal.
 
     Return None bila admin (artinya: semua dashboard, termasuk perangkat
     yang belum punya dashboard).
     """
-    if is_admin_user(conn, user_id):
+    if await is_admin_user(conn, user_id):
         return None
     ids = set()
-    for r in conn.execute(
-        'SELECT id FROM dashboards WHERE user_id = ?', (user_id,)
-    ).fetchall():
+    for r in await _all(
+            conn, 'SELECT id FROM dashboards WHERE user_id = ?', (user_id,)):
         ids.add(r['id'])
-    for r in conn.execute(
-        'SELECT dashboard_id, role FROM dashboard_members WHERE user_id = ?', (user_id,)
-    ).fetchall():
+    for r in await _all(
+            conn,
+            'SELECT dashboard_id, role FROM dashboard_members WHERE user_id = ?',
+            (user_id,)):
         if role_allows(r['role'], minimum):
             ids.add(r['dashboard_id'])
     return sorted(ids)
@@ -102,55 +142,6 @@ def accessible_dashboard_ids(conn, user_id, minimum='viewer'):
 # ==========================================
 # SCOPE REQUEST
 # ==========================================
-def resolve_scope(conn, minimum='viewer'):
-    """Tentukan lingkup data request ini.
-
-    Frontend mengirim header `X-Dashboard-Id` (atau query `dashboard_id`).
-      - angka  : hanya dashboard itu (harus punya peran >= minimum)
-      - 'all'/kosong : semua dashboard yang boleh diakses user
-                       (admin: semua perangkat, termasuk yang belum dimiliki)
-
-    Return dict: user_id, is_admin, dashboard_ids (list | None=semua),
-                 dashboard_id (int | None), error (None | (msg, status)).
-    """
-    user_id = current_user_id()
-    admin = is_admin_user(conn, user_id)
-    raw = request.headers.get('X-Dashboard-Id') or request.args.get('dashboard_id')
-    raw = (raw or '').strip().lower()
-
-    scope = {
-        'user_id': user_id, 'is_admin': admin,
-        'dashboard_ids': None, 'dashboard_id': None, 'error': None,
-    }
-
-    if raw in ('', 'all', 'null', 'undefined', '0'):
-        scope['dashboard_ids'] = accessible_dashboard_ids(conn, user_id, minimum)
-        return scope
-
-    try:
-        did = int(raw)
-    except ValueError:
-        scope['error'] = ('dashboard_id tidak valid', 400)
-        return scope
-
-    role = get_dashboard_role(conn, did, user_id)
-    if role is None:
-        scope['error'] = ('Dashboard tidak ditemukan', 404)
-        return scope
-    if not role_allows(role, minimum):
-        scope['error'] = ('Peran Anda di dashboard ini tidak cukup untuk aksi tersebut', 403)
-        return scope
-
-    scope['dashboard_ids'] = [did]
-    scope['dashboard_id'] = did
-    return scope
-
-
-def scope_error_response(scope):
-    msg, code = scope['error']
-    return jsonify({'success': False, 'error': msg}), code
-
-
 def dashboard_in_sql(scope, column='dashboard_id'):
     """Potongan SQL: `<column> IN (...)` untuk kolom yang berisi dashboard id."""
     ids = scope['dashboard_ids']
@@ -173,100 +164,60 @@ def device_in_sql(scope, column='device_id'):
             list(ids))
 
 
+async def resolve_scope(conn, request, user_id, minimum='viewer'):
+    """Cermin deps.resolve_scope berbasis aiosqlite.
+
+    Header/query diambil dari Request FastAPI. Return dict scope
+    {'user_id', 'is_admin', 'dashboard_ids', 'dashboard_id', 'error'}.
+    """
+    raw = request.headers.get('x-dashboard-id') or request.query_params.get('dashboard_id')
+    raw = (raw or '').strip().lower()
+    admin = await is_admin_user(conn, user_id)
+    scope = {'user_id': user_id, 'is_admin': admin,
+             'dashboard_ids': None, 'dashboard_id': None, 'error': None}
+    if raw in ('', 'all', 'null', 'undefined', '0'):
+        scope['dashboard_ids'] = await accessible_dashboard_ids(conn, user_id, minimum)
+        return scope
+    try:
+        did = int(raw)
+    except (TypeError, ValueError):
+        scope['error'] = ('dashboard_id tidak valid', 400)
+        return scope
+    role = await get_dashboard_role(conn, did, user_id)
+    if role is None:
+        scope['error'] = ('Dashboard tidak ditemukan', 404)
+        return scope
+    if not role_allows(role, minimum):
+        scope['error'] = ('Peran Anda di dashboard ini tidak cukup untuk aksi tersebut', 403)
+        return scope
+    scope['dashboard_ids'] = [did]
+    scope['dashboard_id'] = did
+    return scope
+
+
 # ==========================================
 # AKSES PER PERANGKAT / KARTU
 # ==========================================
-def device_allowed(conn, scope, device_id):
+async def device_allowed(conn, scope, device_id):
     """True bila perangkat termasuk dalam scope request (dashboard terpilih / yang boleh diakses)."""
     ids = scope['dashboard_ids']
     if ids is None:
         return True
     if not ids:
         return False
-    row = conn.execute(
+    row = await _one(
+        conn,
         f"SELECT 1 FROM devices WHERE device_id = ? AND dashboard_id IN ({','.join('?' * len(ids))})",
-        [device_id] + list(ids)
-    ).fetchone()
+        [device_id] + list(ids),
+    )
     return row is not None
 
 
-def device_role(conn, device_row, user_id):
+async def device_role(conn, device_row, user_id):
     """Peran user pada dashboard pemilik perangkat. Perangkat tanpa dashboard = admin saja."""
     if device_row['dashboard_id'] is None:
-        return 'owner' if is_admin_user(conn, user_id) else None
-    return get_dashboard_role(conn, device_row['dashboard_id'], user_id)
-
-
-def load_device(conn, device_id, minimum='viewer', columns='*'):
-    """Ambil perangkat + cek peran.
-
-    Return (row, None) bila boleh, atau (None, (response, status)).
-      - perangkat tidak ada / tidak terlihat -> 404
-      - terlihat tapi peran kurang          -> 403
-    """
-    user_id = current_user_id()
-    cols = columns if 'dashboard_id' in columns or columns == '*' else columns + ', dashboard_id'
-    row = conn.execute(
-        f'SELECT {cols} FROM devices WHERE device_id = ?', (device_id,)
-    ).fetchone()
-    if not row:
-        return None, (jsonify({'success': False, 'error': 'Device not found'}), 404)
-
-    role = device_role(conn, row, user_id)
-    if role is None:
-        return None, (jsonify({'success': False, 'error': 'Device not found'}), 404)
-    if not role_allows(role, minimum):
-        return None, (jsonify({
-            'success': False,
-            'error': 'Anda tidak punya izin untuk mengubah perangkat ini',
-        }), 403)
-    return row, None
-
-
-def pick_write_dashboard(conn, scope, requested_id=None, minimum='editor'):
-    """Tentukan dashboard tujuan untuk membuat sesuatu (perangkat, kartu).
-
-    Urutan: id eksplisit -> dashboard yang sedang dipilih -> dashboard default user.
-    Return (dashboard_id, None) atau (None, (response, status)).
-    """
-    user_id = scope['user_id']
-    did = None
-    if requested_id not in (None, '', 0, '0'):
-        try:
-            did = int(requested_id)
-        except (ValueError, TypeError):
-            return None, (jsonify({'success': False, 'error': 'dashboard_id tidak valid'}), 400)
-    elif scope['dashboard_id']:
-        did = scope['dashboard_id']
-    else:
-        row = conn.execute(
-            'SELECT id FROM dashboards WHERE user_id = ? '
-            'ORDER BY is_default DESC, id ASC LIMIT 1', (user_id,)
-        ).fetchone()
-        did = row['id'] if row else None
-
-    if did is None:
-        if is_admin_user(conn, user_id):
-            # Admin tanpa dashboard: data dibiarkan "belum dimiliki" (hanya terlihat admin).
-            return None, None
-        return None, (jsonify({
-            'success': False,
-            'error': 'Anda belum punya dashboard yang boleh diubah',
-        }), 403)
-
-    exists = conn.execute('SELECT id FROM dashboards WHERE id = ?', (did,)).fetchone()
-    if not exists:
-        return None, (jsonify({'success': False, 'error': 'Dashboard tidak ditemukan'}), 404)
-
-    role = get_dashboard_role(conn, did, user_id)
-    if role is None:
-        return None, (jsonify({'success': False, 'error': 'Dashboard tidak ditemukan'}), 404)
-    if not role_allows(role, minimum):
-        return None, (jsonify({
-            'success': False,
-            'error': 'Anda hanya boleh melihat dashboard ini (peran viewer)',
-        }), 403)
-    return did, None
+        return 'owner' if await is_admin_user(conn, user_id) else None
+    return await get_dashboard_role(conn, device_row['dashboard_id'], user_id)
 
 
 # ==========================================
@@ -309,12 +260,14 @@ def mask_token(plain):
     return '••••' + plain[-4:] if len(plain) > 4 else '••••'
 
 
-def get_dashboard_telegram(conn, dashboard_id):
+async def get_dashboard_telegram(conn, dashboard_id):
     """Konfigurasi Telegram dashboard (token sudah didekripsi) atau None."""
-    row = conn.execute(
+    row = await _one(
+        conn,
         'SELECT dashboard_id, bot_token_enc, chat_id, enabled FROM dashboard_telegram '
-        'WHERE dashboard_id = ?', (dashboard_id,)
-    ).fetchone()
+        'WHERE dashboard_id = ?',
+        (dashboard_id,),
+    )
     if not row:
         return None
     return {
@@ -323,31 +276,3 @@ def get_dashboard_telegram(conn, dashboard_id):
         'chat_id': row['chat_id'] or '',
         'enabled': bool(row['enabled']),
     }
-
-
-# ==========================================
-# AUDIT
-# ==========================================
-def audit(conn, action, detail=''):
-    """Catat aksi sensitif. Gagal mencatat tidak boleh menggagalkan aksinya."""
-    try:
-        conn.execute(
-            'INSERT INTO audit_log (user_id, username, action, detail, ip, created_at) '
-            'VALUES (?, ?, ?, ?, ?, ?)',
-            (session.get('user_id'), session.get('username') or '', action,
-             str(detail)[:2000], request.remote_addr or '', get_wib_time())
-        )
-    except Exception as e:
-        logger.warning(f'Gagal menulis audit log: {e}')
-    logger.warning(f"AUDIT {action} by={session.get('username')} {detail}")
-
-
-def default_dashboard_for_admin(conn):
-    """Dashboard default milik admin pertama (tujuan migrasi/pemindahan data lama)."""
-    row = conn.execute('''
-        SELECT d.id FROM dashboards d
-        JOIN users u ON u.id = d.user_id
-        WHERE u.is_admin = 1
-        ORDER BY d.is_default DESC, u.id ASC, d.id ASC LIMIT 1
-    ''').fetchone()
-    return row['id'] if row else None

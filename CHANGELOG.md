@@ -1,5 +1,26 @@
 # Changelog
 
+## V2.0.0 — 2026-11-09
+
+Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route `/api/v1/*` dipertahankan), hapus fitur absensi v19 (route `/cardholders`, `/attendance/*`, tabel `attendance`+`cardholders`, 5 chat tools, menu & section absensi; `DROP TABLE attendance/cardholders`), frontend ringan (lazy-load Chart.js/Leaflet, gabung CSS), port publik 4455/443 via Nginx, DB fresh (database/iot.db mulai dari nol, tanpa migrasi data lama).
+
+- **Tanggal rilis:** 2026-11-09. Port publik Nginx `4455` + `443` (NAT `4455->443`, `${NGINX_PORT:-4455}:80` + `443:80`); DB fresh mulai dari schema v19.
+- **Restore DB lama:** backup v18 (masih ada `attendance`) bila di-restore dimigrasi otomatis ke v19 (`DROP attendance/cardholders`) saat start berikutnya — aman, user tidak perlu migrasi manual (lihat README § Restore Database).
+- **Rilis image:** `nexus-refactor-nexus-iot:2.0.0` (tag Docker: `docker tag nexus-refactor-nexus-iot:latest nexus-refactor-nexus-iot:2.0.0`), sesuai git tag `v2.0.0`.
+- **Flask dihapus:** `app/api.py`, `app/auth.py`, `app/chat.py`, `app/dashboards.py`, `app/views.py`, `app/extensions.py`, `app/ratelimit.py` dihapus; `app/__init__.py` jadi shim versi (versi tunggal di `app/main.py`); `app/database.py` tanpa Flask `g` (thread-local); `app/permissions.py` + `app/workspace.py` tanpa Flask session; auth/scope/throttle pindah ke `app/deps.py` + `app/routers/*` (FastAPI + Uvicorn, production Gunicorn + UvicornWorker). `ruff check app run.py` hijau. README disinkronkan (badge FastAPI/Uvicorn + Gunicorn 23.0.0, port publik 4455/443, tanpa baris absensi).
+
+## Unreleased — Refactor bertahap (fondasi)
+
+Refactor tanpa mengubah perilaku API/DB. Semua endpoint dan schema tetap sama; hanya pemisahan tanggung jawab dan pembersihan import-time side effect.
+
+- **Config (`app/config.py`)**: helper `_env_bool/_env_int/_env_float/_env_str` terpusat; rule alert suhu diekstrak ke `_build_alert_rules()`, parser CORS ke `_parse_cors_origins()`. Nilai default dan perilaku parsing tetap sama.
+- **Application factory (`app/__init__.py`)**: `create_app()` dipecah menjadi `_apply_proxy_fix`, `_init_extensions`, `_register_static_cache_bust`, `_register_blueprints`, `_register_security_headers`, `_register_error_handlers`, `_register_health_routes`. Validasi config dipindah dari import-time (`sys.exit` saat `import app`) ke `create_app()` via `validate_config_or_exit()` — import modul tidak lagi memproses exit proses.
+- **Database (`app/database.py` + `app/migrations.py`)**: `database.py` 1028 baris → 132 baris (hanya koneksi + `init_db` runner). Seluruh `_migrate_v1.._migrate_v18` dan `_rebuild_fk_tables` pindah ke `app/migrations.py` + registry `MIGRATIONS`. `SCHEMA_VERSION`, `WIB_DEFAULT`, dan semua `_migrate_*` tetap bisa diimpor dari `app.database` (re-export).
+- **API helpers (`app/api.py` + `app/api_common.py`)**: helper bersama (`_clean_timestamp`, `validate_device_api_key`, `update_device_status`, `_alert_label`, `_detect_interval` + konstanta `AUTO_INTERVAL_*`, `_current_user_id`, `_validate_username`, `PURGE_TABLES`, `_parse_purge_request`, `_purge_where`, `_purge_preview`) dipindah ke `app/api_common.py` (243 baris). `api.py` 3199 → 2980 baris dan mengimpor ulang semua nama tersebut, sehingga 59 route dan import lama (`from app.api import ...`, monkeypatch `app.api.get_db_context`/`sqlite3` di tes) tetap jalan.
+- **Tahap berikutnya yang disarankan**: pecah route `api.py` per domain (`devices`, `alerts`, `attendance`, `users`, `system`, `ingest`) menjadi blueprint terpisah, dan ekstrak `dashboards.py` (955 baris) dengan pola yang sama.
+
+---
+
 ## V6.5.0
 
 Rilis yang menggabungkan perbaikan fase 1–5 (sebelumnya 6.0.0). Rincian teknis per fase ada di bagian bawah.
@@ -103,3 +124,45 @@ Rilis yang menggabungkan perbaikan fase 1–5 (sebelumnya 6.0.0). Rincian teknis
 - Apakah tool absensi chat (`get_present_today`, `get_absent_today`, `get_attendance_range`, `get_cardholders`) dibatasi hanya untuk admin? Belum diubah.
 - Chat dianggap terkonfigurasi hanya bila `LLM_API_KEY` terisi (sesuai N7). Pengguna LLM lokal yang selama ini mengandalkan default `sk-no-key` perlu mengisi nilai apa saja.
 
+
+## Perbaikan Pascabedah (Fase A)
+
+Dari hasil audit kode + verifikasi di staging (2026-10-19).
+
+### Diperbaiki
+
+| Area | Perbaikan |
+|---|---|
+| Manage user | Modal legacy dihapus. `settings_section.html` dan `modals.html` sama-sama merender 7 `id` form yang sama, sehingga `getElementById()` menulis ke drawer Pengaturan dan Command Palette → "Kelola user" selalu gagal. Sekarang satu-satunya pintu masuk `NexusUsers.open()`. |
+| Notifikasi | `POST /api/v1/notifications/test` melaporkan `success: true` walau tidak ada channel aktif (`all([])` atas generator kosong). Kini menyaring kunci `_` lebih dulu dan membalas 503 bila memang belum siap. |
+| NEXUS AI | Menu, panel, dan `chat.js` hilang total saat `LLM_API_KEY` kosong. Menu kini tetap terlihat dengan status "belum aktif" + penjelasan cara mengaktifkannya. |
+| Mobile | `historyChartMobile is not defined` setiap ganti tema. |
+| Markup | `</nav>` ganda di `dashboard.html`. |
+| Test | 5 test failure → 0. `PYTHON_DOTENV_DISABLED=1` di `conftest.py` membuat test hermetik terhadap `.env` sungguhan; `importlib.reload(app.extensions)` kini memulihkan singleton `limiter` sehingga tidak merusak test lain. |
+
+### Diketahui masih terbuka (Fase B/C)
+
+Severity alert memakai pita "first match" sehingga 39 °C dilabeli `danger` dan pesannya masih menyebut pita *healthy*. Validasi `offline_timeout` belum dipakai pada `POST /devices` dan bulk-import. `PUT /dashboards/<id>/layout` belum divalidasi per-elemen. Backup `pre-delete_*`/`pre-restore_*` tidak pernah di-prune. Hapus dashboard diam-diam menghapus kartu absensi. Session idle timeout tidak pernah aktif karena `/api/v1/metrics` belum terdaftar sebagai polling.
+
+## Perbaikan Pascabedah (Fase B)
+
+Dead code + logika backend. Baseline test: 323 lulus → 335 lulus, 0 gagal.
+
+### Diperbaiki
+
+| Area | Perbaikan |
+|---|---|
+| Mesin alert | `SEVERITY_ORDER` kini memuat `info`, jadi rule info-only tidak lagi dilaporkan `danger`. Pesan alert memakai band bersarang untuk menyebut batas yang benar-benar dilanggar: 36 °C → "Melewati batas warning (32°C)", bukan lagi "Di luar batas normal (6–28°C)". Validasi rule disatukan ke `utils.validate_single_alert_rule` (termasuk `min <= max`). |
+| `offline_timeout` | `OfflineTimeoutField` dipakai di POST/PUT/bulk-import (10–604800 detik) plus syarat ≥ `expected_interval`. Sebelumnya POST menerima `-5`. |
+| Hapus dashboard | Dashboard yang masih berisi kartu RFID ditolak 409 — sebelumnya kartu + riwayat absensi terhapus diam-diam. |
+| `PUT /layout` | Elemen non-dict ditolak 400 (sebelumnya 500). |
+| Hapus user | Ditolak bila admin pelaku tidak punya dashboard tujuan, supaya device/kartu tidak jadi yatim. |
+| Backup | `pre-delete_*` dan `pre-restore_*` ikut di-prune (file manual tetap aman). Sebelumnya menumpuk selamanya. |
+| Session | `/api/v1/metrics` dan `/api/v1/chat` didaftarkan sebagai polling agar idle timeout benar-benar aktif. |
+| Restore | `_db_in_use()` membedakan `database is locked` (True) dari DB rusak (False) — restore tidak lagi ditolak selamanya saat DB korup. |
+| Halaman error | 404/401/403/429/500 untuk route halaman merender `error.html`; endpoint `/api/*` tetap JSON. |
+| Dead code | `app/decorators.py`, `role_required`, `can_access_dashboard`, `default_dashboard_for_admin`, route `/alerts` + template, dan sisa JS/CSS untuk id yang tidak ada (`mapPreview`, `pageTitle`, `mapListCount`, `alertFilterInfo`, `chatTab`, `updateJsonPreview`) dihapus. |
+
+### Diketahui masih terbuka (Fase C)
+
+`PUT /dashboards/<id>/layout` belum dipanggil frontend (layout masih localStorage). 8 method `API.*` dan `dashboard_store.js` belum dikonsolidasikan. Dedup notifikasi masih per-proses.

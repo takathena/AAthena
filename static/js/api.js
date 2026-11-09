@@ -230,16 +230,6 @@
         health: () => apiCall('/health'),
         getSystemInfo: () => apiCall('/api/v1/system/info'),
 
-        // Attendance
-        getAttendance: () => apiCall('/api/v1/attendance'),
-        getAttendanceStats: () => apiCall('/api/v1/attendance/stats'),
-        getAttendanceToday: () => apiCall('/api/v1/attendance/today'),
-        getUnregisteredCards: () => apiCall('/api/v1/attendance/unregistered'),
-        getCardholders: () => apiCall('/api/v1/cardholders'),
-        getLastUnknownTap: () => apiCall('/api/v1/attendance/last-unknown'),
-        addCardholder: (data) => apiCall('/api/v1/cardholders', { method: 'POST', body: JSON.stringify(data) }),
-        deleteCardholder: (uid) => apiCall(`/api/v1/cardholders/${encodeURIComponent(uid)}`, { method: 'DELETE' }),
-
         // Raw access
         fetch: apiFetch,
         call: apiCall,

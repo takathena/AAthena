@@ -21,10 +21,6 @@
         { id: 'nav-graph', group: 'Halaman', label: 'Buka Analitik',
           icon: 'fa-chart-line', keywords: ['analitik', 'chart', 'grafik', 'graph'],
           hint: 'G A', action: () => _go('#graph') },
-        { id: 'nav-attendance', group: 'Halaman', label: 'Buka Absensi',
-          icon: 'fa-id-card', keywords: ['absensi', 'attendance', 'rfid', 'kartu'],
-          hint: 'G B', action: () => _go('#attendance'),
-          needs: 'perm:attendance.view' },
         { id: 'nav-devices', group: 'Halaman', label: 'Buka Perangkat',
           icon: 'fa-microchip', keywords: ['perangkat', 'device', 'devices'],
           hint: 'G P', action: () => _go('#devices') },
@@ -56,7 +52,8 @@
         // ---------- ADMIN ----------
         { id: 'manage-users', group: 'Admin', label: 'Kelola user',
           icon: 'fa-users', keywords: ['user', 'pengguna', 'kelola', 'manage', 'admin'],
-          action: () => _click('manageUsersBtn'),
+          action: () => (window.NexusUsers ? window.NexusUsers.open()
+                                           : _click('manageUsersBtn')),
           needs: 'admin' },
         { id: 'global-rules', group: 'Admin', label: 'Global alert rules',
           icon: 'fa-sliders', keywords: ['global', 'rules', 'alert', 'aturan'],

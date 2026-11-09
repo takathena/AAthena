@@ -1,13 +1,13 @@
 """
-NEXUS IoT - Telegram Notification Dispatcher
+NEXUS IoT - Telegram Notification Dispatcher (native async FastAPI)
 """
+import asyncio
+import hashlib
 import html
-import time
 import logging
-import threading
-import requests
 from datetime import datetime, timedelta, timezone
-from queue import Queue, Empty
+
+import httpx
 
 from app.config import get_config
 from app.database import get_db_context
@@ -16,11 +16,9 @@ from app.workspace import get_dashboard_telegram
 logger = logging.getLogger('nexus')
 WIB = timezone(timedelta(hours=7))
 
-_notify_queue = Queue(maxsize=1000)
-_worker_started = False
-_worker_lock = threading.Lock()
+_notify_queue = None  # asyncio.Queue, dibuat lazily di event loop aktif
+_worker_task = None
 _recent_notifications = {}
-_recent_lock = threading.Lock()
 DEDUP_WINDOW_SECONDS = 60
 
 SEVERITY_EMOJI = {'info': 'ℹ️', 'warning': '⚠️', 'danger': '🔥', 'healthy': '✅'}
@@ -99,7 +97,7 @@ def _is_parse_error(resp):
     return "can't parse entities" in str(desc).lower()
 
 
-def _resolve_target(event):
+async def _resolve_target(event):
     """Tentukan bot tujuan sebuah event.
 
     Return (kind, token, chat_id):
@@ -109,16 +107,17 @@ def _resolve_target(event):
     """
     dash_id = event.get('dashboard_id')
     try:
-        with get_db_context() as conn:
+        async with get_db_context() as conn:
             if dash_id is None and event.get('device_id'):
-                row = conn.execute(
+                cur = await conn.execute(
                     'SELECT dashboard_id FROM devices WHERE device_id = ?',
                     (event['device_id'],)
-                ).fetchone()
+                )
+                row = await cur.fetchone()
                 dash_id = row['dashboard_id'] if row else None
             if dash_id is None:
                 return 'default', None, None
-            cfg = get_dashboard_telegram(conn, dash_id)
+            cfg = await get_dashboard_telegram(conn, dash_id)
     except Exception as e:
         logger.warning(f"Gagal membaca Telegram dashboard, pakai bot default: {type(e).__name__}")
         return 'default', None, None
@@ -132,8 +131,12 @@ def _resolve_target(event):
     return 'default', None, None
 
 
-def _send_telegram(event, token=None, chat_id=None):
-    """Kirim satu event. token/chat_id kosong = pakai bot default dari .env."""
+async def _send_telegram(event, token=None, chat_id=None):
+    """Kirim satu event. token/chat_id kosong = pakai bot default dari .env.
+
+    Retry 3x: 429 -> tunggu retry_after, 5xx/network -> backoff 2**attempt.
+    Fallback teks polos sekali bila Telegram menolak entitas HTML.
+    """
     config = get_config()
     if token is None and chat_id is None:
         if not config.TELEGRAM_ENABLED:
@@ -143,8 +146,8 @@ def _send_telegram(event, token=None, chat_id=None):
     if not token or not chat_id:
         return False, 'telegram_not_configured'
 
-    # URL berisi token: jangan pernah di-log, dan jangan log teks exception requests
-    # (str(e) dari requests sering memuat URL lengkap).
+    # URL berisi token: jangan pernah di-log, dan jangan log teks exception
+    # (str(e) dari httpx sering memuat URL lengkap).
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         'chat_id': chat_id,
@@ -155,59 +158,59 @@ def _send_telegram(event, token=None, chat_id=None):
     fell_back = False
 
     attempt = 0
-    while attempt < 3:
-        try:
-            resp = requests.post(url, json=payload, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get('ok'):
-                    return True, None
-                return False, f"telegram_api_error: {data.get('description')}"
-            if not fell_back and _is_parse_error(resp):
-                # Fallback: kirim ulang sebagai teks polos (tanpa parse_mode).
-                logger.warning("Telegram menolak format HTML, kirim ulang sebagai teks polos")
-                payload = {
-                    'chat_id': chat_id,
-                    'text': _format_message(event, html_mode=False),
-                    'disable_web_page_preview': True,
-                }
-                fell_back = True
-                continue  # tidak menghabiskan jatah retry
-            if resp.status_code == 429:
-                retry_after = resp.json().get('parameters', {}).get('retry_after', 5)
-                time.sleep(retry_after)
+    async with httpx.AsyncClient(timeout=10) as client:
+        while attempt < 3:
+            try:
+                resp = await client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get('ok'):
+                        return True, None
+                    return False, f"telegram_api_error: {data.get('description')}"
+                if not fell_back and _is_parse_error(resp):
+                    # Fallback: kirim ulang sebagai teks polos (tanpa parse_mode).
+                    logger.warning("Telegram menolak format HTML, kirim ulang sebagai teks polos")
+                    payload = {
+                        'chat_id': chat_id,
+                        'text': _format_message(event, html_mode=False),
+                        'disable_web_page_preview': True,
+                    }
+                    fell_back = True
+                    continue  # tidak menghabiskan jatah retry
+                if resp.status_code == 429:
+                    retry_after = resp.json().get('parameters', {}).get('retry_after', 5)
+                    await asyncio.sleep(retry_after)
+                    attempt += 1
+                    continue
+                if 500 <= resp.status_code < 600:
+                    await asyncio.sleep(2 ** attempt)
+                    attempt += 1
+                    continue
+                return False, f"telegram_http_{resp.status_code}"
+            except httpx.RequestError:
+                logger.warning("Telegram request error")
+                await asyncio.sleep(2 ** attempt)
                 attempt += 1
-                continue
-            if 500 <= resp.status_code < 600:
-                time.sleep(2 ** attempt)
-                attempt += 1
-                continue
-            return False, f"telegram_http_{resp.status_code}"
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Telegram request error: {type(e).__name__}")
-            time.sleep(2 ** attempt)
-            attempt += 1
 
     return False, 'telegram_max_retries_exceeded'
 
 
 def _event_hash(event):
-    import hashlib
     key = f"{event.get('device_id')}:{event.get('alert_type')}:{event.get('severity')}:{event.get('message')}"
     return hashlib.md5(key.encode('utf-8')).hexdigest()
 
 
 def _is_duplicate(event):
+    import time
     h = _event_hash(event)
     now = time.time()
-    with _recent_lock:
-        expired = [k for k, t in _recent_notifications.items() if now - t > DEDUP_WINDOW_SECONDS]
-        for k in expired:
-            del _recent_notifications[k]
-        if h in _recent_notifications:
-            return True
-        _recent_notifications[h] = now
-        return False
+    expired = [k for k, t in _recent_notifications.items() if now - t > DEDUP_WINDOW_SECONDS]
+    for k in expired:
+        del _recent_notifications[k]
+    if h in _recent_notifications:
+        return True
+    _recent_notifications[h] = now
+    return False
 
 
 def _should_notify(event):
@@ -219,27 +222,27 @@ def _should_notify(event):
     return levels.get(severity, 0) >= levels.get(config.NOTIFY_MIN_SEVERITY, 1)
 
 
-def _dispatch_worker():
+async def _dispatch_worker():
     logger.info("Notification worker started")
     while True:
         try:
-            item = _notify_queue.get(timeout=5)
-        except Empty:
+            item = await asyncio.wait_for(_notify_queue.get(), timeout=5)
+        except asyncio.TimeoutError:
             continue
         if item is None:
             break
         try:
             event, target = item
-            _dispatch_one(event, target)
+            await _dispatch_one(event, target)
         except Exception as e:
             logger.error(f"Notification dispatch error: {e}", exc_info=True)
         finally:
             _notify_queue.task_done()
 
 
-def _dispatch_one(event, target=None):
+async def _dispatch_one(event, target=None):
     config = get_config()
-    kind, token, chat_id = target or _resolve_target(event)
+    kind, token, chat_id = target or await _resolve_target(event)
     if kind == 'muted':
         return
     if kind == 'default' and not (config.NOTIFY_ENABLED and config.TELEGRAM_ENABLED):
@@ -250,9 +253,9 @@ def _dispatch_one(event, target=None):
         return
 
     if kind == 'dashboard':
-        ok, err = _send_telegram(event, token=token, chat_id=chat_id)
+        ok, err = await _send_telegram(event, token=token, chat_id=chat_id)
     else:
-        ok, err = _send_telegram(event)
+        ok, err = await _send_telegram(event)
     if ok:
         logger.info(f"📨 Telegram sent ({kind}): {event.get('device_id')}/{event.get('alert_type')}")
     else:
@@ -260,33 +263,49 @@ def _dispatch_one(event, target=None):
 
 
 def _start_worker_if_needed():
-    global _worker_started
-    with _worker_lock:
-        if _worker_started:
-            return
-        t = threading.Thread(target=_dispatch_worker, name='notify-worker', daemon=True)
-        t.start()
-        _worker_started = True
+    global _notify_queue, _worker_task
+    if _notify_queue is None:
+        _notify_queue = asyncio.Queue(maxsize=1000)
+    if _worker_task is None or _worker_task.done():
+        _worker_task = asyncio.get_running_loop().create_task(_dispatch_worker())
 
 
-def notify_alert_event(event):
-    if not event:
-        return
-    config = get_config()
-    target = _resolve_target(event)
-    kind = target[0]
-    if kind == 'muted':
-        return
-    if kind == 'default' and not (config.NOTIFY_ENABLED and config.TELEGRAM_ENABLED):
-        return
+async def _enqueue(event, target):
     _start_worker_if_needed()
     try:
         _notify_queue.put_nowait((event, target))
-    except Exception as e:
+    except asyncio.QueueFull as e:
         logger.warning(f"Notification queue full: {e}")
 
 
-def send_test_notification(token=None, chat_id=None):
+def notify_alert_event(event):
+    """Enqueue notifikasi alert. Fire-and-forget, kompatibel sync & async caller.
+
+    - Di dalam event loop: dijadwalkan sebagai task (worker asyncio.Queue).
+    - Di luar event loop (thread sync): kirim langsung via dispatcher yang sama.
+    """
+    if not event:
+        return
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(_dispatch_one(event))
+        return
+
+    async def _prepare_and_enqueue():
+        config = get_config()
+        target = await _resolve_target(event)
+        kind = target[0]
+        if kind == 'muted':
+            return
+        if kind == 'default' and not (config.NOTIFY_ENABLED and config.TELEGRAM_ENABLED):
+            return
+        await _enqueue(event, target)
+
+    asyncio.get_running_loop().create_task(_prepare_and_enqueue())
+
+
+async def send_test_notification(token=None, chat_id=None):
     """Kirim pesan tes. Dengan token+chat_id = tes bot sebuah dashboard; tanpa = bot default."""
     event = {
         'event': 'created',
@@ -301,13 +320,13 @@ def send_test_notification(token=None, chat_id=None):
         'timestamp': datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S WIB'),
     }
     if token and chat_id:
-        ok, err = _send_telegram(event, token=token, chat_id=chat_id)
+        ok, err = await _send_telegram(event, token=token, chat_id=chat_id)
         return {'telegram': {'success': ok, 'error': err}}
 
     config = get_config()
     results = {}
     if config.TELEGRAM_ENABLED:
-        ok, err = _send_telegram(event)
+        ok, err = await _send_telegram(event)
         results['telegram'] = {'success': ok, 'error': err}
     if not results:
         results['_info'] = {

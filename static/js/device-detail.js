@@ -323,9 +323,32 @@ function getChartTheme(){
   };
 }
 
+function showChartFallback(msg){
+  const canvas = document.getElementById('historyChartCanvas');
+  const legendEl = document.getElementById('chartLegend');
+  if(legendEl) legendEl.innerHTML = '';
+  if(!canvas) return;
+  if(historyChart){ historyChart.destroy(); historyChart = null; }
+  canvas.style.display = 'none';
+  const parent = canvas.parentElement;
+  if(parent && !parent.querySelector('.chart-empty-msg')){
+    const el = document.createElement('div');
+    el.className = 'chart-empty-msg';
+    el.innerHTML = '<i class="fa-solid fa-satellite-dish"></i><span>' + esc(msg) + '</span>';
+    parent.appendChild(el);
+  }
+}
+
 async function loadHistoryChart(){
   const canvas = document.getElementById('historyChartCanvas');
   if(!canvas) return;
+
+  // Chart.js lazy-load: muat dulu bila belum siap; fallback rapi bila offline
+  if(typeof Chart === 'undefined'){
+    try{ if(window.NexusLazy) await window.NexusLazy.loadChartLibs(); }
+    catch(e){ showChartFallback('Chart.js gagal dimuat. Cek koneksi internet/CDN.'); return; }
+    if(typeof Chart === 'undefined'){ showChartFallback('Chart.js gagal dimuat. Cek koneksi internet/CDN.'); return; }
+  }
 
   try{
     const limit = Math.min(historyHours * 100, 5000);
@@ -334,6 +357,7 @@ async function loadHistoryChart(){
 
     if(!d.success || !d.history || !d.history.length){
       if(historyChart){ historyChart.destroy(); historyChart = null; }
+      const lg = document.getElementById('chartLegend'); if(lg) lg.innerHTML = '';
       canvas.style.display = 'none';
       const parent = canvas.parentElement;
       if(parent && !parent.querySelector('.chart-empty-msg')){

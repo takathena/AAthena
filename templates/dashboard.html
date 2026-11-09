@@ -3,17 +3,13 @@
 {% block title %}NEXUS — Command Center{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/unified.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/command-palette.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/metrics.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/date-range-picker.css') }}">
+{% if chat_enabled %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -34,7 +30,6 @@
     #dashboardSection,
     #mapSection,
     #graphSection,
-    #attendanceSection,
     #devicesSection,
     #alertsSection,
     #settingsSection {
@@ -45,7 +40,7 @@
 <script>
     (function() {
         var hash = (window.location.hash || '').replace('#', '').trim();
-        var valid = ['dashboard', 'map', 'graph', 'attendance', 'devices', 'alerts', 'settings'];
+        var valid = ['dashboard', 'map', 'graph', 'devices', 'alerts', 'settings'];
         var isSettingsHash = /^settings(\/[a-z-]+)?$/.test(hash);
         if (!valid.includes(hash) && !isSettingsHash) {
             try {
@@ -111,10 +106,6 @@
             <span class="icon"><i class="fa-solid fa-chart-line"></i></span>
             <span class="label">Analitik</span>
         </a>
-        <a class="nav-item" href="#attendance" data-section="attendance" data-needs="perm:attendance.view">
-            <span class="icon"><i class="fa-solid fa-id-card"></i></span>
-            <span class="label">Absensi</span>
-        </a>
         <div class="nav-section">Manajemen</div>
         <a class="nav-item" href="#devices" data-section="devices">
             <span class="icon"><i class="fa-solid fa-microchip"></i></span>
@@ -135,8 +126,16 @@
                 <i class="fa-solid fa-circle" style="font-size:6px;"></i>
             </span>
         </a>
+        {% else %}
+        <div class="nav-section">Asisten</div>
+        <a class="nav-item nx-disabled" href="#chatSetup" id="chatDisabledBtn" aria-disabled="true"
+           data-hint="NEXUS AI belum aktif. Set LLM_API_KEY di .env lalu restart container."
+           title="NEXUS AI belum aktif — set LLM_API_KEY di .env lalu restart">
+            <span class="icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+            <span class="label">NEXUS AI</span>
+            <span class="nx-chip-sm">Belum aktif</span>
+        </a>
         {% endif %}
-    </nav>
     </nav>
     <div class="sidebar-footer">
         <a class="nav-item" href="#settings" data-section="settings" title="Pengaturan">
@@ -250,7 +249,6 @@
         {% include 'partials/map_section.html' %}
         {% include 'partials/graph_section.html' %}
         {% include 'partials/devices_section.html' %}
-        {% include 'partials/attendance_section.html' %}
         {% include 'partials/alerts_section.html' %}
         {% include 'partials/settings_section.html' %}
     </div>
@@ -263,19 +261,13 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js"></script>
+<script src="{{ url_for('static', filename='js/lazy-load.js') }}"></script>
+<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/alert_rules_builder.js') }}"></script>
 <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
-<script src="{{ url_for('static', filename='js/attendance.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 <script src="{{ url_for('static', filename='js/users.js') }}"></script>
-<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
-<script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
-<script src="{{ url_for('static', filename='js/command-palette.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/workspace.js') }}"></script>
 {% if chat_enabled %}

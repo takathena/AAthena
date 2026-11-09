@@ -18,7 +18,6 @@ let devices = [];
 let filterDash = 'all', filterDev = 'all';
 let charts = [], timeMinutes = 1440;
 let dashboardId = null, currentTabId = null, tabs = [];
-let attendanceView = 'report';
 let alerts = [], alertStatus = 'all', alertSev = '', alertSearch = '';
 let alertDateStart = '', alertDateEnd = '';
 let alertSelectedIds = new Set();
@@ -161,15 +160,17 @@ function confirmModal(title, message, onConfirm){
 function openDrawer(){
   const d = document.getElementById('drawer');
   const b = document.getElementById('drawerBackdrop');
-  if(d) d.classList.add('open');
+  if(d){ d.classList.add('open'); d.setAttribute('aria-hidden', 'false'); }
   if(b) b.classList.add('active');
+  const m = document.getElementById('menuBtn'); if(m) m.setAttribute('aria-expanded', 'true');
   document.body.classList.add('drawer-open');
 }
 function closeDrawer(){
   const d = document.getElementById('drawer');
   const b = document.getElementById('drawerBackdrop');
-  if(d) d.classList.remove('open');
+  if(d){ d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
   if(b) b.classList.remove('active');
+  const m = document.getElementById('menuBtn'); if(m) m.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('drawer-open');
 }
 document.addEventListener('keydown', e => {
@@ -198,11 +199,11 @@ document.addEventListener('keydown', e => {
 
 /* ===== Theme ===== */
 updateThemeIcon();
-window.ThemeManager.onChange(function(theme){
+window.ThemeManager.onChange(function(){
   updateThemeIcon();
-  if(document.getElementById('s-analytics').classList.contains('active')) loadCharts();
-  if(mobileTrendChart) loadMobileTrend();
-  if(historyChartMobile) loadMobileHistoryChart();
+  const analytics = document.getElementById('s-analytics');
+  if(analytics && analytics.classList.contains('active')) loadCharts();
+  if(typeof mobileTrendChart !== 'undefined' && mobileTrendChart) loadMobileTrend();
 });
 function updateThemeIcon(){
   const i = document.getElementById('themeIcon');
@@ -212,10 +213,6 @@ function updateThemeIcon(){
 
 /* ===== Nav ===== */
 function go(name, opts = {}){
-  if(name === 'attendance' && !hasPerm('attendance.view')){
-    toast('Anda belum punya izin melihat absensi');
-    name = 'dashboard';
-  }
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('s-' + name);
   if(el) el.classList.add('active');
@@ -228,9 +225,8 @@ function go(name, opts = {}){
   closeDrawer();
 
   if(name === 'dashboard'){ loadDashboard(); loadActivity(); }
-  else if(name === 'map') setTimeout(() => initMap(), 100);
-  else if(name === 'analytics') loadTabs().then(() => { if(currentTabId) loadCharts(); });
-  else if(name === 'attendance') loadAttend();
+  else if(name === 'map') setTimeout(() => { if(window.NexusLazy) window.NexusLazy.loadMapLibs().then(()=> initMap()).catch(()=> initMap()); else initMap(); }, 100);
+  else if(name === 'analytics') { const loadAnalytics = ()=> loadTabs().then(() => { if(currentTabId) loadCharts(); }); if(window.NexusLazy) window.NexusLazy.loadChartLibs().then(loadAnalytics).catch(()=>{ const cl=document.getElementById('chartsList'); if(cl) cl.innerHTML='<div class="empty" style="padding:30px;"><div class="empty-title">Chart.js gagal dimuat. Cek koneksi lalu buka lagi Analitik.</div></div>'; }); else loadAnalytics(); }
   else if(name === 'devices') renderDevicesFull();
   else if(name === 'alerts') loadAlerts();
 
@@ -250,7 +246,7 @@ function openDevice(id){
   window.location.href = '/device/' + encodeURIComponent(id);
 }
 
-/* ===== Izin absensi (Paket A) — backend tetap sumber kebenaran ===== */
+/* ===== Izin — backend tetap sumber kebenaran ===== */
 let permState = { loaded:false, isAdmin:false, perms:[] };
 function hasPerm(p){
   if(!permState.loaded) return true;               // belum tahu: biarkan server memutuskan
@@ -443,6 +439,11 @@ function initMap(force){
   }
   if(force && map){ try{ map.remove(); }catch(e){} map = null; mapMarkers = {}; mapReady = false; }
   const el = document.getElementById('mMapFull'); if(!el) return;
+  // Leaflet lazy-load saat section peta dibuka; fallback bila offline
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div class="empty" style="padding:30px;"><div class="empty-title">Gagal memuat peta (offline?). Cek koneksi lalu buka lagi section Peta.</div></div>';
+    return;
+  }
   map = L.map('mMapFull', {zoomControl:true, attributionControl:false}).setView(MAP_DEFAULT_CENTER, MAP_DEFAULT_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
   map.on('click', e => { if(selDeviceId) placeMarker(e.latlng.lat, e.latlng.lng); });
@@ -469,7 +470,7 @@ function mapStyle(d){
   return {color:'#737373', label:'—'};
 }
 function loadMapMarkers(){
-  if(!map) return;
+  if(!map || typeof L === 'undefined') return;
   Object.values(mapMarkers).forEach(m => { try{ map.removeLayer(m); }catch(e){} });
   mapMarkers = {};
   devices.forEach(d => {
@@ -843,6 +844,8 @@ async function loadChartsData(){
 
 function renderChart(ch, hist){
   const canvas = document.getElementById(`${ch.id}_c`); if(!canvas) return;
+  // Chart.js lazy-load: fallback pesan bila offline/baru gagal
+  if(typeof Chart === 'undefined'){ const w=document.getElementById(ch.id); if(w) w.innerHTML += '<div class="empty" style="padding:20px;"><div class="empty-title">Chart.js gagal dimuat. Cek koneksi internet/CDN.</div></div>'; return; }
   const ctx = canvas.getContext('2d');
   if(ch.chartInstance) try{ ch.chartInstance.destroy(); }catch(e){}
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
@@ -1052,182 +1055,6 @@ function removeChart(id){
   confirmModal('Hapus Diagram', `Hapus diagram "${ch.title}"?`, async () => {
     await api(`/api/v1/widgets/${ch.widgetId}`, {method:'DELETE'});
     loadCharts();
-  });
-}
-
-/* ===== Attendance ===== */
-function setAttendView(v){
-  attendanceView = v;
-  document.querySelectorAll('.attend-tab').forEach(t => t.classList.toggle('active', t.dataset.t === v));
-  loadAttend();
-}
-function resetAttendDate(){
-  const s = document.getElementById('dateStart');
-  const e = document.getElementById('dateEnd');
-  if(s) s.value = '';
-  if(e) e.value = '';
-  loadAttend();
-  toast('Filter tanggal direset');
-}
-async function loadAttend(){
-  if(!hasPerm('attendance.view')) return;   // Paket A: tanpa izin, jangan minta data absensi
-  const c = document.getElementById('attendList'); if(!c) return;
-  c.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  try{
-    const sr = await api('/api/v1/attendance/stats');
-    const sd = await sr.json();
-    if(sd.success){
-      document.getElementById('sHadir').textContent = sd.stats.hadir_hari_ini || 0;
-      document.getElementById('sKartu').textContent = sd.stats.total_kartu_aktif || 0;
-      document.getElementById('sUnknown').textContent = sd.stats.kartu_belum_terdaftar || 0;
-      document.getElementById('attendSub').textContent = `${sd.stats.hadir_hari_ini || 0} hadir hari ini`;
-    }
-  }catch(e){}
-
-  const start = document.getElementById('dateStart').value, end = document.getElementById('dateEnd').value;
-  try{
-    if(attendanceView === 'report'){
-      const params = new URLSearchParams(); if(start) params.set('start', start); if(end) params.set('end', end);
-      const r = await api(`/api/v1/attendance/report?${params}`);
-      const d = await r.json();
-      const rows = d.success ? (d.report || []) : [];
-      if(!rows.length){ c.innerHTML = '<div class="empty"><i class="fa-solid fa-clipboard-list"></i><div class="empty-title">Belum ada laporan</div></div>'; return; }
-      c.innerHTML = rows.map(r => {
-      const cleanTime = (s) => s ? String(s).split(' ')[1]?.split('.')[0] || '-' : '-';
-      const ci = cleanTime(r.check_in);
-      const co = (r.check_out && r.check_out !== r.check_in) ? cleanTime(r.check_out) : '-';
-        let duration = '-';
-        if(r.check_in && r.check_out && r.check_in !== r.check_out){
-          try{
-            const t1 = new Date(r.check_in.replace(' ','T')+'+07:00').getTime();
-            const t2 = new Date(r.check_out.replace(' ','T')+'+07:00').getTime();
-            const mins = Math.floor((t2-t1)/60000);
-            if(mins > 0){
-              const h = Math.floor(mins/60);
-              const m = mins % 60;
-              duration = h > 0 ? `${h}j ${m}m` : `${m}m`;
-            }
-          }catch(e){}
-        }
-        return `<div class="attend-item">
-          <div class="attend-head">
-            <div class="attend-name">${esc(r.nama)}</div>
-            <div class="attend-time">${esc(r.day)}</div>
-          </div>
-          <div class="attend-uid">${esc(r.uid)}</div>
-          <div class="attend-grid">
-            <div><div class="attend-cell-label">Masuk</div><div class="attend-cell-val ok">${ci}</div></div>
-            <div><div class="attend-cell-label">Keluar</div><div class="attend-cell-val warn">${co}</div></div>
-            <div><div class="attend-cell-label">Durasi</div><div class="attend-cell-val mute">${duration}</div></div>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      const r = await api('/api/v1/attendance?limit=200');
-      const d = await r.json();
-      let rows = d.success ? (d.attendance || []) : [];
-      if(start || end){
-        const st = start ? new Date(start+'T00:00:00+07:00').getTime() : 0;
-        const en = end ? new Date(end+'T23:59:59+07:00').getTime() : Infinity;
-        rows = rows.filter(x => {
-          const t = new Date(String(x.timestamp).replace(' ','T')+'+07:00').getTime();
-          return t >= st && t <= en;
-        });
-      }
-      if(!rows.length){ c.innerHTML = '<div class="empty"><i class="fa-solid fa-id-card"></i><div class="empty-title">Belum ada aktivitas</div></div>'; return; }
-      c.innerHTML = rows.map(r => {
-        const dt = fmtDateSplit(r.timestamp);
-        return `<div class="attend-item">
-          <div class="attend-head">
-            <div class="attend-name">${esc(r.nama)}</div>
-            <div class="attend-time">${dt.date} ${dt.time}</div>
-          </div>
-          <div class="attend-grid" style="grid-template-columns:1fr 1fr;">
-            <div><div class="attend-cell-label">UID</div><div class="attend-cell-val">${esc(r.uid)}</div></div>
-            <div><div class="attend-cell-label">Device</div><div class="attend-cell-val">${esc(r.device_id)}</div></div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-  }catch(e){ c.innerHTML = '<div class="empty"><div class="empty-title">Gagal memuat</div></div>'; }
-}
-function exportAttend(){
-  const start = document.getElementById('dateStart').value, end = document.getElementById('dateEnd').value;
-  const params = new URLSearchParams(); if(start) params.set('start', start); if(end) params.set('end', end);
-  window.location.href = '/api/v1/attendance/export?' + params.toString();
-}
-async function captureLastTap(){
-  const r = await api('/api/v1/attendance/last-unknown');
-  const d = await r.json();
-  if(d.success && d.uid) document.getElementById('cardUid').value = d.uid;
-  else alert('Belum ada kartu asing');
-}
-function openCardholder(){
-  document.getElementById('cardUid').value = '';
-  document.getElementById('cardNama').value = '';
-  openModal('m-card');
-}
-async function submitCardholder(){
-  const uid = document.getElementById('cardUid').value.trim();
-  const nama = document.getElementById('cardNama').value.trim();
-  if(!uid || !nama){ alert('UID dan Nama wajib diisi'); return; }
-  const r = await api('/api/v1/cardholders', {method:'POST', body:JSON.stringify({uid, nama})});
-  const d = await r.json();
-  if(d.success){ closeModal('m-card'); loadAttend(); toast('Kartu terdaftar'); }
-  else alert(d.error || 'Gagal');
-}
-async function openStatDetail(type){
-  const title = document.getElementById('statTitle');
-  const body = document.getElementById('statBody');
-  body.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  openModal('m-stat');
-  try{
-    if(type === 'hadir'){
-      title.textContent = 'Hadir Hari Ini';
-      const r = await api('/api/v1/attendance/today');
-      const d = await r.json();
-      const rows = d.success ? (d.hadir || []) : [];
-      if(!rows.length){ body.innerHTML = '<div class="empty"><div class="empty-title">Belum ada tap</div></div>'; return; }
-      body.innerHTML = rows.map(x => `<div class="attend-item" style="padding:12px 0;">
-        <div class="attend-head"><div class="attend-name">${esc(x.nama)}</div><div class="attend-time">${fmtDateSplit(x.pertama_tap).time}</div></div>
-        <div class="attend-uid">${esc(x.uid)}</div>
-      </div>`).join('');
-    } else if(type === 'total'){
-      title.textContent = 'Total Kartu Aktif';
-      const r = await api('/api/v1/cardholders');
-      const d = await r.json();
-      const rows = d.success ? (d.cardholders || []) : [];
-      if(!rows.length){ body.innerHTML = '<div class="empty"><div class="empty-title">Belum ada kartu</div></div>'; return; }
-      body.innerHTML = rows.map(x => `<div class="attend-item" style="padding:12px 0;">
-        <div class="attend-head">
-          <div class="attend-name">${esc(x.nama)}</div>
-          <button class="chart-act danger" onclick="deleteCardholder('${esc(x.uid)}')"><i class="fa-solid fa-trash"></i></button>
-        </div>
-        <div class="attend-uid">${esc(x.uid)}</div>
-      </div>`).join('');
-    } else {
-      title.textContent = 'Kartu Belum Terdaftar';
-      const r = await api('/api/v1/attendance/unregistered');
-      const d = await r.json();
-      const rows = d.success ? (d.kartu || []) : [];
-      if(!rows.length){ body.innerHTML = '<div class="empty"><div class="empty-title">Semua kartu terdaftar</div></div>'; return; }
-      body.innerHTML = rows.map(x => {
-        const dt = fmtDateSplit(x.terakhir_tap);
-        return `<div class="attend-item" style="padding:12px 0;">
-          <div class="attend-head">
-            <div class="attend-name mono" style="font-family:var(--mono);font-size:13px;">${esc(x.uid)}</div>
-            <button class="btn-soft" style="flex-shrink:0;padding:6px 12px;font-size:11.5px;min-height:32px;" onclick="closeModal('m-stat');openCardholder();setTimeout(()=>{document.getElementById('cardUid').value='${esc(x.uid)}';},150)">Daftar</button>
-          </div>
-          <div class="attend-time" style="text-align:left;">${dt.date} ${dt.time}</div>
-        </div>`;
-      }).join('');
-    }
-  }catch(e){ body.innerHTML = '<div class="empty"><div class="empty-title">Gagal memuat</div></div>'; }
-}
-async function deleteCardholder(uid){
-  confirmModal('Hapus Kartu', 'Hapus kartu ini?', async () => {
-    await api(`/api/v1/cardholders/${encodeURIComponent(uid)}`, {method:'DELETE'});
-    openStatDetail('total');
   });
 }
 
@@ -1529,6 +1356,11 @@ async function loadMobileTrend(){
   const canvas = document.getElementById('mobileTrendCanvas');
   const empty = document.getElementById('mobileTrendEmpty');
   if(!canvas) return;
+  // Chart.js lazy: muat dulu bila belum siap; fallback bila offline
+  if(typeof Chart === 'undefined'){
+    if(window.NexusLazy){ try{ await window.NexusLazy.loadChartLibs(); }catch(e){ if(empty){ empty.style.display='flex'; empty.textContent='Chart.js gagal dimuat. Cek koneksi internet/CDN.'; } return; } }
+    if(typeof Chart === 'undefined'){ if(empty){ empty.style.display='flex'; empty.textContent='Chart.js gagal dimuat. Cek koneksi internet/CDN.'; } return; }
+  }
 
   try{
     const r = await api(`/api/v1/alerts/trend?hours=${trendHours}`);
@@ -2805,8 +2637,6 @@ async function openSystemInfo(){
       ['Data Sensor', (i.sensor_data_count ?? 0).toLocaleString('id-ID')],
       ['Alert Aktif', i.active_alerts ?? 0],
       ['Riwayat Alert', (i.alert_history_count ?? 0).toLocaleString('id-ID')],
-      ['Absensi', i.attendance_count == null ? '—' : i.attendance_count.toLocaleString('id-ID')],
-      ['Kartu', i.cardholder_count ?? '—'],
       ['Ukuran DB', `${i.database_size_mb ?? 0} MB`],
       ['Retensi', `${i.data_retention_days ?? 30} hari`],
     ];
@@ -2897,4 +2727,3 @@ if(!window.showToast){
 setInterval(loadDashboard, 30000);
 setInterval(() => { if(document.getElementById('s-dashboard').classList.contains('active')) loadActivity(); }, 60000);
 setInterval(() => { if(document.getElementById('s-alerts').classList.contains('active')) loadAlerts(); }, 20000);
-setInterval(() => { if(document.getElementById('s-attendance').classList.contains('active')) loadAttend(); }, 15000);

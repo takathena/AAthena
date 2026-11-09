@@ -84,8 +84,14 @@ def _db_in_use(db_path):
         conn.execute('BEGIN EXCLUSIVE')
         conn.execute('ROLLBACK')
         return False
-    except sqlite3.OperationalError:
-        return True
+    except sqlite3.OperationalError as e:
+        # 'database is locked' → proses lain masih membuka DB, ganti DB berbahaya.
+        # Error lain (mis. 'database disk image is malformed') berarti DB rusak,
+        # BUKAN sedang dipakai — restore justru harus tetap boleh dijalankan.
+        if 'locked' in str(e).lower():
+            return True
+        logger.warning(f"_db_in_use: OperationalError non-lock pada {db_path}: {e}")
+        return False
     finally:
         if conn is not None:
             conn.close()

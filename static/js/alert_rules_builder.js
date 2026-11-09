@@ -91,14 +91,6 @@
 
         item.querySelector('.alert-rule-sensor-select').addEventListener('change', function() { onSensorChange(this); });
         item.querySelector('.alert-rule-remove').addEventListener('click', function() { onRemove(this); });
-        item.querySelectorAll('.severity-input').forEach(input => {
-            input.addEventListener('input', () => {
-                const container = item.closest('.alert-rules-builder');
-                const mode = container.id.includes('add') ? 'add' : 'edit';
-                window.updateJsonPreview(mode);
-            });
-        });
-
         return item;
     }
 
@@ -111,20 +103,15 @@
             row.querySelector('[data-field="min"]').value = preset.defaults[severity].min;
             row.querySelector('[data-field="max"]').value = preset.defaults[severity].max;
         });
-        const container = item.closest('.alert-rules-builder');
-        const mode = container.id.includes('add') ? 'add' : 'edit';
-        window.updateJsonPreview(mode);
     }
 
     function onRemove(btn) {
         const item = btn.closest('.alert-rule-item');
         const container = item.parentElement;
-        const mode = container.id.includes('add') ? 'add' : 'edit';
         item.remove();
         if (container.querySelectorAll('.alert-rule-item').length === 0) {
             container.innerHTML = '<div class="alert-rule-empty">Belum ada custom rule. Pakai global default.</div>';
         }
-        window.updateJsonPreview(mode);
     }
 
     window.addAlertRule = function(mode = 'add') {
@@ -179,9 +166,4 @@
         });
     };
 
-    window.updateJsonPreview = function(mode) {
-        const rules = window.collectAlertRules(mode);
-        const textarea = document.getElementById(mode === 'add' ? 'addDeviceAlertRules' : 'editDeviceAlertRules');
-        if (textarea) textarea.value = rules ? JSON.stringify(rules, null, 2) : '';
-    };
 })();

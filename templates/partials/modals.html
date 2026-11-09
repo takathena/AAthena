@@ -364,37 +364,6 @@
     </div>
 </div>
 
-<!-- CARDHOLDER MODAL -->
-<div class="modal" id="cardholderModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Daftarkan Kartu</h3>
-            <button class="modal-close">&times;</button>
-        </div>
-        <div class="form-group">
-            <label>UID Kartu</label>
-            <div style="display:flex;gap:8px;">
-                <input type="text" id="cardholderUid" placeholder="0x010dd605" style="flex:1;"
-                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <button class="btn btn-secondary" data-action="capture-last-tap" title="Ambil UID tap terakhir" style="flex:0 0 auto;">
-                    <i class="fa-solid fa-crosshairs"></i> Tangkap
-                </button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Nama Pemilik</label>
-            <input type="text" id="cardholderNama" placeholder="Nama lengkap"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-        </div>
-        <div class="modal-actions">
-            <button class="btn btn-secondary modal-close">Batal</button>
-            <button class="btn btn-success" data-action="submit-cardholder">
-                <i class="fa-solid fa-check"></i> Simpan
-            </button>
-        </div>
-    </div>
-</div>
-
 <!-- STAT DETAIL MODAL -->
 <div class="modal" id="statDetailModal">
     <div class="modal-content" style="max-width:640px;">
@@ -540,7 +509,7 @@
                 <option value="fa-temperature-half">Suhu</option>
                 <option value="fa-droplet">Kelembaban</option>
                 <option value="fa-fire">Api / Gas</option>
-                <option value="fa-id-card">RFID / Absensi</option>
+                <option value="fa-id-card">RFID</option>
                 <option value="fa-map">Peta</option>
                 <option value="fa-microchip">Perangkat</option>
                 <option value="fa-bell">Alert</option>
@@ -582,77 +551,9 @@
     </div>
 </div>
 
-<!-- USER MANAGEMENT MODAL -->
-<div class="modal" id="userModal">
-    <div class="modal-content" style="max-width:600px;">
-        <div class="modal-header">
-            <h3 id="userModalTitle"><i class="fa-solid fa-users"></i> Kelola User</h3>
-            <button class="modal-close">&times;</button>
-        </div>
-
-        <div id="userListView">
-            <div class="user-list" id="userList">
-                <div class="loading" style="padding:32px;text-align:center;">
-                    <div class="spinner"></div>
-                    <div style="margin-top:10px;font-size:12.5px;color:var(--text-3);">Memuat user...</div>
-                </div>
-            </div>
-        </div>
-
-        <div id="userFormView" style="display:none;">
-            <input type="hidden" id="userFormId" value="">
-
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="userFormUsername" placeholder="username"
-                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <small style="font-size:10.5px;color:var(--text-3);margin-top:4px;display:block;">
-                    Huruf, angka, titik, dash, underscore. Min 3 karakter.
-                </small>
-            </div>
-
-            <div class="form-group">
-                <label>Nama Tampilan</label>
-                <input type="text" id="userFormDisplayName" placeholder="Nama lengkap"
-                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            </div>
-
-            <div class="form-group">
-                <label id="userFormPasswordLabel">Password</label>
-                <input type="password" id="userFormPassword"
-                       placeholder="Minimal 8 karakter"
-                       autocomplete="new-password">
-                <small style="font-size:10.5px;color:var(--text-3);margin-top:4px;display:block;"
-                       id="userFormPasswordHint">
-                    Minimal 8 karakter.
-                </small>
-            </div>
-
-            <div class="form-group">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
-                    <input type="checkbox" id="userFormIsAdmin"
-                           style="width:15px;height:15px;accent-color:var(--text);cursor:pointer;">
-                    <span>Admin (bisa kelola user & akses semua fitur)</span>
-                </label>
-            </div>
-
-            <div id="userFormError" style="display:none;background:var(--accent-crit-bg);border:1px solid var(--accent-crit);color:var(--accent-crit);padding:9px 12px;border-radius:var(--radius-md);font-size:12.5px;font-weight:500;margin-top:8px;"></div>
-        </div>
-
-        <div class="modal-actions" id="userModalActions">
-            <button class="btn btn-primary" id="userAddNewBtn" style="width:100%;">
-                <i class="fa-solid fa-plus"></i> Tambah User Baru
-            </button>
-
-            <button class="btn btn-secondary" id="userCancelBtn" style="display:none;flex:1;">
-                Batal
-            </button>
-            <button class="btn btn-primary" id="userSaveBtn" style="display:none;flex:1;">
-                <i class="fa-solid fa-check"></i> <span id="userSaveBtnLabel">Simpan</span>
-            </button>
-        </div>
-    </div>
-</div>
+<!-- Kelola pengguna dipindah ke drawer di partials/settings_section.html -->
+<!-- (modul users.js). Modal lama ini dihapus: id form-nya bentrok dengan drawer,
+     sehingga getElementById() selalu menulis ke form yang tersembunyi. -->
 
 <!-- BACKUP MODAL -->
 <div class="modal" id="backupModal">
@@ -787,7 +688,7 @@
             <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;flex-shrink:0;font-size:14px;"></i>
             <div>
                 <b style="display:block;margin-bottom:4px;">Tindakan ini BERBAHAYA!</b>
-                Semua data saat ini (device, sensor, alert, absensi) akan <b>digantikan</b> dengan data dari file backup.
+                Semua data saat ini (device, sensor, alert) akan <b>digantikan</b> dengan data dari file backup.
                 <br><br>
                 Pre-restore backup otomatis dibuat sebelum proses. Restart container <b>WAJIB</b> dilakukan setelah restore.
             </div>
@@ -1073,7 +974,6 @@
                 <label><input type="checkbox" value="sensor_data" checked> Data sensor</label>
                 <label><input type="checkbox" value="alert_history"> Riwayat alert</label>
                 <label><input type="checkbox" value="device_status_log"> Log status perangkat</label>
-                <label><input type="checkbox" value="attendance"> Absensi</label>
                 <label><input type="checkbox" value="alerts_inactive"> Alert nonaktif</label>
             </div>
         </div>

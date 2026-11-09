@@ -213,11 +213,33 @@
 /* Dipakai oleh NexusUI.applyNeeds() di ui.js. Backend tetap sumber kebenaran. */
 .nx-hidden { display: none !important; }
 
+/* ---------- Fitur ada tapi belum dikonfigurasi ---------- */
+/* Elemen tetap terlihat supaya pengguna tahu fiturnya ada; ui.js menjelaskan
+   cara mengaktifkannya saat diklik. */
+.nx-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nx-disabled:hover { background: transparent; color: var(--text-3); }
+.nx-chip-sm {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 /* ---------- Halaman Pengaturan (Fase 1) ---------- */
 .nx-settings { padding: 24px; max-width: 1040px; }
 .nx-settings__header { margin-bottom: 20px; }
 .nx-settings__title { font-size: 20px; font-weight: 600; color: var(--text); margin: 0; }
 .nx-settings__layout { display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: start; }
+.nx-settings__panels { min-width: 0; }
 .nx-settings__tabs { display: flex; flex-direction: column; gap: 2px; }
 .nx-settings__tab {
   display: flex;

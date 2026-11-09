@@ -8,14 +8,12 @@
 
     const state = {
         devices: [],
-        attendance: [],
         currentSection: 'dashboard',
         charts: [],
         chartIdCounter: 0,
         globalTimeMinutes: 1440,
         deviceFilter: 'all',
         deviceFilterFull: 'all',
-        mapPreview: null,
         mapFull: null,
         markerCluster: null,
         marker: null,
@@ -25,8 +23,6 @@
         refreshTimeout: null,
         autoRefreshInterval: null,
         dashboardInterval: null,
-        attendanceInterval: null,
-        attendanceLastId: 0,
         deviceSearchTerm: '',
         alertSearchTerm: '',
         analyticsTabs: [],
@@ -42,7 +38,6 @@
         mapHasUnsavedChange: false,
         activityRefreshInterval: null,
         markerMap: new Map(),
-        attendanceView: 'report',
         deleteTarget: null,
         canvasHeight: 720,
     };
@@ -85,12 +80,7 @@
         CANVAS_HEIGHT: 'nexus-chart-canvas-height',
     };
 
-    const DASHBOARD_SECTIONS = ['dashboard', 'map', 'graph', 'attendance', 'devices', 'alerts', 'settings'];
-
-    function canViewAttendance() {
-        if (!userState.permissionsLoaded) return true;
-        return userState.currentIsAdmin || (userState.permissions || []).includes('attendance.view');
-    }
+    const DASHBOARD_SECTIONS = ['dashboard', 'map', 'graph', 'devices', 'alerts', 'settings'];
 
     function refreshPermissionGates() {
         if (!window.NexusUI) return;
@@ -238,11 +228,6 @@
     // ==========================================
     function showSection(section, skipHistory = false) {
         if (!DASHBOARD_SECTIONS.includes(section)) section = 'dashboard';
-        if (section === 'attendance' && !canViewAttendance()) {
-            showToast('Anda belum punya izin melihat absensi', 'warning');
-            section = 'dashboard';
-            updateHash('dashboard', true);
-        }
         state.currentSection = section;
 
         DASHBOARD_SECTIONS.forEach(s => {
@@ -252,9 +237,6 @@
             else { el.style.display = 'none'; el.setAttribute('hidden', ''); }
         });
 
-        const titles = { dashboard: 'Dashboard', map: 'Peta Interaktif', graph: 'Analitik Sensor', devices: 'Manajemen Perangkat', attendance: 'Absensi', alerts: 'Alert Center', settings: 'Pengaturan' };
-        const titleEl = $('pageTitle');
-        if (titleEl) titleEl.textContent = titles[section] || 'Dashboard';
 
         $$('.sidebar .nav-item[data-section]').forEach(item => {
             item.classList.toggle('active', item.getAttribute('data-section') === section);
@@ -268,37 +250,49 @@
             if (section === 'alerts') {
                 searchInput.value = state.alertSearchTerm || '';
                 searchInput.placeholder = 'Cari alert...';
-            } else if (section === 'attendance') {
-                searchInput.value = state.deviceSearchTerm || '';
-                searchInput.placeholder = 'Cari nama/UID/perangkat...';
             } else {
                 searchInput.value = state.deviceSearchTerm || '';
                 searchInput.placeholder = 'Cari perangkat...';
             }
         }
 
-        if (section !== 'attendance') stopAttendancePolling();
-        if (section === 'attendance') { loadAttendance(); startAttendancePolling(); }
         if (section === 'settings' && window.NexusSettings) { NexusSettings.show(getSettingsTabFromHash()); }
         if (section === 'map') {
             setTimeout(() => {
                 if (!state.mapFull) initFullMap();
-                loadMarkers(state.mapFull, true);
-                renderMapDeviceList();
-                if (state.mapFull) state.mapFull.invalidateSize();
-                updateMapSelectedBanner();
+                // Leaflet lazy: markers/invalidate ditangani initFullMap setelah map siap (atau fallback offline)
+                if (state.mapFull) {
+                    loadMarkers(state.mapFull, true);
+                    renderMapDeviceList();
+                    state.mapFull.invalidateSize();
+                    updateMapSelectedBanner();
+                } else {
+                    renderMapDeviceList();
+                    updateMapSelectedBanner();
+                }
             }, 100);
         }
         if (section === 'dashboard') {
-            setTimeout(() => { if (state.mapPreview) state.mapPreview.invalidateSize(); loadActivityFeed(); }, 100);
+            setTimeout(() => { loadActivityFeed(); }, 100);
         }
         if (section === 'graph') {
             setTimeout(() => {
-                loadAnalyticsTabs();
-                refreshAllCharts();
-                setTimeout(() => {
-                    state.charts.forEach(c => { if (c.chartInstance) try { c.chartInstance.resize(); } catch (e) {} });
-                }, 200);
+                const runGraph = () => {
+                    loadAnalyticsTabs();
+                    refreshAllCharts();
+                    setTimeout(() => {
+                        state.charts.forEach(c => { if (c.chartInstance) try { c.chartInstance.resize(); } catch (e) {} });
+                    }, 200);
+                };
+                // Chart.js/interact.js lazy-load saat graph dibuka; fallback pesan bila offline
+                if (window.NexusLazy && typeof window.NexusLazy.loadChartLibs === 'function') {
+                    window.NexusLazy.loadChartLibs().then(runGraph).catch(() => {
+                        const grid = $('chartsGrid');
+                        if (grid) grid.innerHTML = '<div class="chart-empty" style="padding:30px;text-align:center;">Gagal memuat Chart.js (offline?). Cek koneksi lalu buka lagi section Analitik.</div>';
+                    });
+                } else {
+                    runGraph();
+                }
             }, 100);
         }
         if (section === 'alerts' && window.NexusAlerts && typeof window.NexusAlerts.load === 'function') {
@@ -335,20 +329,24 @@
         const { summary, devices } = result.data;
         state.devices = Array.isArray(devices) ? devices : [];
 
-        const M = window.NexusMetrics;
         const total = summary.total_devices || 0;
         const online = summary.online_devices || 0;
         const offline = summary.offline_devices || 0;
         const alerts = summary.active_alerts || 0;
-
-        if (M) {
+        const applyMetrics = () => {
+            const M = window.NexusMetrics;
+            if (!M) return;
             M.setValue('totalDevices', total);
             M.setValue('onlineDevices', online);
             M.setValue('offlineDevices', offline);
             M.setValue('activeAlerts', alerts);
-
             // Sparkline real dari /api/v1/metrics/devices-history
             loadDashboardMetricsHistory();
+        };
+        if (window.NexusMetrics) applyMetrics();
+        // metrics.css/js lazy saat section dibuka
+        else if (window.NexusLazy && typeof window.NexusLazy.loadMetrics === 'function') {
+            window.NexusLazy.loadMetrics().then(applyMetrics).catch(() => {});
         }
 
         const setText = (id, val) => { const el = $(id); if (el) el.textContent = val; };
@@ -357,7 +355,6 @@
         const onboarding = $('onboardingCard');
         if (onboarding) onboarding.hidden = (summary.total_devices || 0) > 0;
         updateHealthRing(summary);
-        loadMarkers(state.mapPreview);
         if (state.mapFull) loadMarkers(state.mapFull, true);
         updateFilterCounts();
         renderFilteredDevices();
@@ -624,17 +621,21 @@
     // ==========================================
     // MAP
     // ==========================================
-    function initMapPreview() {
-        if (state.mapPreview) return;
-        const el = $('mapPreview'); if (!el) return;
-        state.mapPreview = L.map('mapPreview', { zoomControl: true, attributionControl: false }).setView([-2.5489, 118.0149], 5);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapPreview);
-        registerMapInstance(state.mapPreview);
-    }
-
-    function initFullMap() {
+    async function initFullMap() {
         if (state.mapFull) return;
         const el = $('mapFull'); if (!el) return;
+        // Leaflet lazy-load saat section peta dibuka; fallback bila offline
+        if (typeof L === 'undefined') {
+            el.innerHTML = '<div class="map-fallback" style="padding:30px;text-align:center;">Memuat peta...</div>';
+            try {
+                if (window.NexusLazy) await window.NexusLazy.loadMapLibs();
+            } catch (e) { /* ditangani di bawah */ }
+            if (typeof L === 'undefined') {
+                el.innerHTML = '<div class="map-fallback" style="padding:30px;text-align:center;">Gagal memuat peta (offline?). Cek koneksi lalu buka lagi section Peta.</div>';
+                return;
+            }
+            el.innerHTML = '';
+        }
         state.mapFull = L.map('mapFull').setView([-2.5489, 118.0149], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapFull);
         if (typeof L.markerClusterGroup === 'function') {
@@ -646,6 +647,10 @@
             placeMarkerAt(e.latlng.lat, e.latlng.lng);
         });
         registerMapInstance(state.mapFull);
+        loadMarkers(state.mapFull, true);
+        renderMapDeviceList();
+        try { state.mapFull.invalidateSize(); } catch (e) {}
+        updateMapSelectedBanner();
     }
 
     function placeMarkerAt(lat, lng) {
@@ -679,7 +684,7 @@
     }
 
     function loadMarkers(map, useCluster = false) {
-        if (!map) return;
+        if (!map || typeof L === 'undefined') return;
         if (state.marker && !state.mapHasUnsavedChange) { map.removeLayer(state.marker); state.marker = null; }
         const validIds = new Set();
         state.devices.forEach(d => {
@@ -771,7 +776,6 @@
         else if (filter === 'offline') list = list.filter(d => d.status === 'offline');
         else if (filter === 'alert') list = list.filter(d => d.has_alert === true);
         if (term) list = list.filter(d => (d.device_name || '').toLowerCase().includes(term) || (d.device_id || '').toLowerCase().includes(term) || (d.location || '').toLowerCase().includes(term));
-        const countEl = $('mapListCount'); if (countEl) countEl.textContent = list.length;
         if (list.length === 0) { container.innerHTML = `<div class="map-empty-list">${term ? 'Tidak ada device yang cocok' : 'Tidak ada device di filter ini'}</div>`; return; }
         container.innerHTML = list.map(d => {
             const style = getDeviceMapStyle(d);
@@ -963,155 +967,6 @@
     }
 
     // ==========================================
-    // ATTENDANCE
-    // ==========================================
-    async function loadAttendanceStats() {
-        const result = await API.getAttendanceStats();
-        if (handleAttendanceDenied(result)) return;
-        if (!result.success) return;
-        const s = result.data.stats || {};
-        const setVal = (id, v) => { const el = $(id); if (el) el.textContent = v ?? 0; };
-        setVal('statHadirHariIni', s.hadir_hari_ini);
-        setVal('statTotalKartu', s.total_kartu_aktif);
-        setVal('statBelumTerdaftar', s.kartu_belum_terdaftar);
-
-        // Sparkline real dari /api/v1/metrics/attendance-history
-        if (typeof window.__nexusRenderAttendanceSparks === 'function') {
-            window.__nexusRenderAttendanceSparks();
-        }
-    }
-
-    function setAttendanceView(view) {
-        state.attendanceView = view;
-        document.querySelectorAll('.attendance-tab').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === view);
-        });
-        loadAttendance();
-    }
-
-    function handleAttendanceDenied(res) {
-        if (res && res.status === 403 && res.data && res.data.code === 'PERMISSION_DENIED') {
-            stopAttendancePolling();
-            userState.permissions = (userState.permissions || []).filter(p => p.indexOf('attendance.') !== 0);
-            userState.permissionsLoaded = true;
-            refreshPermissionGates();
-            showToast('Izin absensi Anda dicabut', 'warning');
-            showSection('dashboard');
-            return true;
-        }
-        return false;
-    }
-
-    async function loadAttendance() {
-        const tbody = $('attendanceTableBody'); const thead = $('attendanceThead');
-        if (!tbody) return;
-        const startVal = ($('attendanceStartDate') || {}).value || '';
-        const endVal = ($('attendanceEndDate') || {}).value || '';
-        if (state.attendanceView === 'report') {
-            const params = new URLSearchParams();
-            if (startVal) params.set('start', startVal);
-            if (endVal) params.set('end', endVal);
-            const res = await API.call(`/api/v1/attendance/report?${params}`);
-            if (handleAttendanceDenied(res)) return;
-            if (!res.success) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--accent-crit);">Gagal memuat</td></tr>`; return; }
-            if (thead) thead.innerHTML = `<tr><th>Tanggal</th><th>Nama</th><th>UID</th><th>Check-in</th><th>Check-out</th></tr>`;
-            const rows = res.data.report || [];
-            if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-clipboard-list"></i><h3>Belum Ada Laporan</h3></div></td></tr>`; return; }
-            tbody.innerHTML = rows.map(r => {
-                const cleanTime = (s) => s ? String(s).split(' ')[1]?.split('.')[0] || '-' : '-';
-                const ci = cleanTime(r.check_in);
-                const co = (r.check_out && r.check_out !== r.check_in) ? cleanTime(r.check_out) : '-';
-                return `<tr><td><span style="font-family:var(--mono);font-size:12px;">${escapeHtml(r.day)}</span></td><td>${escapeHtml(r.nama)}</td><td><span class="device-id">${escapeHtml(r.uid)}</span></td><td><span style="color:var(--accent-ok);font-weight:600;font-family:var(--mono);font-size:12px;">${ci}</span></td><td><span style="color:var(--accent-warn);font-weight:600;font-family:var(--mono);font-size:12px;">${co}</span></td></tr>`;
-            }).join('');
-        } else {
-            const result = await API.getAttendance();
-            if (!result.success) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--accent-crit);">Gagal memuat</td></tr>`; return; }
-            if (thead) thead.innerHTML = `<tr><th>Nama</th><th>UID</th><th>Perangkat</th><th>Waktu</th></tr>`;
-            let rows = result.data.attendance || [];
-            if (startVal || endVal) {
-                const startTs = startVal ? new Date(startVal + 'T00:00:00+07:00').getTime() : 0;
-                const endTs = endVal ? new Date(endVal + 'T23:59:59+07:00').getTime() : Infinity;
-                rows = rows.filter(r => { const d = parseDate(r.timestamp); if (!d) return true; const t = d.getTime(); return t >= startTs && t <= endTs; });
-            }
-            if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-id-card"></i><h3>Belum Ada Aktivitas</h3></div></td></tr>`; return; }
-            tbody.innerHTML = rows.map(r => {
-                const dt = formatDateTimeSplit(r.timestamp);
-                return `<tr data-timestamp="${escapeHtml(String(r.timestamp))}"><td>${escapeHtml(r.nama)}</td><td><span class="device-id">${escapeHtml(r.uid)}</span></td><td>${escapeHtml(r.device_id)}</td><td><div class="datetime-display"><div class="date">${dt.date}</div><div class="time">${dt.time}</div></div></td></tr>`;
-            }).join('');
-        }
-        loadAttendanceStats();
-    }
-
-    function startAttendancePolling() {
-        stopAttendancePolling();
-        state.attendanceInterval = setInterval(() => { if (state.currentSection === 'attendance') loadAttendance(); }, 5000);
-    }
-
-    function stopAttendancePolling() { if (state.attendanceInterval) { clearInterval(state.attendanceInterval); state.attendanceInterval = null; } }
-
-    // ==========================================
-    // CARDHOLDER / STAT DETAIL
-    // ==========================================
-    function openCardholderModal() {
-        const uidEl = $('cardholderUid'); const namaEl = $('cardholderNama');
-        if (uidEl) uidEl.value = ''; if (namaEl) namaEl.value = '';
-        openModal('cardholderModal');
-    }
-
-    async function captureLastTap() {
-        const result = await API.getLastUnknownTap();
-        if (!result.success) { showToast('Gagal', 'error'); return; }
-        if (!result.data.uid) { showToast('Belum ada kartu asing', 'error'); return; }
-        const uidEl = $('cardholderUid'); if (uidEl) uidEl.value = result.data.uid;
-    }
-
-    async function submitCardholder() {
-        const uid = ($('cardholderUid') || {}).value?.trim() || '';
-        const nama = ($('cardholderNama') || {}).value?.trim() || '';
-        if (!uid || !nama) { showToast('UID dan Nama wajib', 'error'); return; }
-        const result = await API.addCardholder({ uid, nama });
-        if (result.success) { closeModal('cardholderModal'); showToast('Kartu terdaftar!', 'success'); loadAttendance(); }
-        else showToast(result.error || 'Gagal', 'error');
-    }
-
-    async function openStatDetailModal(type) {
-        const titleEl = $('statDetailTitle'); const thead = $('statDetailThead'); const tbody = $('statDetailBody');
-        if (!tbody) return;
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:30px;color:var(--text-3);">Memuat...</td></tr>`;
-        openModal('statDetailModal');
-        if (type === 'hadir') {
-            if (titleEl) titleEl.textContent = 'Hadir Hari Ini';
-            if (thead) thead.innerHTML = `<tr><th>Nama</th><th>UID</th><th style="text-align:right;">Tap Pertama</th></tr>`;
-            const result = await API.getAttendanceToday();
-            const rows = result.success ? (result.data.hadir || []) : [];
-            if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:30px;color:var(--text-3);">Belum ada tap</td></tr>`; return; }
-            tbody.innerHTML = rows.map(r => `<tr><td>${escapeHtml(r.nama)}</td><td><span class="device-id">${escapeHtml(r.uid)}</span></td><td style="text-align:right;">${formatDateTimeSplit(r.pertama_tap).time}</td></tr>`).join('');
-        } else if (type === 'total') {
-            if (titleEl) titleEl.textContent = 'Total Kartu Aktif';
-            if (thead) thead.innerHTML = `<tr><th>Nama</th><th>UID</th><th>Terdaftar</th><th style="text-align:right;">Aksi</th></tr>`;
-            const result = await API.getCardholders();
-            const rows = result.success ? (result.data.cardholders || []) : [];
-            if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-3);">Belum ada kartu</td></tr>`; return; }
-            tbody.innerHTML = rows.map(r => `<tr><td>${escapeHtml(r.nama)}</td><td><span class="device-id">${escapeHtml(r.uid)}</span></td><td>${formatDateTimeSplit(r.created_at).date}</td><td style="text-align:right;"><button class="action-btn delete" data-action="hapus-cardholder" data-uid="${escapeHtml(r.uid)}" data-nama="${escapeHtml(r.nama)}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
-            tbody.querySelectorAll('[data-action="hapus-cardholder"]').forEach(btn => btn.addEventListener('click', () => openDeleteCardholderModal(btn.dataset.uid, btn.dataset.nama)));
-        } else if (type === 'belum-terdaftar') {
-            if (titleEl) titleEl.textContent = 'Kartu Belum Terdaftar';
-            if (thead) thead.innerHTML = `<tr><th>UID</th><th>Tap Terakhir</th><th style="text-align:right;">Aksi</th></tr>`;
-            const result = await API.getUnregisteredCards();
-            const rows = result.success ? (result.data.kartu || []) : [];
-            if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:30px;color:var(--text-3);">Semua kartu terdaftar</td></tr>`; return; }
-            tbody.innerHTML = rows.map(r => { const dt = formatDateTimeSplit(r.terakhir_tap); return `<tr><td><span class="device-id">${escapeHtml(r.uid)}</span></td><td>${dt.date} ${dt.time}</td><td style="text-align:right;"><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" data-action="daftarkan-from-detail" data-uid="${escapeHtml(r.uid)}">Daftarkan</button></td></tr>`; }).join('');
-            tbody.querySelectorAll('[data-action="daftarkan-from-detail"]').forEach(btn => btn.addEventListener('click', () => {
-                closeModal('statDetailModal');
-                const uidEl = $('cardholderUid'); const namaEl = $('cardholderNama');
-                if (uidEl) uidEl.value = btn.dataset.uid;
-                if (namaEl) namaEl.value = '';
-                openModal('cardholderModal');
-            }));
-        }
-    }
-
-    // ==========================================
     // DEVICE CRUD
     // ==========================================
     function viewDevice(id) {
@@ -1299,30 +1154,15 @@
         openModal('deleteModal');
     }
 
-    function openDeleteCardholderModal(uid, nama) {
-        state.deleteTarget = { type: 'cardholder', id: uid, confirmKey: nama };
-        const setVal = (elId, val) => { const el = $(elId); if (el) el.value = val; };
-        setVal('deleteType', 'cardholder'); setVal('deleteDeviceId', uid);
-        const titleEl = $('deleteModalTitle'); const textEl = $('deleteModalText');
-        const labelEl = $('deleteConfirmLabel'); const inputEl = $('deleteConfirmInput');
-        if (titleEl) titleEl.textContent = 'Hapus Kartu';
-        if (textEl) textEl.textContent = `Kartu "${nama}" (${uid}) akan dihapus.`;
-        if (labelEl) labelEl.innerHTML = `Ketik nama <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;">${escapeHtml(nama)}</code> untuk konfirmasi`;
-        if (inputEl) { inputEl.value = ''; inputEl.placeholder = `Ketik ${nama}...`; }
-        updateDeleteButtonState();
-        openModal('deleteModal');
-    }
-
     async function confirmDelete() {
         const target = state.deleteTarget; if (!target) return;
         const input = $('deleteConfirmInput'); const value = input ? input.value.trim() : '';
         if (value !== target.confirmKey) { showToast(`Ketik "${target.confirmKey}" dengan benar`, 'error'); return; }
-        const result = target.type === 'cardholder' ? await API.deleteCardholder(target.id) : await API.deleteDevice(target.id);
+        const result = await API.deleteDevice(target.id);
         if (result.success) {
             closeModal('deleteModal');
             state.deleteTarget = null;
-            if (target.type === 'cardholder') { showToast('Kartu dihapus', 'success'); openStatDetailModal('total'); loadAttendance(); }
-            else { showToast('Perangkat dihapus', 'success'); loadDashboard(); }
+            showToast('Perangkat dihapus', 'success'); loadDashboard();
         } else showToast(result.error || 'Gagal', 'error');
     }
 
@@ -2366,8 +2206,6 @@
             { label: 'Total Data Sensor', value: (info.sensor_data_count ?? 0).toLocaleString('id-ID'), icon: 'fa-database' },
             { label: 'Alert Aktif', value: info.active_alerts ?? 0, icon: 'fa-bell', color: 'var(--accent-warn)' },
             { label: 'Riwayat Alert', value: (info.alert_history_count ?? 0).toLocaleString('id-ID'), icon: 'fa-clock-rotate-left' },
-            { label: 'Total Absensi', value: (info.attendance_count ?? 0).toLocaleString('id-ID'), icon: 'fa-id-card' },
-            { label: 'Kartu Terdaftar', value: info.cardholder_count ?? 0, icon: 'fa-address-card' },
             { label: 'Ukuran Database', value: `${info.database_size_mb ?? 0} MB`, icon: 'fa-hard-drive' },
             { label: 'Retensi Data Sensor', value: `${info.data_retention_days ?? 30} hari`, icon: 'fa-calendar' },
         ];
@@ -2781,6 +2619,12 @@
 
                 const usersBtn = $('manageUsersBtn');
                 if (usersBtn) usersBtn.style.display = userState.currentIsAdmin ? '' : 'none';
+                // Tombol legacy ini tak terlihat (ada di #legacyActions). Satu-satunya
+                // jalan ke kelola pengguna: command palette -> NexusUsers.open().
+                if (usersBtn) usersBtn.addEventListener('click', () => {
+                    if (window.NexusUsers) window.NexusUsers.open();
+                    else window.showToast('Modul pengguna belum siap', 'error');
+                });
 
                 const backupBtn = $('backupBtn');
                 if (backupBtn) backupBtn.style.display = userState.currentIsAdmin ? '' : 'none';
@@ -2802,294 +2646,6 @@
         }
     }
 
-    async function loadUsers() {
-        const listEl = $('userList');
-        if (!listEl) return;
-        listEl.innerHTML = `<div class="loading" style="padding:32px;text-align:center;">
-            <div class="spinner"></div>
-            <div style="margin-top:10px;font-size:12.5px;color:var(--text-3);">Memuat user...</div>
-        </div>`;
-
-        const res = await API.call('/api/v1/users');
-        if (!res.success) {
-            listEl.innerHTML = `<div class="empty-state" style="padding:32px;">
-                <i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-crit);"></i>
-                <h3>Gagal memuat</h3>
-                <p>${escapeHtml(res.error || 'Koneksi gagal')}</p>
-            </div>`;
-            return;
-        }
-        userState.users = res.data.users || [];
-        renderUserList();
-    }
-
-    function renderUserList() {
-        const listEl = $('userList');
-        if (!listEl) return;
-
-        if (userState.users.length === 0) {
-            listEl.innerHTML = `<div class="empty-state" style="padding:32px;">
-                <i class="fa-solid fa-users" style="opacity:0.4;"></i>
-                <h3>Belum ada user</h3>
-            </div>`;
-            return;
-        }
-
-        listEl.innerHTML = userState.users.map(u => {
-            const isMe = u.id === userState.currentUserId;
-            const adminBadge = u.is_admin
-                ? '<span class="user-badge user-badge-admin">Admin</span>'
-                : '<span class="user-badge">User</span>';
-            const meBadge = isMe
-                ? '<span class="user-badge user-badge-me">Anda</span>'
-                : '';
-
-            const deleteBtn = (!isMe) ? `
-                <button class="user-action-btn delete" data-action="delete-user"
-                        data-user-id="${u.id}" title="Hapus">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            ` : '';
-
-            return `
-                <div class="user-card" data-user-id="${u.id}">
-                    <div class="user-avatar ${u.is_admin ? 'is-admin' : ''}">
-                        <i class="fa-solid ${u.is_admin ? 'fa-shield-halved' : 'fa-user'}"></i>
-                    </div>
-                    <div class="user-info">
-                        <div class="user-name-row">
-                            <span class="user-display-name">${escapeHtml(u.display_name || u.username)}</span>
-                            ${adminBadge}
-                            ${meBadge}
-                        </div>
-                        <div class="user-username">@${escapeHtml(u.username)}</div>
-                    </div>
-                    <div class="user-actions">
-                        <button class="user-action-btn edit" data-action="edit-user"
-                                data-user-id="${u.id}" title="Edit">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        ${deleteBtn}
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        listEl.querySelectorAll('[data-action="edit-user"]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = parseInt(btn.dataset.userId, 10);
-                openUserForm(id);
-            });
-        });
-        listEl.querySelectorAll('[data-action="delete-user"]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = parseInt(btn.dataset.userId, 10);
-                const u = userState.users.find(x => x.id === id);
-                if (!u) return;
-                if (!confirm(`Hapus user "${u.display_name || u.username}" (@${u.username})?\n\nSemua dashboard dan widget milik user ini akan ikut terhapus.`)) return;
-                const res = await API.call(`/api/v1/users/${id}`, { method: 'DELETE' });
-                if (res.success) {
-                    window.showToast('User dihapus', 'success');
-                    await loadUsers();
-                } else {
-                    window.showToast(res.error || 'Gagal hapus', 'error');
-                }
-            });
-        });
-    }
-
-    function switchUserView(view) {
-        userState.view = view;
-        const listView = $('userListView');
-        const formView = $('userFormView');
-        const addBtn = $('userAddNewBtn');
-        const cancelBtn = $('userCancelBtn');
-        const saveBtn = $('userSaveBtn');
-
-        if (view === 'form') {
-            if (listView) listView.style.display = 'none';
-            if (formView) formView.style.display = '';
-            if (addBtn) addBtn.style.display = 'none';
-            if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-            if (saveBtn) saveBtn.style.display = 'inline-flex';
-        } else {
-            if (listView) listView.style.display = '';
-            if (formView) formView.style.display = 'none';
-            if (addBtn) addBtn.style.display = 'inline-flex';
-            if (cancelBtn) cancelBtn.style.display = 'none';
-            if (saveBtn) saveBtn.style.display = 'none';
-        }
-
-        const errEl = $('userFormError');
-        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-    }
-
-    function openUserForm(userId) {
-        const setVal = (id, v) => { const el = $(id); if (el) el.value = v; };
-
-        if (userId) {
-            const u = userState.users.find(x => x.id === userId);
-            if (!u) return;
-            userState.editId = userId;
-            const titleEl = $('userModalTitle');
-            if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-pen"></i> Edit User';
-
-            setVal('userFormId', String(u.id));
-            setVal('userFormUsername', u.username || '');
-            setVal('userFormDisplayName', u.display_name || '');
-            setVal('userFormPassword', '');
-            const admEl = $('userFormIsAdmin');
-            if (admEl) admEl.checked = u.is_admin === true;
-
-            const uInput = $('userFormUsername');
-            if (uInput) { uInput.setAttribute('readonly', 'readonly'); uInput.style.opacity = '0.6'; }
-
-            const pwdLabel = $('userFormPasswordLabel');
-            if (pwdLabel) pwdLabel.textContent = 'Password Baru (kosongkan jika tidak diubah)';
-            const pwdHint = $('userFormPasswordHint');
-            if (pwdHint) pwdHint.textContent = 'Kosongkan jika tidak ingin mengubah password.';
-
-            const saveLabel = $('userSaveBtnLabel');
-            if (saveLabel) saveLabel.textContent = 'Update';
-        } else {
-            userState.editId = null;
-            const titleEl = $('userModalTitle');
-            if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-plus"></i> Tambah User Baru';
-
-            setVal('userFormId', '');
-            setVal('userFormUsername', '');
-            setVal('userFormDisplayName', '');
-            setVal('userFormPassword', '');
-            const admEl = $('userFormIsAdmin');
-            if (admEl) admEl.checked = false;
-
-            const uInput = $('userFormUsername');
-            if (uInput) { uInput.removeAttribute('readonly'); uInput.style.opacity = ''; }
-
-            const pwdLabel = $('userFormPasswordLabel');
-            if (pwdLabel) pwdLabel.textContent = 'Password';
-            const pwdHint = $('userFormPasswordHint');
-            if (pwdHint) pwdHint.textContent = 'Minimal 8 karakter.';
-
-            const saveLabel = $('userSaveBtnLabel');
-            if (saveLabel) saveLabel.textContent = 'Simpan';
-        }
-
-        switchUserView('form');
-        setTimeout(() => {
-            const focusEl = userId ? $('userFormDisplayName') : $('userFormUsername');
-            if (focusEl) focusEl.focus();
-        }, 100);
-    }
-
-    function showUserFormError(msg) {
-        const errEl = $('userFormError');
-        if (!errEl) return;
-        errEl.textContent = msg;
-        errEl.style.display = 'block';
-    }
-
-    async function saveUserForm() {
-        const id = ($('userFormId') || {}).value;
-        const username = (($('userFormUsername') || {}).value || '').trim();
-        const displayName = (($('userFormDisplayName') || {}).value || '').trim();
-        const password = (($('userFormPassword') || {}).value || '');
-        const isAdmin = !!($('userFormIsAdmin') || {}).checked;
-
-        const errEl = $('userFormError');
-        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-
-        if (!id) {
-            if (!username || username.length < 3) { showUserFormError('Username minimal 3 karakter'); return; }
-            if (!password || password.length < 8) { showUserFormError('Password minimal 8 karakter'); return; }
-        } else {
-            if (password && password.length < 8) { showUserFormError('Password baru minimal 8 karakter'); return; }
-        }
-
-        const saveBtn = $('userSaveBtn');
-        if (saveBtn) saveBtn.disabled = true;
-
-        try {
-            if (!id) {
-                const payload = {
-                    username, password,
-                    display_name: displayName || username,
-                    is_admin: isAdmin,
-                };
-                const res = await API.call('/api/v1/users', {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
-                });
-                if (res.success) {
-                    window.showToast('User dibuat', 'success');
-                    switchUserView('list');
-                    await loadUsers();
-                } else {
-                    showUserFormError(res.error || 'Gagal membuat user');
-                }
-            } else {
-                const payload = {};
-                if (displayName) payload.display_name = displayName;
-                if (password) payload.password = password;
-                payload.is_admin = isAdmin;
-
-                const res = await API.call(`/api/v1/users/${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(payload),
-                });
-                if (res.success) {
-                    window.showToast('User diperbarui', 'success');
-                    switchUserView('list');
-                    await loadUsers();
-                    if (parseInt(id, 10) === userState.currentUserId) {
-                        await loadCurrentUser();
-                    }
-                } else {
-                    showUserFormError(res.error || 'Gagal update user');
-                }
-            }
-        } finally {
-            if (saveBtn) saveBtn.disabled = false;
-        }
-    }
-
-    function openUserManagementModal() {
-        if (!userState.currentIsAdmin) {
-            window.showToast('Hanya admin yang bisa kelola user', 'error');
-            return;
-        }
-        const modal = $('userModal');
-        if (!modal) return;
-        switchUserView('list');
-        openModal('userModal');
-        loadUsers();
-    }
-
-    function bindUserManagement() {
-        const btn = $('manageUsersBtn');
-        if (btn && !btn.__bound) {
-            btn.__bound = true;
-            btn.addEventListener('click', openUserManagementModal);
-        }
-
-        const addBtn = $('userAddNewBtn');
-        if (addBtn && !addBtn.__bound) {
-            addBtn.__bound = true;
-            addBtn.addEventListener('click', () => openUserForm(null));
-        }
-
-        const cancelBtn = $('userCancelBtn');
-        if (cancelBtn && !cancelBtn.__bound) {
-            cancelBtn.__bound = true;
-            cancelBtn.addEventListener('click', () => switchUserView('list'));
-        }
-
-        const saveBtn = $('userSaveBtn');
-        if (saveBtn && !saveBtn.__bound) {
-            saveBtn.__bound = true;
-            saveBtn.addEventListener('click', saveUserForm);
-        }
-    }
 
     // ==========================================
     // BACKUP MANAGEMENT
@@ -4366,9 +3922,6 @@
 
     function bindActionButtons() {
         const map = {
-            'open-cardholder-modal': openCardholderModal,
-            'capture-last-tap': captureLastTap,
-            'submit-cardholder': submitCardholder,
             'add-device': openAddDeviceModal,
             'add-chart': openAddChartModal,
             'refresh-charts': refreshAllCharts,
@@ -4386,9 +3939,6 @@
         });
         const delTabBtn = $('analyticsTabDeleteBtn');
         if (delTabBtn) delTabBtn.addEventListener('click', deleteAnalyticsTab);
-        document.querySelectorAll('.stat-card.clickable[data-stat-type]').forEach(card => {
-            card.addEventListener('click', () => openStatDetailModal(card.dataset.statType));
-        });
         document.querySelectorAll('.stat-card.clickable[data-goto]').forEach(card => {
             card.addEventListener('click', () => {
                 const target = card.dataset.goto; const filter = card.dataset.filter;
@@ -4398,7 +3948,6 @@
         });
         const activityRefresh = $('activityRefreshBtn');
         if (activityRefresh) activityRefresh.addEventListener('click', loadActivityFeed);
-        document.querySelectorAll('.attendance-tab').forEach(btn => btn.addEventListener('click', () => setAttendanceView(btn.dataset.tab)));
     }
 
     function bindFilters() {
@@ -4411,9 +3960,6 @@
                     if (window.NexusAlerts && window.NexusAlerts.setSearch) {
                         window.NexusAlerts.setSearch(value);
                     }
-                } else if (state.currentSection === 'attendance') {
-                    state.deviceSearchTerm = value;
-                    loadAttendance();
                 } else {
                     state.deviceSearchTerm = value;
                     filterDevices();
@@ -4473,7 +4019,6 @@
         bindModals();
         bindActionButtons();
         bindDashboardSwitcher();
-        bindUserManagement();
         bindBackup();
         bindChangePassword();
         bindCleanupButton();
@@ -4531,12 +4076,6 @@
                     showSection('devices');
                 } else if (key === 'activeAlerts') {
                     showSection('alerts');
-                } else if (key === 'statHadirHariIni') {
-                    openStatDetailModal('hadir');
-                } else if (key === 'statTotalKartu') {
-                    openStatDetailModal('total');
-                } else if (key === 'statBelumTerdaftar') {
-                    openStatDetailModal('belum-terdaftar');
                 }
             }
         });
@@ -4552,7 +4091,6 @@
         window.addEventListener('beforeunload', () => {
             if (state.dashboardInterval) clearInterval(state.dashboardInterval);
             if (state.autoRefreshInterval) clearInterval(state.autoRefreshInterval);
-            if (state.attendanceInterval) clearInterval(state.attendanceInterval);
             if (state.activityRefreshInterval) clearInterval(state.activityRefreshInterval);
             state.charts.forEach(c => { if (c.chartInstance) try { c.chartInstance.destroy(); } catch (e) {} });
         });
@@ -4589,7 +4127,6 @@
             } catch (e) {}
         }
         state.currentSection = initialSection;
-        initMapPreview();
         await loadCurrentUser();
         await loadCurrentDashboardInfo();
         await loadDashboard();
@@ -4600,9 +4137,6 @@
         state.activityRefreshInterval = setInterval(() => { if (state.currentSection === 'dashboard') loadActivityFeed(); }, 60000);
         console.log('[Dashboard] Ready v8.0 (metric cards integrated)');
     }
-
-    window.__nexusRefreshAttendance = () => loadAttendance();
-    window.__nexusLoadAttendance = () => loadAttendance();
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();

@@ -8,14 +8,9 @@
     const AI_NAME = 'NEXUS AI';
 
     const SHORTCUTS = [
-        { icon: 'fa-user-xmark',          label: 'Siapa yang tidak masuk hari ini?',   q: 'Siapa yang tidak masuk hari ini?' },
         { icon: 'fa-microchip',           label: 'Status semua perangkat',            q: 'Bagaimana status semua perangkat?' },
         { icon: 'fa-bell',                label: 'Alert yang aktif saat ini',         q: 'Alert apa saja yang sedang aktif?' },
-        { icon: 'fa-user-check',          label: 'Berapa yang hadir hari ini?',       q: 'Berapa karyawan yang hadir hari ini?' },
-        { icon: 'fa-file-csv',            label: 'Export absensi 7 hari terakhir',    q: 'Export absensi 7 hari terakhir sebagai CSV' },
-        { icon: 'fa-file-csv',            label: 'Export absensi minggu ini',         q: 'Export absensi minggu ini sebagai CSV' },
         { icon: 'fa-file-arrow-down',     label: 'Template bulk import',              q: 'Buatkan template bulk import perangkat' },
-        { icon: 'fa-list',                label: 'Daftar semua kartu terdaftar',      q: 'Tampilkan daftar semua kartu terdaftar' },
     ];
 
     const state = {
@@ -192,7 +187,6 @@
     // ============================================================
     function init() {
         els.panel = document.getElementById('chatPanel');
-        els.tab = document.getElementById('chatTab');
         els.messages = document.getElementById('chatMessages');
         els.input = document.getElementById('chatInput');
         els.send = document.getElementById('chatSend');
@@ -283,7 +277,6 @@
                 toggle();
             });
         }
-        if (els.tab) els.tab.addEventListener('click', toggle);
 
         if (els.input) {
             els.input.addEventListener('keydown', (e) => {
@@ -359,7 +352,6 @@
         if (!animate && els.panel) els.panel.style.transition = 'none';
 
         if (els.panel) els.panel.classList.add('open');
-        if (els.tab) els.tab.classList.add('hidden');
         if (els.toggleBtn) els.toggleBtn.classList.add('active');
         document.body.classList.add('chat-open');
 
@@ -379,7 +371,6 @@
         state.isOpen = false;
         closeShortcutsMenu();
         if (els.panel) els.panel.classList.remove('open');
-        if (els.tab) els.tab.classList.remove('hidden');
         if (els.toggleBtn) els.toggleBtn.classList.remove('active');
         document.body.classList.remove('chat-open');
 
@@ -540,7 +531,7 @@
     function disableWidget() {
         if (state.healthTimer) { clearInterval(state.healthTimer); state.healthTimer = null; }
         if (state.isOpen) close();
-        [els.panel, els.tab, els.toggleBtn, document.getElementById('chatBackdrop'),
+        [els.panel, els.toggleBtn, document.getElementById('chatBackdrop'),
          document.querySelector('.chat-fab-mobile')].forEach(el => { if (el) el.style.display = 'none'; });
     }
 
