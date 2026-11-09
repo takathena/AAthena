@@ -432,3 +432,9 @@ git commit -m "docs: changelog+readme pasca big refactor"
 - [ ] **Step 5: Handoff review**
 
 - [ ] Lampirkan: `pytest -q` tail, `ruff` tail, `docker compose ps`, `curl /health` JSON, screenshot/daftar checklist Task 8 (10 baris).
+
+## Status Eksekusi Task 4–6 (V2.0.0 FastAPI)
+
+- **Task 4 — Dashboards package:** Selesai. `app/dashboards/` package terpisah, frontend tidak diubah selain lazy-load/gabung CSS.
+- **Task 5 — Alerts/chat/background:** Selesai. Absensi chat tools (5 tool) dihapus bersama fitur absensi; services `attendance.py` tidak dipertahankan di V2.
+- **Task 6 — Frontend sanity:** Selesai. Frontend ringan, port publik 4455/443, DB fresh. `README.md`/`.env.example`/`docker-compose.yml`/`Dockerfile` bersih dari `attendance|cardholder|absensi|hadir` (grep final nihil).
