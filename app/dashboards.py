@@ -320,7 +320,7 @@ def set_default_dashboard(dashboard_id):
 
 
 def purge_dashboard(conn, dashboard_id):
-    """Hapus dashboard beserta isinya (widget, tab, anggota, Telegram, kartu).
+    """Hapus dashboard beserta isinya (widget, tab, anggota, Telegram).
 
     Pemanggil bertanggung jawab memastikan perangkatnya sudah dipindah/dihapus.
     """
@@ -328,7 +328,6 @@ def purge_dashboard(conn, dashboard_id):
     conn.execute('DELETE FROM analytics_tabs WHERE dashboard_id = ?', (dashboard_id,))
     conn.execute('DELETE FROM dashboard_members WHERE dashboard_id = ?', (dashboard_id,))
     conn.execute('DELETE FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))
-    conn.execute('DELETE FROM cardholders WHERE dashboard_id = ?', (dashboard_id,))
     conn.execute('DELETE FROM dashboards WHERE id = ?', (dashboard_id,))
 
 
@@ -361,20 +360,6 @@ def delete_dashboard(dashboard_id):
                           'Hapus perangkatnya dulu (atau minta admin memindahkannya), '
                           'supaya data sensor tidak hilang tanpa disengaja.'),
                 'device_count': device_count,
-            }), 409
-
-        # purge_dashboard() juga menghapus cardholders. Tanpa guard ini kartu +
-        # riwayat absensinya hilang diam-diam saat dashboard dihapus.
-        cardholder_count = conn.execute(
-            'SELECT COUNT(*) FROM cardholders WHERE dashboard_id = ?', (dashboard_id,)
-        ).fetchone()[0]
-        if cardholder_count:
-            return jsonify({
-                'success': False,
-                'error': (f'Dashboard masih berisi {cardholder_count} kartu RFID. '
-                          'Hapus atau pindahkan kartunya dulu supaya riwayat '
-                          'absensi tidak hilang tanpa disengaja.'),
-                'cardholder_count': cardholder_count,
             }), 409
 
         purge_dashboard(conn, dashboard_id)

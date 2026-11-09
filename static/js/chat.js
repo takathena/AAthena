@@ -8,14 +8,9 @@
     const AI_NAME = 'NEXUS AI';
 
     const SHORTCUTS = [
-        { icon: 'fa-user-xmark',          label: 'Siapa yang tidak masuk hari ini?',   q: 'Siapa yang tidak masuk hari ini?' },
         { icon: 'fa-microchip',           label: 'Status semua perangkat',            q: 'Bagaimana status semua perangkat?' },
         { icon: 'fa-bell',                label: 'Alert yang aktif saat ini',         q: 'Alert apa saja yang sedang aktif?' },
-        { icon: 'fa-user-check',          label: 'Berapa yang hadir hari ini?',       q: 'Berapa karyawan yang hadir hari ini?' },
-        { icon: 'fa-file-csv',            label: 'Export absensi 7 hari terakhir',    q: 'Export absensi 7 hari terakhir sebagai CSV' },
-        { icon: 'fa-file-csv',            label: 'Export absensi minggu ini',         q: 'Export absensi minggu ini sebagai CSV' },
         { icon: 'fa-file-arrow-down',     label: 'Template bulk import',              q: 'Buatkan template bulk import perangkat' },
-        { icon: 'fa-list',                label: 'Daftar semua kartu terdaftar',      q: 'Tampilkan daftar semua kartu terdaftar' },
     ];
 
     const state = {

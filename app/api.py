@@ -18,7 +18,7 @@ from marshmallow import ValidationError
 from app.database import get_db_context, get_wib_time
 from app.validators import (
     device_create_schema, device_update_schema, sensor_data_schema,
-    bulk_import_item_schema, normalize_uid,
+    bulk_import_item_schema,
 )
 from app.utils import (
     generate_api_key, safe_json_loads, validate_alert_rules,
@@ -92,16 +92,6 @@ def receive_data():
             logger.warning(f"Invalid API key attempt: device={data['device_id']}")
             return jsonify({'success': False, 'error': 'Invalid device_id or api_key'}), 401
 
-        # Data RFID: UID wajib string heksadesimal yang valid (ditolak sebelum disimpan).
-        rfid_uid = None
-        if data['sensor_type'] == 'RFID' and 'uid' in data['data']:
-            rfid_uid = normalize_uid(data['data'].get('uid'))
-            if rfid_uid is None:
-                return jsonify({
-                    'success': False,
-                    'error': 'Format UID tidak valid (hex 4-32 karakter, boleh awalan 0x)',
-                }), 400
-
         with get_db_context() as conn:
             conn.execute('''
                 INSERT INTO sensor_data
@@ -136,24 +126,6 @@ def receive_data():
             conn.commit()
 
         update_device_status(data['device_id'], 'online', request.remote_addr)
-
-        if data['sensor_type'] == 'RFID':
-            uid = rfid_uid
-            if uid:
-                with get_db_context() as conn:
-                    cutoff = get_wib_time() - timedelta(seconds=30)
-                    recent = conn.execute('''
-                        SELECT id FROM attendance
-                        WHERE uid = ? AND device_id = ? AND timestamp >= ?
-                        ORDER BY timestamp DESC LIMIT 1
-                    ''', (uid, data['device_id'], cutoff)).fetchone()
-
-                    if not recent:
-                        conn.execute(
-                            'INSERT INTO attendance (uid, device_id, timestamp) VALUES (?, ?, ?)',
-                            (uid, data['device_id'], get_wib_time())
-                        )
-                        conn.commit()
 
         if data['sensor_type'] != 'heartbeat':
             try:
@@ -379,74 +351,6 @@ def get_devices_metrics_history():
         'alerts': alerts_series,
     }), 200
 
-
-@api_bp.route('/metrics/attendance-history', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_attendance_metrics_history():
-    """History harian untuk sparkline Absensi."""
-    days = min(max(request.args.get('days', 7, type=int), 1), 90)
-    today = get_wib_time().replace(hour=0, minute=0, second=0, microsecond=0)
-    since = today - timedelta(days=days - 1)
-
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-
-        dev_sql, dev_params = ws.device_in_sql(scope, 'a.device_id')
-        card_sql, card_params = ws.dashboard_in_sql(scope, 'c.dashboard_id')
-
-        buckets = [(since + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days)]
-
-        hadir_rows = conn.execute(f'''
-            SELECT DATE(a.timestamp) AS day, COUNT(DISTINCT a.uid) AS n
-            FROM attendance a
-            WHERE a.timestamp >= ? AND {dev_sql}
-            GROUP BY day
-        ''', [since] + dev_params).fetchall()
-        hadir_map = {r['day']: r['n'] for r in hadir_rows}
-
-        unknown_rows = conn.execute(f'''
-            SELECT DATE(a.timestamp) AS day, COUNT(DISTINCT a.uid) AS n
-            FROM attendance a
-            WHERE a.timestamp >= ?
-              AND NOT EXISTS (SELECT 1 FROM cardholders c WHERE c.uid = a.uid)
-              AND {dev_sql}
-            GROUP BY day
-        ''', [since] + dev_params).fetchall()
-        unknown_map = {r['day']: r['n'] for r in unknown_rows}
-
-        card_rows = conn.execute(f'''
-            SELECT DATE(c.created_at) AS day, COUNT(*) AS n
-            FROM cardholders c
-            WHERE {card_sql}
-            GROUP BY day
-        ''', card_params).fetchall()
-        card_add_map = {r['day']: r['n'] for r in card_rows}
-
-        total_cards_now = conn.execute(
-            f'SELECT COUNT(*) FROM cardholders c WHERE {card_sql}', card_params
-        ).fetchone()[0] or 0
-
-        card_series = [0] * days
-        card_series[-1] = total_cards_now
-        for i in range(days - 2, -1, -1):
-            added_next = card_add_map.get(buckets[i + 1], 0)
-            card_series[i] = max(0, card_series[i + 1] - added_next)
-
-        hadir_series = [hadir_map.get(b, 0) for b in buckets]
-        unknown_series = [unknown_map.get(b, 0) for b in buckets]
-
-    return jsonify({
-        'success': True,
-        'days': days,
-        'buckets': buckets,
-        'hadir': hadir_series,
-        'kartu': card_series,
-        'unknown': unknown_series,
-    }), 200
 
 @api_bp.route('/devices', methods=['POST'])
 @login_required
@@ -792,7 +696,6 @@ def delete_device(device_id):
         conn.execute('DELETE FROM alerts WHERE device_id = ?', (device_id,))
         conn.execute('DELETE FROM alert_history WHERE device_id = ?', (device_id,))
         conn.execute('DELETE FROM device_status_log WHERE device_id = ?', (device_id,))
-        conn.execute('DELETE FROM attendance WHERE device_id = ?', (device_id,))
         conn.execute('DELETE FROM devices WHERE device_id = ?', (device_id,))
         conn.commit()
 
@@ -1327,408 +1230,6 @@ def export_device_data(device_id):
     )
 
 
-# ==========================================
-# CARDHOLDERS
-# ==========================================
-@api_bp.route('/cardholders', methods=['POST'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_MANAGE)
-def add_cardholder():
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({'success': False, 'error': 'Invalid JSON'}), 400
-
-        raw_nama = payload.get('nama', '')
-        nama = raw_nama.strip() if isinstance(raw_nama, str) else ''
-        if not payload.get('uid') or not nama:
-            return jsonify({'success': False, 'error': 'uid dan nama wajib diisi'}), 400
-
-        uid = normalize_uid(payload.get('uid'))
-        if uid is None:
-            return jsonify({
-                'success': False,
-                'error': 'Format UID tidak valid (hex 4-32 karakter, boleh awalan 0x)',
-            }), 400
-
-        with get_db_context() as conn:
-            scope = ws.resolve_scope(conn, 'editor')
-            if scope['error']:
-                return ws.scope_error_response(scope)
-            dashboard_id, denied = ws.pick_write_dashboard(
-                conn, scope, requested_id=payload.get('dashboard_id'), minimum='editor'
-            )
-            if denied:
-                return denied
-
-            existing = conn.execute(
-                'SELECT uid FROM cardholders WHERE uid = ?', (uid,)
-            ).fetchone()
-            if existing:
-                return jsonify({'success': False, 'error': 'UID sudah terdaftar'}), 400
-
-            conn.execute(
-                'INSERT INTO cardholders (uid, nama, created_at, dashboard_id) VALUES (?, ?, ?, ?)',
-                (uid, nama, get_wib_time(), dashboard_id)
-            )
-            conn.commit()
-
-        return jsonify({'success': True, 'cardholder': {'uid': uid, 'nama': nama}}), 201
-
-    except Exception as e:
-        logger.error(f"Error adding cardholder: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
-
-@api_bp.route('/cardholders', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_cardholders():
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-        sc_sql, sc_params = ws.dashboard_in_sql(scope, 'dashboard_id')
-        rows = conn.execute(
-            f'SELECT uid, nama, created_at, dashboard_id FROM cardholders '
-            f'WHERE {sc_sql} ORDER BY created_at DESC', sc_params
-        ).fetchall()
-
-    cardholders = []
-    for row in rows:
-        d = dict(row)
-        d['created_at'] = _clean_timestamp(d.get('created_at'))
-        cardholders.append(d)
-
-    return jsonify({'success': True, 'cardholders': cardholders}), 200
-
-
-@api_bp.route('/cardholders/<uid>', methods=['DELETE'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_MANAGE)
-def delete_cardholder(uid):
-    with get_db_context() as conn:
-        existing = conn.execute(
-            'SELECT uid, dashboard_id FROM cardholders WHERE uid = ?', (uid,)
-        ).fetchone()
-        if not existing:
-            return jsonify({'success': False, 'error': 'Kartu tidak ditemukan'}), 404
-
-        user_id = ws.current_user_id()
-        role = (ws.get_dashboard_role(conn, existing['dashboard_id'], user_id)
-                if existing['dashboard_id'] is not None
-                else ('owner' if ws.is_admin_user(conn, user_id) else None))
-        if role is None:
-            return jsonify({'success': False, 'error': 'Kartu tidak ditemukan'}), 404
-        if not ws.role_allows(role, 'editor'):
-            return jsonify({'success': False, 'error': 'Anda tidak punya izin menghapus kartu ini'}), 403
-
-        conn.execute('DELETE FROM cardholders WHERE uid = ?', (uid,))
-        conn.commit()
-
-    return jsonify({'success': True}), 200
-
-
-@api_bp.route('/attendance', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_attendance():
-    limit = min(request.args.get('limit', 100, type=int), 1000)
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-        sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-        rows = conn.execute(f'''
-            SELECT a.id, a.uid, a.device_id, a.timestamp,
-                   COALESCE(c.nama, 'Tidak dikenal') AS nama
-            FROM attendance a
-            LEFT JOIN cardholders c ON a.uid = c.uid
-            WHERE {sa_sql}
-            ORDER BY a.timestamp DESC LIMIT ?
-        ''', sa_params + [limit]).fetchall()
-
-    attendance = []
-    for row in rows:
-        d = dict(row)
-        d['timestamp'] = _clean_timestamp(d.get('timestamp'))
-        attendance.append(d)
-
-    return jsonify({'success': True, 'attendance': attendance}), 200
-
-
-@api_bp.route('/attendance/report', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_attendance_report():
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    uid = request.args.get('uid')
-
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-    if scope['error']:
-        return ws.scope_error_response(scope)
-    sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-
-    query = f'''
-        SELECT
-            DATE(a.timestamp) AS day,
-            a.uid,
-            COALESCE(c.nama, 'Tidak dikenal') AS nama,
-            MIN(a.timestamp) AS check_in,
-            MAX(a.timestamp) AS check_out,
-            COUNT(*) AS total_taps
-        FROM attendance a
-        LEFT JOIN cardholders c ON a.uid = c.uid
-        WHERE {sa_sql}
-    '''
-    params = list(sa_params)
-
-    if start_date:
-        query += ' AND a.timestamp >= ?'
-        params.append(f"{start_date} 00:00:00")
-    if end_date:
-        query += ' AND a.timestamp <= ?'
-        params.append(f"{end_date} 23:59:59")
-    if uid:
-        query += ' AND a.uid = ?'
-        params.append(uid)
-
-    query += ' GROUP BY day, a.uid ORDER BY day DESC, check_in DESC LIMIT 2000'
-
-    with get_db_context() as conn:
-        rows = conn.execute(query, params).fetchall()
-
-    report = []
-    for r in rows:
-        d = dict(r)
-
-        d['check_in'] = _clean_timestamp(d.get('check_in'))
-        d['check_out'] = _clean_timestamp(d.get('check_out'))
-
-        duration_str = '-'
-        if d['check_in'] and d['check_out'] and d['check_in'] != d['check_out']:
-            try:
-                ci = datetime.strptime(d['check_in'], '%Y-%m-%d %H:%M:%S')
-                co = datetime.strptime(d['check_out'], '%Y-%m-%d %H:%M:%S')
-                total_min = int((co - ci).total_seconds() / 60)
-                h = total_min // 60
-                m = total_min % 60
-                duration_str = f"{h}j {m}m" if h > 0 else f"{m}m"
-            except Exception:
-                pass
-        d['duration'] = duration_str
-        report.append(d)
-
-    return jsonify({'success': True, 'report': report}), 200
-
-
-@api_bp.route('/attendance/stats', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_attendance_stats():
-    now_wib = get_wib_time()
-    today_start = now_wib.replace(hour=0, minute=0, second=0, microsecond=0)
-    tomorrow_start = today_start + timedelta(days=1)
-
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-        sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-        sc_sql, sc_params = ws.dashboard_in_sql(scope, 'dashboard_id')
-
-        # Hanya kartu yang terdaftar; kartu asing dihitung di kartu_belum_terdaftar.
-        hadir_hari_ini = conn.execute(f'''
-            SELECT COUNT(DISTINCT a.uid) FROM attendance a
-            JOIN cardholders c ON c.uid = a.uid
-            WHERE a.timestamp >= ? AND a.timestamp < ? AND {sa_sql}
-        ''', [today_start, tomorrow_start] + sa_params).fetchone()[0]
-
-        total_kartu_aktif = conn.execute(
-            f'SELECT COUNT(*) FROM cardholders WHERE {sc_sql}', sc_params
-        ).fetchone()[0]
-
-        kartu_belum_terdaftar = conn.execute(f'''
-            SELECT COUNT(DISTINCT a.uid) FROM attendance a
-            WHERE NOT EXISTS (SELECT 1 FROM cardholders c WHERE c.uid = a.uid)
-              AND {sa_sql}
-        ''', sa_params).fetchone()[0]
-
-    return jsonify({
-        'success': True,
-        'stats': {
-            'hadir_hari_ini': hadir_hari_ini,
-            'total_kartu_aktif': total_kartu_aktif,
-            'kartu_belum_terdaftar': kartu_belum_terdaftar
-        }
-    }), 200
-
-
-@api_bp.route('/attendance/today', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_attendance_today():
-    now_wib = get_wib_time()
-    today_start = now_wib.replace(hour=0, minute=0, second=0, microsecond=0)
-    tomorrow_start = today_start + timedelta(days=1)
-
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-        sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-        rows = conn.execute(f'''
-            SELECT COALESCE(c.nama, 'Tidak dikenal') AS nama, a.uid,
-                   MIN(a.timestamp) AS pertama_tap
-            FROM attendance a
-            LEFT JOIN cardholders c ON a.uid = c.uid
-            WHERE a.timestamp >= ? AND a.timestamp < ? AND {sa_sql}
-            GROUP BY a.uid
-            ORDER BY pertama_tap ASC
-        ''', [today_start, tomorrow_start] + sa_params).fetchall()
-
-    hadir = []
-    for r in rows:
-        d = dict(r)
-        d['pertama_tap'] = _clean_timestamp(d.get('pertama_tap'))
-        hadir.append(d)
-
-    return jsonify({'success': True, 'hadir': hadir}), 200
-
-
-@api_bp.route('/attendance/unregistered', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_unregistered_cards():
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-        sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-        rows = conn.execute(f'''
-            SELECT a.uid, MAX(a.timestamp) AS terakhir_tap
-            FROM attendance a
-            WHERE NOT EXISTS (SELECT 1 FROM cardholders c WHERE c.uid = a.uid)
-              AND {sa_sql}
-            GROUP BY a.uid
-            ORDER BY terakhir_tap DESC
-        ''', sa_params).fetchall()
-
-    kartu = []
-    for r in rows:
-        d = dict(r)
-        d['terakhir_tap'] = _clean_timestamp(d.get('terakhir_tap'))
-        kartu.append(d)
-
-    return jsonify({'success': True, 'kartu': kartu}), 200
-
-
-@api_bp.route('/attendance/last-unknown', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def get_last_unknown_tap():
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-        if scope['error']:
-            return ws.scope_error_response(scope)
-        sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-        row = conn.execute(f'''
-            SELECT a.uid, a.timestamp FROM attendance a
-            WHERE NOT EXISTS (SELECT 1 FROM cardholders c WHERE c.uid = a.uid)
-              AND {sa_sql}
-            ORDER BY a.timestamp DESC LIMIT 1
-        ''', sa_params).fetchone()
-
-    if not row:
-        return jsonify({'success': True, 'uid': None}), 200
-
-    return jsonify({
-        'success': True,
-        'uid': row['uid'],
-        'timestamp': _clean_timestamp(row['timestamp'])
-    }), 200
-
-
-@api_bp.route('/attendance/export', methods=['GET'])
-@login_required
-@limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
-@perm.permission_required(perm.PERM_ATTENDANCE_VIEW)
-def export_attendance():
-    from flask import Response
-    import csv
-    import io as _io
-
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    uid = request.args.get('uid')
-
-    with get_db_context() as conn:
-        scope = ws.resolve_scope(conn)
-    if scope['error']:
-        return ws.scope_error_response(scope)
-    sa_sql, sa_params = ws.device_in_sql(scope, 'a.device_id')
-
-    query = f'''
-        SELECT a.id, a.uid, a.device_id, a.timestamp,
-               COALESCE(c.nama, 'Tidak dikenal') AS nama
-        FROM attendance a
-        LEFT JOIN cardholders c ON a.uid = c.uid
-        WHERE {sa_sql}
-    '''
-    params = list(sa_params)
-
-    if start_date:
-        try:
-            query += ' AND a.timestamp >= ?'
-            params.append(f"{start_date} 00:00:00")
-        except Exception:
-            pass
-
-    if end_date:
-        try:
-            query += ' AND a.timestamp <= ?'
-            params.append(f"{end_date} 23:59:59")
-        except Exception:
-            pass
-
-    if uid:
-        query += ' AND a.uid = ?'
-        params.append(uid)
-
-    query += ' ORDER BY a.timestamp DESC LIMIT 50000'
-
-    with get_db_context() as conn:
-        rows = conn.execute(query, params).fetchall()
-
-    output = _io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['ID', 'UID', 'Nama', 'Device ID', 'Timestamp'])
-
-    for r in rows:
-        writer.writerow([csv_safe(v) for v in (
-            r['id'], r['uid'], r['nama'], r['device_id'],
-            _clean_timestamp(r['timestamp'])
-        )])
-
-    filename = f"attendance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-    )
-
-
 @api_bp.route('/system/info', methods=['GET'])
 @login_required
 @limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
@@ -1742,8 +1243,6 @@ def get_system_info():
             return ws.scope_error_response(scope)
         sd_sql, sd_params = ws.dashboard_in_sql(scope, 'dashboard_id')
         sv_sql, sv_params = ws.device_in_sql(scope, 'device_id')
-        can_view_att = perm.has_permission(conn, ws.current_user_id(), perm.PERM_ATTENDANCE_VIEW)
-
         device_count = conn.execute(
             f'SELECT COUNT(*) FROM devices WHERE {sd_sql}', sd_params).fetchone()[0]
         sensor_count = conn.execute(
@@ -1753,13 +1252,6 @@ def get_system_info():
             sv_params).fetchone()[0]
         history_count = conn.execute(
             f'SELECT COUNT(*) FROM alert_history WHERE {sv_sql}', sv_params).fetchone()[0]
-        attendance_count = cardholder_count = 0
-        if can_view_att:
-            attendance_count = conn.execute(
-                f'SELECT COUNT(*) FROM attendance WHERE {sv_sql}', sv_params).fetchone()[0]
-            cardholder_count = conn.execute(
-                f'SELECT COUNT(*) FROM cardholders WHERE {sd_sql}', sd_params).fetchone()[0]
-
     db_size = 0
     db_path = config.DB_PATH
     if os.path.exists(db_path):
@@ -1776,9 +1268,6 @@ def get_system_info():
             'sensor_data_count': sensor_count,
             'active_alerts': alert_count,
             'alert_history_count': history_count,
-            **({'attendance_count': attendance_count,
-                'cardholder_count': cardholder_count}
-               if can_view_att else {}),
             'database_size_bytes': db_size,
             'database_size_mb': round(db_size / (1024 * 1024), 2),
             'data_retention_days': config.DATA_RETENTION_DAYS,
@@ -2071,7 +1560,7 @@ def delete_user(user_id):
             ).fetchall()
         ]
 
-        # Perangkat & kartu milik user yang dihapus TIDAK ikut hilang: dipindah ke
+        # Perangkat milik user yang dihapus TIDAK ikut hilang: dipindah ke
         # dashboard default admin yang melakukan penghapusan.
         acting = conn.execute(
             'SELECT id FROM dashboards WHERE user_id = ? ORDER BY is_default DESC, id ASC LIMIT 1',
@@ -2079,7 +1568,7 @@ def delete_user(user_id):
         ).fetchone()
         target_dash = acting['id'] if acting else None
 
-        # Kalau admin pelaku tidak punya dashboard tujuan, device/kartu milik
+        # Kalau admin pelaku tidak punya dashboard tujuan, perangkat milik
         # user yang dihapus akan jadi yatim (dashboard_id=NULL) → lenyap dari
         # semua halaman. Tolak dulu supaya datanya tidak hilang diam-diam.
         if target_dash is None and dash_ids:
@@ -2088,14 +1577,11 @@ def delete_user(user_id):
                 orphan += conn.execute(
                     'SELECT COUNT(*) FROM devices WHERE dashboard_id = ?', (did,)
                 ).fetchone()[0]
-                orphan += conn.execute(
-                    'SELECT COUNT(*) FROM cardholders WHERE dashboard_id = ?', (did,)
-                ).fetchone()[0]
             if orphan:
                 return jsonify({
                     'success': False,
                     'error': (f'Anda belum punya dashboard tujuan untuk menampung '
-                              f'{orphan} perangkat/kartu milik user ini. Buat '
+                              f'{orphan} perangkat milik user ini. Buat '
                               f'dashboard dulu, lalu hapus ulang user.'),
                 }), 409
 
@@ -2105,9 +1591,6 @@ def delete_user(user_id):
             moved_devices += conn.execute(
                 'UPDATE devices SET dashboard_id = ? WHERE dashboard_id = ?', (target_dash, did)
             ).rowcount
-            conn.execute(
-                'UPDATE cardholders SET dashboard_id = ? WHERE dashboard_id = ?', (target_dash, did)
-            )
             purge_dashboard(conn, did)
 
         conn.execute('DELETE FROM dashboard_members WHERE user_id = ?', (user_id,))
@@ -2146,8 +1629,6 @@ def get_user_permissions(user_id):
 @limiter.limit(lambda: get_config().RATE_LIMIT_DEFAULT)
 def update_user_permissions(user_id):
     payload = request.get_json(silent=True) or {}
-    view = bool(payload.get('attendance_view'))
-    manage = bool(payload.get('attendance_manage'))
 
     with get_db_context() as conn:
         target = perm.get_user_info(conn, user_id)
@@ -2161,7 +1642,7 @@ def update_user_permissions(user_id):
 
         before = sorted(perm.explicit_permissions(conn, user_id))
         after = sorted(perm.set_user_permissions(
-            conn, user_id, _current_user_id(), view, manage))
+            conn, user_id, _current_user_id()))
         username = conn.execute(
             'SELECT username FROM users WHERE id = ?', (user_id,)
         ).fetchone()['username']
@@ -2285,7 +1766,6 @@ def trigger_cleanup():
         cutoff_sensor = now - timedelta(days=config.DATA_RETENTION_DAYS)
         cutoff_history = now - timedelta(days=config.ALERT_HISTORY_RETENTION_DAYS)
         cutoff_log = now - timedelta(days=config.STATUS_LOG_RETENTION_DAYS)
-        cutoff_attendance = now - timedelta(days=config.ATTENDANCE_RETENTION_DAYS)
 
         with get_db_context() as conn:
             total_deleted = 0
@@ -2301,10 +1781,6 @@ def trigger_cleanup():
 
             r = conn.execute('DELETE FROM device_status_log WHERE created_at < ?', (cutoff_log,))
             results['device_status_log'] = r.rowcount
-            total_deleted += r.rowcount
-
-            r = conn.execute('DELETE FROM attendance WHERE timestamp < ?', (cutoff_attendance,))
-            results['attendance'] = r.rowcount
             total_deleted += r.rowcount
 
             r = conn.execute(

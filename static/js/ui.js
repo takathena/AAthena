@@ -25,7 +25,7 @@
     }
   }
 
-  // data-needs="editor" atau "owner admin" atau "perm:attendance.view" (salah satu cocok = tampil)
+  // data-needs="editor" atau "owner admin" atau "perm:foo.view" (salah satu cocok = tampil)
   function allowed(spec, ctx) {
     return String(spec).split(/[\s,]+/).filter(Boolean)
       .some(function (t) { return satisfies(t, ctx); });

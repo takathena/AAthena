@@ -9,12 +9,6 @@ Peran (users.role):
   moderator   saat ini berperilaku seperti user (lihat dashboard di Paket B).
   user        hanya dashboard yang dimiliki / dibagikan, plus izin eksplisit.
 
-Izin (user_permissions):
-  attendance.view    melihat absensi dan daftar kartu
-  attendance.manage  mengelola kartu (mencakup attendance.view)
-
-Admin dan superadmin implisit punya semua izin. Migrasi tidak memberi izin ke siapa pun.
-
 Penentuan admin memakai users.is_admin (sudah dipakai backend sejak v1). Peran
 di kolom role hanya membedakan superadmin, admin, moderator, dan user. Keduanya
 harus selalu konsisten; set_role() menjaga itu.
@@ -30,13 +24,6 @@ ROLE_ADMIN = 'admin'
 ROLE_MODERATOR = 'moderator'
 ROLE_USER = 'user'
 ROLES = (ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_MODERATOR, ROLE_USER)
-
-PERM_ATTENDANCE_VIEW = 'attendance.view'
-PERM_ATTENDANCE_MANAGE = 'attendance.manage'
-ALL_PERMISSIONS = (PERM_ATTENDANCE_VIEW, PERM_ATTENDANCE_MANAGE)
-
-# Izin yang otomatis ikut ketika izin kunci diberikan.
-IMPLIES = {PERM_ATTENDANCE_MANAGE: {PERM_ATTENDANCE_VIEW}}
 
 PERMISSION_DENIED_ERROR = 'Anda tidak punya izin untuk fitur ini'
 
@@ -79,40 +66,17 @@ def explicit_permissions(conn, user_id):
 
 def effective_permissions(conn, user_id):
     """Semua izin yang berlaku saat ini untuk user (dibaca dari DB setiap kali)."""
-    info = get_user_info(conn, user_id)
-    if not info:
-        return set()
-    if is_privileged(info['role']):
-        return set(ALL_PERMISSIONS)
-    granted = explicit_permissions(conn, user_id)
-    result = set(granted)
-    for perm in granted:
-        result |= IMPLIES.get(perm, set())
-    return result & set(ALL_PERMISSIONS)
+    return set()
 
 
 def has_permission(conn, user_id, permission):
     return permission in effective_permissions(conn, user_id)
 
 
-def set_user_permissions(conn, user_id, granted_by, view, manage):
-    """Ganti izin eksplisit user. manage menyertakan view. Caller harus commit."""
-    keep = set()
-    if manage:
-        keep.add(PERM_ATTENDANCE_MANAGE)
-        keep.add(PERM_ATTENDANCE_VIEW)
-    elif view:
-        keep.add(PERM_ATTENDANCE_VIEW)
+def set_user_permissions(conn, user_id, granted_by):
+    """Bersihkan izin eksplisit user. Caller harus commit."""
     conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
-    from app.database import get_wib_time
-    now = get_wib_time()
-    for perm in sorted(keep):
-        conn.execute(
-            'INSERT INTO user_permissions (user_id, permission, granted_by, granted_at) '
-            'VALUES (?, ?, ?, ?)',
-            (user_id, perm, granted_by, now),
-        )
-    return keep
+    return set()
 
 
 def permission_denied_response():

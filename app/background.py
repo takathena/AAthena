@@ -331,17 +331,16 @@ def check_device_status():
 
 
 def cleanup_old_data():
-    """Cleanup data lama di 5 tabel dengan retention berbeda."""
+    """Cleanup data lama di 4 tabel dengan retention berbeda."""
     config = get_config()
     retention_sensor = config.DATA_RETENTION_DAYS
     retention_history = config.ALERT_HISTORY_RETENTION_DAYS
     retention_log = config.STATUS_LOG_RETENTION_DAYS
-    retention_attendance = config.ATTENDANCE_RETENTION_DAYS
 
     logger.info(
         f"Data cleanup started "
         f"(sensor={retention_sensor}d, history={retention_history}d, "
-        f"status_log={retention_log}d, attendance={retention_attendance}d)"
+        f"status_log={retention_log}d)"
     )
 
     if shutdown_event.wait(300):
@@ -354,7 +353,6 @@ def cleanup_old_data():
             cutoff_sensor = now - timedelta(days=retention_sensor)
             cutoff_history = now - timedelta(days=retention_history)
             cutoff_log = now - timedelta(days=retention_log)
-            cutoff_attendance = now - timedelta(days=retention_attendance)
 
             with get_db_context() as conn:
                 total_deleted = 0
@@ -379,13 +377,6 @@ def cleanup_old_data():
                     (cutoff_log,)
                 )
                 results['device_status_log'] = r.rowcount
-                total_deleted += r.rowcount
-
-                r = conn.execute(
-                    'DELETE FROM attendance WHERE timestamp < ?',
-                    (cutoff_attendance,)
-                )
-                results['attendance'] = r.rowcount
                 total_deleted += r.rowcount
 
                 r = conn.execute(

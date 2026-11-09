@@ -7,16 +7,14 @@
 <meta name="theme-color" content="#0a0a0a">
 <meta name="dashboard-id" content="{{ dashboard_id }}">
 <title>NEXUS</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Leaflet + Chart.js dimuat lazy via lazy-load.js saat section map/graph dibuka -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/unified.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+{% if chat_enabled %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+{% endif %}
 </head>
 <body>
 
@@ -71,11 +69,6 @@
     <button class="drawer-item" data-tab="analytics" onclick="go('analytics')">
       <i class="fa-solid fa-chart-line"></i>
       <span>Analitik</span>
-    </button>
-
-    <button class="drawer-item" data-tab="attendance" data-perm="attendance.view" onclick="go('attendance')">
-      <i class="fa-solid fa-id-card"></i>
-      <span>Absensi</span>
     </button>
 
     <div class="drawer-section">Manajemen</div>
@@ -348,58 +341,6 @@
 
     <div id="chartsList">
       <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </section>
-
-  <!-- ============ ATTENDANCE ============ -->
-  <section id="s-attendance" class="section">
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Absensi</h1>
-        <div class="page-sub" id="attendSub">—</div>
-      </div>
-      <div class="page-actions">
-        <button class="page-action" onclick="exportAttend()" title="Export CSV" aria-label="Export">
-          <i class="fa-solid fa-download"></i>
-        </button>
-        <button class="page-action page-action-primary" onclick="openCardholder()" title="Daftar Kartu" aria-label="Daftar Kartu" data-perm="attendance.manage">
-          <i class="fa-solid fa-plus"></i>
-        </button>
-      </div>
-    </div>
-
-    <div class="stat-grid cols-3">
-      <div class="stat" onclick="openStatDetail('hadir')">
-        <div class="stat-num ok" id="sHadir">0</div>
-        <div class="stat-label">Hadir</div>
-      </div>
-      <div class="stat" onclick="openStatDetail('total')">
-        <div class="stat-num" id="sKartu">0</div>
-        <div class="stat-label">Kartu</div>
-      </div>
-      <div class="stat" onclick="openStatDetail('belum')">
-        <div class="stat-num warn" id="sUnknown">0</div>
-        <div class="stat-label">Unknown</div>
-      </div>
-    </div>
-
-    <div class="attend-tabs">
-      <button class="attend-tab active" data-t="report" onclick="setAttendView('report')">Laporan</button>
-      <button class="attend-tab" data-t="history" onclick="setAttendView('history')">Riwayat</button>
-    </div>
-
-    <div class="date-row">
-      <input type="date" id="dateStart" onchange="loadAttend()">
-      <input type="date" id="dateEnd" onchange="loadAttend()">
-      <button class="adf-reset" onclick="resetAttendDate()" title="Reset" aria-label="Reset tanggal">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
-
-    <div class="group">
-      <div class="group-body" id="attendList" style="padding:0;">
-        <div class="loading"><div class="spinner"></div></div>
-      </div>
     </div>
   </section>
 
@@ -778,43 +719,6 @@
   </div>
 </div>
 
-<!-- Cardholder -->
-<div class="modal" id="m-card">
-  <div class="modal-inner">
-    <div class="modal-head">
-      <h3>Daftarkan Kartu</h3>
-      <button class="modal-close" onclick="closeModal('m-card')"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="field">
-      <label>UID Kartu</label>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="cardUid" placeholder="0x010dd605" style="flex:1;">
-        <button class="btn-soft" onclick="captureLastTap()" style="flex-shrink:0;padding:0 14px;min-height:44px;" title="Tap terakhir">
-          <i class="fa-solid fa-crosshairs"></i>
-        </button>
-      </div>
-    </div>
-    <div class="field"><label>Nama Pemilik</label><input type="text" id="cardNama" placeholder="Nama lengkap"></div>
-    <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-card')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCardholder()">Simpan</button>
-    </div>
-  </div>
-</div>
-
-<!-- Stat Detail -->
-<div class="modal" id="m-stat">
-  <div class="modal-inner">
-    <div class="modal-head">
-      <h3 id="statTitle">Detail</h3>
-      <button class="modal-close" onclick="closeModal('m-stat')"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div id="statBody" style="display:flex;flex-direction:column;">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
-</div>
-
 <!-- Tab Modal -->
 <div class="modal" id="m-tab">
   <div class="modal-inner">
@@ -937,7 +841,7 @@
         <option value="fa-temperature-half">Suhu</option>
         <option value="fa-droplet">Kelembaban</option>
         <option value="fa-fire">Api / Gas</option>
-        <option value="fa-id-card">RFID / Absensi</option>
+        <option value="fa-id-card">RFID</option>
         <option value="fa-map">Peta</option>
         <option value="fa-microchip">Perangkat</option>
         <option value="fa-bell">Alert</option>
@@ -1357,6 +1261,7 @@
 {% endif %}
 
 <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lazy-load.js') }}"></script>
 <script src="{{ url_for('static', filename='js/error-handler.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 {% if chat_enabled %}<script src="{{ url_for('static', filename='js/chat.js') }}"></script>{% endif %}

@@ -232,7 +232,7 @@
         }
         const d = r.data;
         const names = { sensor_data: 'Data sensor', alert_history: 'Riwayat alert', device_status_log: 'Log status',
-            attendance: 'Absensi', alerts_inactive: 'Alert nonaktif' };
+            alerts_inactive: 'Alert nonaktif' };
         box.innerHTML = Object.entries(d.tables).map(([k, v]) =>
             `<div style="display:flex;justify-content:space-between;"><span>${esc(names[k] || k)}</span>
              <span>${v.rows.toLocaleString('id-ID')} baris · ~${fmtBytes(v.estimated_bytes)}</span></div>`).join('')

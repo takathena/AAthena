@@ -1,7 +1,6 @@
 """Paket A — penerapan izin di UI (desktop, mobile, Kelola Pengguna).
 
-Tes ini memeriksa sumber, bukan tampilan. Penegakan sebenarnya ada di backend
-(lihat test_paket_a_permissions.py).
+Tes ini memeriksa sumber, bukan tampilan. Penegakan sebenarnya ada di backend.
 """
 import os
 import re
@@ -17,47 +16,18 @@ def _read(*parts):
         return f.read()
 
 
-def test_desktop_attendance_nav_and_manage_button_are_gated():
-    html = _read('templates', 'dashboard.html')
-    assert 'data-section="attendance" data-needs="perm:attendance.view"' in html
-    att = _read('templates', 'partials', 'attendance_section.html')
-    assert 'data-needs="perm:attendance.manage"' in att
-
-
-def test_desktop_router_refuses_attendance_without_permission():
-    js = _read('static', 'js', 'dashboard.js')
-    assert 'canViewAttendance()' in js
-    assert 'Anda belum punya izin melihat absensi' in js
-
-
-def test_desktop_handles_revoked_permission_mid_session():
-    js = _read('static', 'js', 'dashboard.js')
-    assert "'PERMISSION_DENIED'" in js
-    assert 'handleAttendanceDenied' in js
-    assert 'stopAttendancePolling();' in js
-
-
 def test_ui_js_supports_permission_tokens():
     js = _read('static', 'js', 'ui.js')
     assert "'perm:'" in js
 
 
-def test_mobile_gates_attendance_and_cardholder_actions():
-    html = _read('templates', 'mobile.html')
-    assert 'data-tab="attendance" data-perm="attendance.view"' in html
-    assert 'data-perm="attendance.manage"' in html
-    js = _read('static', 'js', 'mobile.js')
-    assert 'function hasPerm' in js
-    assert "hasPerm('attendance.view')" in js
-
-
-def test_users_drawer_has_roles_and_attendance_permissions():
+def test_users_drawer_has_roles():
     part = _read('templates', 'partials', 'settings_section.html')
     for value in ('value="user"', 'value="moderator"', 'value="admin"'):
         assert value in part
-    assert 'id="userPermView"' in part and 'id="userPermManage"' in part
+    assert 'id="userPermView"' not in part and 'id="userPermManage"' not in part
     js = _read('static', 'js', 'users.js')
-    assert '/permissions' in js
+    assert '/permissions' not in js
     assert "'role'" in js or 'payload.role' in js
 
 
@@ -83,11 +53,11 @@ global.document = { addEventListener() {}, querySelectorAll() { return []; } };
 eval(fs.readFileSync(process.argv[1], 'utf8'));
 const A = window.NexusUI._allowed;
 const cases = [
-  ['perm:attendance.view', {isAdmin:false, permissions:['attendance.view']}],
-  ['perm:attendance.view', {isAdmin:false, permissions:[]}],
-  ['perm:attendance.manage', {isAdmin:false, permissions:['attendance.view']}],
-  ['perm:attendance.view', {isAdmin:true, permissions:[]}],
-  ['perm:attendance.view admin', {isAdmin:false, permissions:[]}],
+  ['perm:foo.view', {isAdmin:false, permissions:['foo.view']}],
+  ['perm:foo.view', {isAdmin:false, permissions:[]}],
+  ['perm:foo.manage', {isAdmin:false, permissions:['foo.view']}],
+  ['perm:foo.view', {isAdmin:true, permissions:[]}],
+  ['perm:foo.view admin', {isAdmin:false, permissions:[]}],
 ];
 console.log(JSON.stringify(cases.map(c => A(c[0], c[1]))));
 """

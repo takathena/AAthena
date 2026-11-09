@@ -29,9 +29,11 @@
 <body>
     {% block content %}{% endblock %}
 
+    {% block app_scripts %}
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dashboard_store.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    {% endblock %}
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/error-handler.js') }}"></script>

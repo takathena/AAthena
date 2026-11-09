@@ -901,6 +901,14 @@ def _migrate_v18(cursor):
     print("[DB] v18: peran diisi, tabel user_permissions siap")
 
 
+def _migrate_v19(cursor):
+    """Hapus fitur absensi: DROP TABLE attendance + cardholders. Aman dijalankan ulang."""
+    print("[DB] v19: dropping attendance & cardholders...")
+    cursor.execute('DROP TABLE IF EXISTS attendance')
+    cursor.execute('DROP TABLE IF EXISTS cardholders')
+    print("[DB] v19: attendance & cardholders dibuang")
+
+
 # Registry migrasi urut. app/database.py (_init_db_inner) memakai daftar ini.
 MIGRATIONS = [
     (1, _migrate_v1),
@@ -921,6 +929,7 @@ MIGRATIONS = [
     (16, _migrate_v16),
     (17, _migrate_v17),
     (18, _migrate_v18),
+    (19, _migrate_v19),
 ]
 
 # Re-export untuk kompatibilitas: nama lama yang sempat diimpor langsung.
@@ -929,5 +938,5 @@ __all__ = [
     "_migrate_v1", "_migrate_v2", "_migrate_v3", "_migrate_v4", "_migrate_v5",
     "_migrate_v6", "_migrate_v7", "_migrate_v8", "_migrate_v9", "_migrate_v10",
     "_migrate_v11", "_migrate_v12", "_migrate_v13", "_migrate_v14", "_migrate_v15",
-    "_migrate_v16", "_migrate_v17", "_migrate_v18", "_rebuild_fk_tables",
+    "_migrate_v16", "_migrate_v17", "_migrate_v18", "_migrate_v19", "_rebuild_fk_tables",
 ]

@@ -974,9 +974,10 @@
             loadAlerts();
         });
 
-        // Date range picker untuk alert
+        // Date range picker untuk alert (css/js lazy saat section dibuka)
         const drpEl = document.getElementById('alertDateRange');
-        if (drpEl && window.NexusDateRangePicker) {
+        const makeAlertDRP = () => {
+            if (!drpEl || !window.NexusDateRangePicker) return;
             state.alertDRP = new window.NexusDateRangePicker.DateRangePicker(drpEl, {
                 placeholder: 'Filter tanggal...',
                 onChange: (start, end) => {
@@ -985,6 +986,10 @@
                     applyFilter();
                 }
             });
+        };
+        if (window.NexusDateRangePicker) makeAlertDRP();
+        else if (window.NexusLazy && typeof window.NexusLazy.loadDateRange === 'function') {
+            window.NexusLazy.loadDateRange().then(makeAlertDRP).catch(() => {});
         }
 
         const refreshBtn = $('refreshAlertsBtn');

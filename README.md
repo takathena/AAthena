@@ -1,8 +1,8 @@
 # NEXUS IoT Platform
 
-Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan Raspberry Pi. Menyediakan dashboard web, peta interaktif, analitik multi-chart yang bisa di-drag, sistem alert berjenjang dengan notifikasi Telegram, absensi berbasis RFID, dan asisten AI yang terhubung langsung ke database.
+Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan Raspberry Pi. Menyediakan dashboard web, peta interaktif, analitik multi-chart yang bisa di-drag, sistem alert berjenjang dengan notifikasi Telegram, dan asisten AI yang terhubung langsung ke database.
 
-![Version](https://img.shields.io/badge/version-6.5.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.1.3-000000?style=flat-square&logo=flask&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&logo=sqlite&logoColor=white)
@@ -75,15 +75,6 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 - Bulk acknowledge dan mark-all-visible
 - Notifikasi Telegram dengan deduplikasi 60 detik dan retry 3x
 
-### Absensi RFID
-
-- Registrasi kartu dengan UID
-- Deteksi otomatis tap terakhir yang belum terdaftar
-- Laporan harian (check-in dan check-out per UID)
-- Riwayat tap dengan filter tanggal
-- Export CSV
-- Deduplikasi tap dalam window 30 detik
-
 ### Multi-User
 
 - Autentikasi session dengan idle timeout terpisah dari lifetime
@@ -95,14 +86,14 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 
 - Chat panel terintegrasi yang bisa minimize
 - Mendukung endpoint OpenAI-compatible (OpenRouter, Ollama, vLLM, Hermes)
-- Function calling dengan 7 tool yang query langsung ke database
+- Function calling dengan 4 tool yang query langsung ke database
 - Markdown rendering dengan subset aman (XSS-protected)
 - Health check upstream LLM otomatis
 
 ### Operasional
 
 - Auto-backup database SQLite tiap 24 jam
-- Retensi data per kategori: sensor 30d, history 90d, status log 30d, attendance 365d
+- Retensi data per kategori: sensor 30d, history 90d, status log 30d
 - VACUUM otomatis jika cleanup menghapus lebih dari 1000 baris
 - Rotating log file dengan batas 10 MB x 5 file
 - Background task hanya dijalankan oleh satu worker via file lock
@@ -147,7 +138,7 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 
 ```
                     +-------------------+
-                    |   ESP32 / RFID    |
+                    |   ESP32           |
                     |   (HTTP POST)     |
                     +---------+---------+
                               |
@@ -186,10 +177,9 @@ Alur request:
 1. Perangkat mengirim JSON ke `POST /api/v1/data` dengan `device_id` dan `api_key`.
 2. Server memverifikasi API key (SHA-256 hash, timing-safe compare).
 3. Data disimpan ke `sensor_data`, status device di-set online, dan interval kirim di-auto-detect.
-4. Jika `sensor_type` adalah RFID, UID dicatat ke tabel `attendance` dengan deduplikasi 30 detik.
-5. Alert rules dievaluasi terhadap data sensor, dan jika perlu alert dibuat atau diupdate.
-6. Background worker (hanya satu dari N worker) memeriksa device offline tiap `CHECK_INTERVAL` detik.
-7. Browser mengakses dashboard, yang memanggil API via fetch dengan CSRF token.
+4. Alert rules dievaluasi terhadap data sensor, dan jika perlu alert dibuat atau diupdate.
+5. Background worker (hanya satu dari N worker) memeriksa device offline tiap `CHECK_INTERVAL` detik.
+6. Browser mengakses dashboard, yang memanggil API via fetch dengan CSRF token.
 
 ---
 
@@ -337,7 +327,6 @@ Semua opsional. Kalau tidak diisi, pakai default dari `app/config.py`.
 | `DATA_RETENTION_DAYS` | `30` | Retensi data sensor |
 | `ALERT_HISTORY_RETENTION_DAYS` | `90` | Retensi riwayat alert |
 | `STATUS_LOG_RETENTION_DAYS` | `30` | Retensi log status device |
-| `ATTENDANCE_RETENTION_DAYS` | `365` | Retensi data absensi |
 
 ### Backup
 
@@ -484,21 +473,6 @@ screen /dev/ttyUSB0 115200
 }
 ```
 
-### Format Payload RFID
-
-```json
-{
-  "device_id": "RFID-01",
-  "api_key": "your-api-key",
-  "sensor_type": "RFID",
-  "wifi_ssid": "NamaWiFi",
-  "uptime_seconds": 3600,
-  "data": {
-    "uid": "0x010dd605"
-  }
-}
-```
-
 ### Contoh dengan curl
 
 ```bash
@@ -602,27 +576,6 @@ Filter untuk `/api/v1/alerts/all`:
 - `device_id`: string
 - `limit`: integer, maksimum 1000
 
-### Cardholders dan Attendance
-
-| Method | Endpoint | Auth | Keterangan |
-|--------|----------|------|------------|
-| GET | `/api/v1/cardholders` | Session | List semua cardholder |
-| POST | `/api/v1/cardholders` | Session | Registrasi kartu baru |
-| DELETE | `/api/v1/cardholders/<uid>` | Session | Hapus kartu |
-| GET | `/api/v1/attendance` | Session | Riwayat tap |
-| GET | `/api/v1/attendance/report` | Session | Laporan harian (check-in/out) |
-| GET | `/api/v1/attendance/stats` | Session | Statistik hari ini |
-| GET | `/api/v1/attendance/today` | Session | Siapa yang hadir hari ini |
-| GET | `/api/v1/attendance/unregistered` | Session | Kartu belum terdaftar |
-| GET | `/api/v1/attendance/last-unknown` | Session | Tap terakhir yang belum dikenal |
-| GET | `/api/v1/attendance/export` | Session | Export CSV |
-
-Filter untuk `/api/v1/attendance/report` dan `/api/v1/attendance/export`:
-
-- `start`: `YYYY-MM-DD`
-- `end`: `YYYY-MM-DD`
-- `uid`: string
-
 ### Chat AI
 
 | Method | Endpoint | Auth | Keterangan |
@@ -702,7 +655,6 @@ nexus-iot/
 │       ├── alert_rules_builder.js
 │       ├── alerts.js
 │       ├── api.js
-│       ├── attendance.js
 │       ├── chat.js
 │       ├── dashboard.js
 │       ├── dashboard_store.js
@@ -722,7 +674,6 @@ nexus-iot/
 │   ├── mobile.html               # Layout mobile
 │   └── partials/
 │       ├── alerts_section.html
-│       ├── attendance_section.html
 │       ├── chat_panel.html
 │       ├── dashboard_section.html
 │       ├── devices_section.html
@@ -864,13 +815,9 @@ Chat panel terintegrasi yang memanggil LLM melalui API OpenAI-compatible. Menduk
 
 | Tool | Deskripsi | Parameter |
 |------|-----------|-----------|
-| `get_present_today` | Karyawan yang sudah absen hari ini | - |
-| `get_absent_today` | Karyawan terdaftar yang belum absen | - |
-| `get_attendance_range` | Laporan absensi rentang tanggal | `start_date`, `end_date` |
 | `get_devices_status` | Status semua device | - |
 | `get_active_alerts` | Alert yang sedang aktif | - |
 | `get_device_history` | Riwayat sensor device | `device_id`, `hours` |
-| `get_cardholders` | Semua karyawan terdaftar | - |
 
 ### Alur
 
@@ -916,9 +863,9 @@ Jika `LLM_API_KEY` kosong, fitur chat dianggap belum dikonfigurasi: tombol/panel
 - Dari klien hanya pesan `role` `user`/`assistant` dengan `content` berupa string yang diteruskan; field lain dibuang. Maksimum 10 pesan terakhir, tiap pesan dipotong ke 4000 karakter.
 - Hasil tool dibatasi maksimum 100 baris per daftar dan 20 KB JSON; bila dipotong, hasil memuat `truncated: true`.
 - LLM boleh memanggil tool hingga 3 putaran (maksimum 5 panggilan per putaran), lalu wajib memberi jawaban teks.
-- System prompt menegaskan bahwa isi data (nama device, karyawan, pesan alert) adalah data, bukan instruksi.
+- System prompt menegaskan bahwa isi data (nama device, pesan alert) adalah data, bukan instruksi.
 - Detail error internal hanya dicatat di log; klien menerima pesan generik.
-- Semua user yang login dapat memakai chat, termasuk tool absensi. Pembatasan tool absensi hanya untuk admin belum diterapkan (keputusan pemilik; lihat CHANGELOG).
+- Semua user yang login dapat memakai chat.
 
 ---
 
@@ -946,7 +893,6 @@ Menghapus data berdasarkan retensi:
 | `sensor_data` | `DATA_RETENTION_DAYS` |
 | `alert_history` | `ALERT_HISTORY_RETENTION_DAYS` |
 | `device_status_log` | `STATUS_LOG_RETENTION_DAYS` |
-| `attendance` | `ATTENDANCE_RETENTION_DAYS` |
 | `alerts` (yang tidak aktif) | `ALERT_HISTORY_RETENTION_DAYS` |
 
 Jika total baris yang dihapus melebihi 1000, `VACUUM` dijalankan untuk mengembalikan ruang ke OS.
@@ -978,7 +924,7 @@ Worker yang tidak mendapat lock **tidak berhenti**: ia mencoba lagi tiap 30 deti
 
 ## Database dan Migrations
 
-Database: SQLite dengan mode WAL. Schema saat ini versi 16.
+Database: SQLite dengan mode WAL. Schema saat ini versi 19.
 
 ### Tabel
 
@@ -991,8 +937,6 @@ Database: SQLite dengan mode WAL. Schema saat ini versi 16.
 | `alerts` | Alert aktif |
 | `alert_history` | Riwayat perubahan alert |
 | `device_status_log` | Log perubahan status device |
-| `attendance` | Tap RFID |
-| `cardholders` | Kartu terdaftar |
 | `dashboards` | Dashboard per pengguna |
 | `analytics_tabs` | Tab analitik per dashboard |
 | `widgets` | Widget chart per tab |
@@ -1009,8 +953,6 @@ Daftar migrasi:
 |-------|-----------|
 | 1 | Tabel inti: devices, sensor_data, alerts |
 | 2 | Kolom `last_ip` dan `firmware_version` |
-| 3 | Tabel `cardholders` dan `attendance` |
-| 4 | Perbaikan foreign key pada `attendance` |
 | 5 | Kolom offline timeout, expected interval, alert rules; tabel `alert_history`, `device_status_log`, `user_settings` |
 | 6 | Index tambahan untuk performa query alert |
 | 7 | Standardisasi timezone ke naive WIB |
@@ -1429,7 +1371,7 @@ Ringkasan perilaku yang sengaja diubah pada perbaikan V6.5 dan perlu diketahui o
 
 Semua route yang **mengubah** data adalah admin-only dan dijaga di backend (JSON `403` untuk non-admin):
 tambah/ubah/hapus device, regenerate API key, ubah/reset alert rules per device, Bulk Import,
-tambah/hapus pemegang kartu (cardholder), tes notifikasi, serta manajemen user/backup/restore/cleanup/global rules.
+tes notifikasi, serta manajemen user/backup/restore/cleanup/global rules.
 Request `GET` (baca) tetap terbuka untuk semua user yang login. Tombol terkait disembunyikan di UI untuk non-admin,
 tetapi backend adalah sumber kebenaran.
 
@@ -1458,11 +1400,10 @@ log start memuat peringatan (gunakan hanya di jaringan tepercaya tanpa HTTPS).
 - Auto-detect hanya untuk device non-manual: butuh minimal 5 data terakhir, selisih < 2 detik diabaikan, hasil tidak di bawah 10 detik, dan hanya menulis bila berubah > 20%.
 - Menyimpan form edit dengan nilai yang sama dengan hasil auto-detect tidak mengubah mode.
 
-### Payload `/api/v1/data` (M1) dan UID kartu (N4)
+### Payload `/api/v1/data` (M1)
 
 - Body maksimal `DATA_MAX_BYTES` (default 8192 byte), lebih dari itu HTTP 413.
 - `data` harus object datar, maks 32 key (`[a-zA-Z0-9_]{1,32}`); nilai berupa angka finite, boolean, atau string maks 64 karakter. `sensor_type` memakai `[A-Za-z0-9_-]{1,32}`.
-- UID RFID wajib string heksadesimal 4-32 karakter (boleh awalan `0x`, pemisah `:` atau `-`), mis. `0x010dd605`. Huruf besar/kecil dipertahankan apa adanya.
 - Ekspor CSV menetralkan sel berawalan `= + - @` (diberi awalan `'`).
 
 ---

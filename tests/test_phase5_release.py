@@ -6,7 +6,7 @@ import app as app_pkg
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-EXPECTED_VERSION = '6.5.0'
+EXPECTED_VERSION = '2.0.0'
 
 
 def _read(*parts):
@@ -23,7 +23,7 @@ def _make_target_block(makefile, target):
 
 # ---------- Versi tunggal ----------
 
-def test_version_constant_is_v6_5():
+def test_version_constant_is_v2_0():
     assert app_pkg.__version__ == EXPECTED_VERSION
 
 

@@ -146,7 +146,6 @@ PURGE_TABLES = {
     'sensor_data': ('sensor_data', 'timestamp', 'LENGTH(data) + LENGTH(sensor_type) + 60', ''),
     'alert_history': ('alert_history', 'created_at', 'LENGTH(message) + 70', ''),
     'device_status_log': ('device_status_log', 'created_at', 'LENGTH(reason) + 50', ''),
-    'attendance': ('attendance', 'timestamp', '50', ''),
     'alerts_inactive': ('alerts', 'COALESCE(updated_at, created_at)', 'LENGTH(message) + 80',
                         'is_active = 0'),
 }

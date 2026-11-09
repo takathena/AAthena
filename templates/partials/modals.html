@@ -364,37 +364,6 @@
     </div>
 </div>
 
-<!-- CARDHOLDER MODAL -->
-<div class="modal" id="cardholderModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Daftarkan Kartu</h3>
-            <button class="modal-close">&times;</button>
-        </div>
-        <div class="form-group">
-            <label>UID Kartu</label>
-            <div style="display:flex;gap:8px;">
-                <input type="text" id="cardholderUid" placeholder="0x010dd605" style="flex:1;"
-                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <button class="btn btn-secondary" data-action="capture-last-tap" title="Ambil UID tap terakhir" style="flex:0 0 auto;">
-                    <i class="fa-solid fa-crosshairs"></i> Tangkap
-                </button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Nama Pemilik</label>
-            <input type="text" id="cardholderNama" placeholder="Nama lengkap"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-        </div>
-        <div class="modal-actions">
-            <button class="btn btn-secondary modal-close">Batal</button>
-            <button class="btn btn-success" data-action="submit-cardholder">
-                <i class="fa-solid fa-check"></i> Simpan
-            </button>
-        </div>
-    </div>
-</div>
-
 <!-- STAT DETAIL MODAL -->
 <div class="modal" id="statDetailModal">
     <div class="modal-content" style="max-width:640px;">
@@ -540,7 +509,7 @@
                 <option value="fa-temperature-half">Suhu</option>
                 <option value="fa-droplet">Kelembaban</option>
                 <option value="fa-fire">Api / Gas</option>
-                <option value="fa-id-card">RFID / Absensi</option>
+                <option value="fa-id-card">RFID</option>
                 <option value="fa-map">Peta</option>
                 <option value="fa-microchip">Perangkat</option>
                 <option value="fa-bell">Alert</option>
@@ -719,7 +688,7 @@
             <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;flex-shrink:0;font-size:14px;"></i>
             <div>
                 <b style="display:block;margin-bottom:4px;">Tindakan ini BERBAHAYA!</b>
-                Semua data saat ini (device, sensor, alert, absensi) akan <b>digantikan</b> dengan data dari file backup.
+                Semua data saat ini (device, sensor, alert) akan <b>digantikan</b> dengan data dari file backup.
                 <br><br>
                 Pre-restore backup otomatis dibuat sebelum proses. Restart container <b>WAJIB</b> dilakukan setelah restore.
             </div>
@@ -1005,7 +974,6 @@
                 <label><input type="checkbox" value="sensor_data" checked> Data sensor</label>
                 <label><input type="checkbox" value="alert_history"> Riwayat alert</label>
                 <label><input type="checkbox" value="device_status_log"> Log status perangkat</label>
-                <label><input type="checkbox" value="attendance"> Absensi</label>
                 <label><input type="checkbox" value="alerts_inactive"> Alert nonaktif</label>
             </div>
         </div>

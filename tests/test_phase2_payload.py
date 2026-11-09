@@ -31,9 +31,8 @@ def test_heartbeat_and_empty_data_accepted(anon_client, dev):
     assert post_data(anon_client, did, key, {}, sensor_type='heartbeat').status_code == 200
 
 
-def test_rfid_and_bool_and_short_string_accepted(anon_client, dev):
+def test_bool_and_short_string_accepted(anon_client, dev):
     key, did = dev
-    assert post_data(anon_client, did, key, {'uid': '0x010dd605'}, 'RFID').status_code == 200
     assert post_data(anon_client, did, key, {'motion': True, 'note': 'x' * 64}).status_code == 200
 
 

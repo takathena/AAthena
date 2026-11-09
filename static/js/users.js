@@ -4,7 +4,6 @@
    - Tambah/edit lewat laci kanan: X dan Simpan saja
    - Hapus lewat dialog Batal | Hapus (tanpa X)
    - Peran: User, Moderator, Admin (Superadmin hanya tampil, tidak bisa diubah)
-   - Izin absensi: melihat dan mengelola kartu (manage mencakup view)
    Aturan peran dan izin ditegakkan backend; UI hanya membatasi tampilan.
    Tanpa penyimpanan browser.
    ========================================================== */
@@ -134,15 +133,7 @@
     $('userFormRoleSuperNote').hidden = !isSuperTarget;
 
     const allPerms = isPriv(targetRole) || isSuperTarget;
-    $('userFormPermGroup').hidden = allPerms;
     $('userFormAllPerms').hidden = !allPerms;
-  }
-
-  function syncPermCheckboxes() {
-    const view = $('userPermView');
-    const manage = $('userPermManage');
-    if (manage.checked) { view.checked = true; view.disabled = true; }
-    else { view.disabled = false; }
   }
 
   function fillForm(u) {
@@ -154,9 +145,6 @@
     $('userFormPasswordLabel').textContent = u ? 'Password baru (kosongkan jika tidak diubah)' : 'Password';
     $('userFormPasswordHint').textContent = u ? 'Kosongkan jika tidak ingin mengubah password.' : 'Minimal 8 karakter.';
     setRole(u ? (u.role || 'user') : 'user');
-    $('userPermView').checked = false;
-    $('userPermManage').checked = false;
-    syncPermCheckboxes();
     $('userFormError').hidden = true;
     $('userFormError').textContent = '';
     applyFormRules(u);
@@ -171,16 +159,6 @@
     $('userFormSave').hidden = !!u;
     global.NexusUI && NexusUI.openDrawer($('userDrawer'));
 
-    // Izin eksplisit hanya relevan untuk user dan moderator.
-    if (u && !isPriv(u.role) && u.role !== 'superadmin') {
-      const res = await global.API.call(API_BASE + '/' + u.id + '/permissions');
-      if (res.success && state.editing === u) {
-        const perms = res.data.permissions || [];
-        $('userPermView').checked = perms.indexOf('attendance.view') !== -1;
-        $('userPermManage').checked = perms.indexOf('attendance.manage') !== -1;
-        syncPermCheckboxes();
-      }
-    }
     setTimeout(() => { const f = u ? $('userFormDisplayName') : $('userFormUsername'); if (f) f.focus(); }, 120);
   }
 
@@ -199,17 +177,6 @@
     const el = $('userFormError');
     el.textContent = msg;
     el.hidden = false;
-  }
-
-  async function savePermissions(userId, role) {
-    if (isPriv(role) || role === 'superadmin') return { success: true };
-    return global.API.call(API_BASE + '/' + userId + '/permissions', {
-      method: 'PUT',
-      body: JSON.stringify({
-        attendance_view: $('userPermView').checked,
-        attendance_manage: $('userPermManage').checked,
-      }),
-    });
   }
 
   async function save() {
@@ -248,12 +215,7 @@
       }
       if (!res.success) return showFormError(res.error || 'Gagal menyimpan pengguna');
 
-      const permRes = await savePermissions(userId, role);
-      if (permRes && !permRes.success) {
-        toast('Pengguna tersimpan, tetapi izin gagal diubah: ' + (permRes.error || ''), 'warning');
-      } else {
-        toast(id ? 'Pengguna diperbarui' : 'Pengguna dibuat', 'success');
-      }
+      toast(id ? 'Pengguna diperbarui' : 'Pengguna dibuat', 'success');
       closeForm(true);
       await load();
       // Perbarui profil sendiri bila yang diubah adalah akun pemanggil.
@@ -307,10 +269,7 @@
     const form = $('userForm');
     if (form) {
       form.addEventListener('input', () => setDirty(true));
-      form.addEventListener('change', (e) => {
-        setDirty(true);
-        if (e.target && e.target.id === 'userPermManage') syncPermCheckboxes();
-      });
+      form.addEventListener('change', () => { setDirty(true); });
       form.addEventListener('submit', (e) => { e.preventDefault(); save(); });
     }
     const saveBtn = $('userFormSave');

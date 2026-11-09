@@ -1,5 +1,9 @@
 # Changelog
 
+## V2.0.0
+
+Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route `/api/v1/*` dipertahankan), frontend lebih ringan (lazy-load Chart.js/Leaflet, gabung CSS), dan hapus fitur absensi (route `/cardholders`, `/attendance/*`, tabel `attendance`+`cardholders`, 5 chat tools, menu & section absensi). Schema naik ke v19 (`DROP TABLE attendance/cardholders`).
+
 ## Unreleased — Refactor bertahap (fondasi)
 
 Refactor tanpa mengubah perilaku API/DB. Semua endpoint dan schema tetap sama; hanya pemisahan tanggung jawab dan pembersihan import-time side effect.

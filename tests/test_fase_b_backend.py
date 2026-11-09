@@ -82,24 +82,6 @@ def test_post_device_accepts_valid_offline_timeout(admin_client):
     assert r.status_code == 201, r.get_json()
 
 
-# ---------- guard hapus dashboard ----------
-def test_delete_dashboard_with_cardholder_is_refused(admin_client):
-    did = admin_client.post('/api/v1/dashboards', json={'name': 'Fase B'}).get_json()['id']
-    with get_db_context() as conn:
-        conn.execute(
-            "INSERT INTO cardholders (uid, nama, dashboard_id) VALUES ('CARD-B1', 'A', ?)",
-            (did,))
-        conn.commit()
-
-    r = admin_client.delete(f'/api/v1/dashboards/{did}')
-    assert r.status_code == 409
-    with get_db_context() as conn:
-        still = conn.execute(
-            'SELECT COUNT(*) FROM cardholders WHERE uid = ?', ('CARD-B1',)
-        ).fetchone()[0]
-    assert still == 1
-
-
 # ---------- PUT /layout menolak elemen non-dict dengan 400 ----------
 def test_put_layout_rejects_non_dict_element(admin_client):
     did = admin_client.post('/api/v1/dashboards', json={'name': 'Layout'}).get_json()['id']

@@ -52,12 +52,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# ✅ Command default: Gunicorn via run:app
+# ✅ Command default: Gunicorn + uvicorn worker (FastAPI v2.0) via run:app
 # Jumlah worker dibaca dari WEB_CONCURRENCY (default 2). --max-requests me-recycle worker
 # secara berkala; pemilik background tasks yang di-recycle digantikan worker lain (H2).
-# --timeout 60 hanya mematikan worker yang macet total; request lama (chat LLM) di worker
-# gthread tidak ikut terhitung karena heartbeat dikirim thread utama.
-CMD ["gunicorn", "-k", "gthread", "--threads", "4", \
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", \
      "--timeout", "60", "--graceful-timeout", "30", "--keep-alive", "5", \
      "--max-requests", "1000", "--max-requests-jitter", "100", \
      "-b", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "run:app"]

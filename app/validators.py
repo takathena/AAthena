@@ -7,25 +7,10 @@ import re
 
 from marshmallow import Schema, fields, validate, ValidationError
 
-# UID kartu RFID: hex (boleh dengan awalan 0x seperti contoh firmware "0x010dd605"),
-# titik dua / dash sebagai pemisah. Huruf besar/kecil dipertahankan apa adanya
-# agar tetap cocok dengan data kartu yang sudah terdaftar.
-UID_PATTERN = re.compile(r'^(0[xX])?[0-9A-Fa-f:\-]{4,32}$')
 SENSOR_KEY_PATTERN = re.compile(r'^[a-zA-Z0-9_]{1,32}$')
 SENSOR_TYPE_PATTERN = re.compile(r'^[A-Za-z0-9_\-]{1,32}$')
 MAX_SENSOR_KEYS = 32
 MAX_SENSOR_STRING_LEN = 64
-
-
-def normalize_uid(value):
-    """Return UID (string, sudah di-strip) bila valid, selain itu None.
-
-    Hanya string yang diterima; angka (mis. 123) ditolak.
-    """
-    if not isinstance(value, str):
-        return None
-    uid = value.strip()
-    return uid if UID_PATTERN.match(uid) else None
 
 
 def validate_sensor_data(data):

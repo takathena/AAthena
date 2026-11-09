@@ -581,9 +581,7 @@ main{padding:16px 14px 40px;max-width:640px;margin:0 auto;}
 .chart-act.danger:active{background:var(--accent-crit-bg);color:var(--accent-crit);}
 .chart-canvas{position:relative;height:190px;}
 
-/* ==========================================================
-   ATTENDANCE
-   ========================================================== */
+/* ===== Attend ===== */
 .attend-tabs{
   display:flex;gap:2px;
   background:var(--surface-2);
@@ -2070,4 +2068,787 @@ body.modal-open .chat-fab-mobile {
   .active-dashboard-slug { font-size: 10px; }
   .dash-switch-name { font-size: 12.5px; }
   .user-name { font-size: 12.5px; }
+}
+
+/* ==========================================================
+   MERGED: fixes.css + unified.css (toast fixes) — do not re-add as separate files
+   ========================================================== */
+/* ==========================================================
+   NEXUS — Fixes (Sure Style v7)
+   - Segmented control + border + gap
+   - UNIFIED SIZING: semua button & dropdown 36px
+   ========================================================== */
+
+/* ---------- ACTIVE STATE TOKENS ---------- */
+:root,
+[data-theme="dark"] {
+  --active-bg: #2f2f2f;
+  --active-bg-hover: #383838;
+  --active-fg: #fafafa;
+  --active-border: #3a3a3a;
+}
+
+[data-theme="light"] {
+  --active-bg: #d4d4d4;
+  --active-bg-hover: #c8c8c8;
+  --active-fg: #0a0a0a;
+  --active-border: #cccccc;
+}
+
+/* ==========================================================
+   DROPDOWN — border tegas
+   ========================================================== */
+.ios-dd-trigger,
+.ios-dropdown-trigger {
+  background: var(--surface);
+  border: 1px solid var(--hairline) !important;
+  box-shadow: none !important;
+}
+.ios-dd-trigger:hover,
+.ios-dropdown-trigger:hover {
+  background: var(--surface-2);
+  border-color: var(--text-3) !important;
+}
+.ios-dd.open .ios-dd-trigger,
+.ios-dropdown.open .ios-dropdown-trigger,
+.ios-dd-trigger:focus,
+.ios-dd-trigger:focus-visible,
+.ios-dropdown-trigger:focus,
+.ios-dropdown-trigger:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--text-3) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.ios-dd-menu,
+.ios-dropdown-menu {
+  background: var(--surface);
+  border: 1px solid var(--hairline) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+[data-theme="dark"] .ios-dd-menu,
+[data-theme="dark"] .ios-dropdown-menu {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.ios-dd-item,
+.ios-dropdown-item {
+  border: 1px solid transparent !important;
+}
+
+/* ==========================================================
+   SEGMENTED CONTROL — chips & tabs (dengan gap)
+   ========================================================== */
+.chips,
+.attend-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline) !important;
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+.chips.chips-3 { grid-template-columns: repeat(3, 1fr); }
+.chips.chips-5 { grid-template-columns: repeat(5, 1fr); }
+.attend-tabs { grid-template-columns: 1fr 1fr; }
+
+.chip,
+.attend-tab {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-3) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.005em;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+  cursor: pointer;
+}
+.chip > span:first-child,
+.attend-tab > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip:hover,
+.chip:active,
+.attend-tab:hover,
+.attend-tab:active {
+  background: var(--surface-3) !important;
+  color: var(--text-2) !important;
+  border-color: var(--hairline) !important;
+}
+
+[data-theme="dark"] .chip.active,
+[data-theme="dark"] .attend-tab.active {
+  background: var(--surface-3) !important;
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  border-color: var(--hairline) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+[data-theme="light"] .chip.active,
+[data-theme="light"] .attend-tab.active {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  border-color: var(--hairline) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.chip .chip-count {
+  background: var(--surface) !important;
+  color: var(--text-3) !important;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  line-height: 1.4;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .chip.active .chip-count,
+[data-theme="light"] .chip.active .chip-count {
+  background: var(--surface-2) !important;
+  color: var(--text-2) !important;
+}
+
+/* ==========================================================
+   PAGE ACTIONS — segmented control
+   ========================================================== */
+.page-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline) !important;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.page-actions .page-action {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--hairline) !important;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.page-actions .page-action:active,
+.page-actions .page-action:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--text-3) !important;
+}
+.page-actions .page-action-primary {
+  background: var(--primary) !important;
+  color: var(--primary-fg) !important;
+  border: 1px solid var(--primary) !important;
+  font-weight: 600;
+}
+.page-actions .page-action-primary:active,
+.page-actions .page-action-primary:hover {
+  background: var(--primary-hover) !important;
+  color: var(--primary-fg) !important;
+  border-color: var(--primary-hover) !important;
+}
+[data-theme="dark"] .page-actions .page-action-primary {
+  background: #fafafa !important;
+  color: #0a0a0a !important;
+  border-color: #fafafa !important;
+}
+[data-theme="light"] .page-actions .page-action-primary {
+  background: #0a0a0a !important;
+  color: #ffffff !important;
+  border-color: #0a0a0a !important;
+}
+
+/* ==========================================================
+   ADJUST-RESET BUTTON (X reset)
+   ========================================================== */
+.adf-reset,
+.alert-date-inline .adf-reset {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--hairline) !important;
+  color: var(--text-3) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease) !important;
+}
+.adf-reset:hover,
+.adf-reset:active {
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  border-color: var(--text-3) !important;
+}
+
+/* ==========================================================
+   MAP TOOLBAR
+   ========================================================== */
+.map-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.map-toolbar .search { margin-bottom: 0; }
+.map-toolbar .chips { margin-bottom: 0; }
+
+/* ==========================================================
+   SEVERITY EXCEPTIONS
+   ========================================================== */
+.ios-dd-item[data-value="danger"].active,
+.ios-dropdown-item[data-value="danger"].active {
+  background: var(--accent-crit-bg) !important;
+  color: var(--accent-crit) !important;
+  border-color: var(--accent-crit) !important;
+}
+.ios-dd-item[data-value="warning"].active,
+.ios-dropdown-item[data-value="warning"].active {
+  background: var(--accent-warn-bg) !important;
+  color: var(--accent-warn) !important;
+  border-color: var(--accent-warn) !important;
+}
+.ios-dd-item[data-value="info"].active,
+.ios-dropdown-item[data-value="info"].active {
+  background: var(--accent-info-bg) !important;
+  color: var(--accent-info) !important;
+  border-color: var(--accent-info) !important;
+}
+.ios-dd-item[data-value="active"].active,
+.ios-dropdown-item[data-value="active"].active {
+  background: var(--accent-crit-bg) !important;
+  color: var(--accent-crit) !important;
+  border-color: var(--accent-crit) !important;
+}
+.ios-dd-item[data-value="resolved"].active,
+.ios-dropdown-item[data-value="resolved"].active {
+  background: var(--accent-ok-bg) !important;
+  color: var(--accent-ok) !important;
+  border-color: var(--accent-ok) !important;
+}
+
+/* ==========================================================
+   CARD HOVER
+   ========================================================== */
+.stat-card.clickable:hover,
+.group:hover,
+.hero-card:hover,
+.chart-card:hover {
+  border-color: var(--text-3);
+}
+.row:hover,
+.activity-item:hover,
+.alert-row:hover {
+  background: var(--surface-2);
+}
+
+/* ==========================================================
+   BORDER UNTUK SEMUA TOMBOL
+   ========================================================== */
+.btn,
+.btn-secondary,
+.btn-ghost,
+.btn-soft,
+.btn-icon,
+.page-action {
+  border: 1px solid var(--hairline) !important;
+}
+.btn-primary {
+  border: 1px solid var(--primary) !important;
+}
+.btn-success, .btn-ok {
+  border: 1px solid var(--accent-ok) !important;
+}
+.btn-danger {
+  border: 1px solid var(--accent-crit) !important;
+}
+.btn-warning {
+  border: 1px solid var(--accent-warn) !important;
+}
+
+.hdr-icon-btn {
+  border: 1px solid transparent !important;
+}
+.hdr-icon-btn:hover,
+.hdr-icon-btn:active {
+  border-color: var(--hairline) !important;
+}
+
+.map-banner .btn-soft,
+.map-banner .btn-save,
+.map-reset-btn {
+  border: 1px solid var(--hairline) !important;
+}
+.map-banner .btn-save {
+  border-color: var(--primary) !important;
+}
+
+.modal-close {
+  border: 1px solid var(--hairline) !important;
+}
+
+.group-action,
+.chart-act,
+.row-more {
+  border: 1px solid transparent !important;
+}
+.group-action:hover,
+.group-action:active,
+.chart-act:hover,
+.chart-act:active,
+.row-more:hover,
+.row-more:active {
+  border-color: var(--hairline) !important;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="password"],
+select,
+textarea {
+  border: 1px solid var(--hairline) !important;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--text-3) !important;
+}
+
+/* ==========================================================
+   FIX: Leaflet z-index
+   ========================================================== */
+.leaflet-container {
+  z-index: 1 !important;
+  position: relative;
+}
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-pane,
+.leaflet-overlay-pane,
+.leaflet-shadow-pane,
+.leaflet-marker-pane,
+.leaflet-tooltip-pane,
+.leaflet-popup-pane,
+.leaflet-map-pane canvas,
+.leaflet-map-pane svg {
+  z-index: 1 !important;
+}
+.leaflet-control,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control-zoom,
+.leaflet-control-attribution {
+  z-index: 2 !important;
+}
+.map-wrap,
+#mMapFull,
+#mapFull {
+  isolation: isolate;
+  position: relative;
+  z-index: 0;
+}
+.drawer { z-index: 200 !important; }
+.drawer-backdrop { z-index: 190 !important; }
+.modal { z-index: 9999 !important; }
+.modal-inner { z-index: 10000 !important; }
+.chat-fab-mobile { z-index: 210 !important; }
+.chat-panel { z-index: 220 !important; }
+.app-hdr { z-index: 60 !important; }
+.toast { z-index: 999999 !important; }
+
+/* ==========================================================
+   MOBILE CARD BORDERS
+   ========================================================== */
+.stat {
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+}
+.stat:active { border-color: var(--text-3) !important; }
+
+.stat-list { border: 1px solid var(--hairline) !important; }
+.group { border: 1px solid var(--hairline) !important; }
+.hero-card { border: 1px solid var(--hairline) !important; }
+.chart-card { border: 1px solid var(--hairline) !important; }
+.map-wrap { border: 1px solid var(--hairline) !important; }
+
+.attend-item {
+  border: 1px solid var(--hairline) !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--surface) !important;
+  margin-bottom: 8px !important;
+  padding: 14px !important;
+}
+.attend-item::after { display: none !important; }
+.attend-item:last-child { margin-bottom: 0 !important; }
+
+.alert-item {
+  border: 1px solid var(--hairline) !important;
+  border-left-width: 3px !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--surface) !important;
+  margin-bottom: 8px !important;
+  padding: 12px 14px !important;
+}
+.alert-item::after { display: none !important; }
+.alert-item:last-child { margin-bottom: 0 !important; }
+.alert-item.danger  { border-left-color: var(--accent-crit) !important; }
+.alert-item.warning { border-left-color: var(--accent-warn) !important; }
+.alert-item.info    { border-left-color: var(--accent-info) !important; }
+.alert-item.resolved{ border-left-color: var(--accent-ok) !important; }
+
+.chips,
+.attend-tabs {
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+}
+
+.ios-dd-trigger {
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+}
+.ios-dd.open .ios-dd-trigger {
+  border-color: var(--text-3) !important;
+}
+
+.date-row input,
+.alert-date-filter .adf-group input {
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+}
+.date-row input:focus,
+.alert-date-filter .adf-group input:focus {
+  border-color: var(--text-3) !important;
+}
+
+.search input {
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+}
+.search input:focus {
+  border-color: var(--text-3) !important;
+}
+
+.alert-bulk-bar { border: 1px solid var(--hairline) !important; }
+.group-body .empty { padding: 48px 20px; }
+#s-map #mapChips { margin-bottom: 10px !important; }
+
+/* ==========================================================
+   ⭐ UNIFIED SIZING — SEMUA BUTTON & DROPDOWN 36px
+   Berlaku global di semua section
+   ========================================================== */
+
+/* --- Text buttons (semua varian) --- */
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-ok,
+.btn-soft {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  border-radius: var(--radius-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  white-space: nowrap;
+}
+
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-ok {
+  font-weight: 600 !important;
+}
+.btn-secondary,
+.btn-ghost,
+.btn-soft {
+  font-weight: 500 !important;
+}
+
+/* --- Icon-only buttons (36x36) --- */
+.btn-icon,
+.page-action,
+.group-action,
+.chart-act,
+.hdr-icon-btn,
+.hdr-btn,
+.modal-close:not(.btn),
+.activity-refresh,
+.map-reset-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* --- Filter buttons (devices toolbar) --- */
+.filter-btn {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  border-radius: var(--radius-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* --- SEMUA DROPDOWN TRIGGER (uniform) --- */
+.ios-dd-trigger,
+.ios-dropdown-trigger,
+.tab-dropdown-trigger,
+.time-range-trigger {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  border-radius: var(--radius-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  cursor: pointer !important;
+}
+
+.ios-dd-trigger:hover,
+.ios-dropdown-trigger:hover,
+.tab-dropdown-trigger:hover,
+.time-range-trigger:hover {
+  background: var(--surface-2) !important;
+  border-color: var(--text-3) !important;
+}
+
+.ios-dd.open .ios-dd-trigger,
+.ios-dropdown.open .ios-dropdown-trigger,
+.tab-dropdown.open .tab-dropdown-trigger,
+.time-range-dropdown.open .time-range-trigger {
+  background: var(--surface-2) !important;
+  border-color: var(--text-3) !important;
+}
+
+/* Label di dalam dropdown */
+.ios-dd-label,
+.ios-dropdown-label,
+.tab-dropdown-trigger .tab-label,
+.time-range-trigger > span {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+}
+
+/* Chevron & icon dalam dropdown */
+.ios-dd-chev,
+.ios-dropdown-chev,
+.tab-dropdown-trigger > i.fa-chevron-down,
+.time-range-trigger > i.fa-chevron-down {
+  font-size: 10px !important;
+  opacity: 0.6 !important;
+  flex-shrink: 0;
+}
+
+/* Icon di depan label */
+.ios-dd-trigger > i:first-child,
+.ios-dropdown-trigger > i:first-child,
+.time-range-trigger > i:first-child,
+.tab-dropdown-trigger > i:first-child {
+  font-size: 12px !important;
+  color: var(--text-3) !important;
+  flex-shrink: 0;
+}
+
+/* --- Date inputs (toolbar) --- */
+.alert-date-inline input[type="date"],
+.date-row input[type="date"],
+.alert-date-filter .adf-group input[type="date"],
+.alert-filter-bar input[type="date"] {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--hairline) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  outline: none !important;
+}
+
+/* --- Search inputs (unified) --- */
+.search-box input,
+.search input,
+.map-list-search input {
+  height: 36px !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* ==========================================================
+   ALERT TOOLBAR — date inline sejajar dropdown
+   ========================================================== */
+.alert-toolbar .alert-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.alert-date-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.alert-date-inline input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+  cursor: pointer;
+}
+[data-theme="light"] .alert-date-inline input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+/* Hide container lama kalau masih ada di cache */
+.alert-filter-bar { display: none !important; }
+
+/* Responsive: mobile → date inputs turun ke baris baru */
+@media (max-width: 768px) {
+  .alert-toolbar .alert-filters {
+    width: 100%;
+  }
+  .alert-toolbar .alert-filters > .ios-dropdown {
+    flex: 1;
+    min-width: 0;
+  }
+  .alert-date-inline {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+  }
+  .alert-date-inline input[type="date"] {
+    width: 100%;
+  }
+}
+
+/* ===== Kontrol global: admin saja (backend tetap menolak dengan 403) ===== */
+body.is-non-admin #testNotifBtn,
+body.is-non-admin [onclick*="testNotifTelegram"] {
+  display: none !important;
+}
+
+/* ===== Viewer di dashboard dibagikan: sembunyikan kontrol tulis perangkat/kartu.
+   (Editor/owner/admin tetap melihatnya; backend menolak dengan 403 bila peran kurang.) ===== */
+body.is-viewer [data-action="add-device"],
+body.is-viewer [data-action="regenerate-key"],
+body.is-viewer .action-btn.delete,
+body.is-viewer .action-btn.config,
+body.is-viewer [onclick*="openAddDevice"],
+body.is-viewer [onclick*="sheetAction('config')"],
+body.is-viewer [onclick*="sheetAction('key')"],
+body.is-viewer [onclick*="sheetAction('delete')"] {
+  display: none !important;
+}
+
+/* Lencana dashboard dibagikan / tampilan semua perangkat */
+.ws-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--text-3);
+  vertical-align: middle;
+}
+
+
+/* ==========================================================
+   Tombol teks yang juga berkelas .modal-close (mis. "Batal", "Tutup")
+   .modal-close aslinya untuk tombol ikon "x" 36x36. Tombol teks harus
+   memakai ukuran tombol normal: tinggi 36px, padding 14px, lebar menyesuaikan
+   (inline style width:100% / flex:1 tetap berlaku).
+   ========================================================== */
+.btn.modal-close {
+  width: auto;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  gap: 6px;
+}
+.btn-secondary.modal-close {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--hairline) !important;
+}
+.btn-secondary.modal-close:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--text-3) !important;
+}
+
+/* ---------- TOAST THEME-AWARE + ANIMATION (folded from unified.css) ---------- */
+.toast {
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
+  border: 1px solid var(--hairline) !important;
+}
+[data-theme="light"] .toast {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+.toast { animation-duration: 0.35s !important; }
+.toast.toast-slide-out {
+  animation: toastSlideOut 0.35s ease forwards !important;
 }
