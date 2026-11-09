@@ -33,6 +33,10 @@
 
     <div class="overview-grid">
 <div class="ring-card">
+    <div class="bento-head">
+        <span class="bento-title"><i class="fa-solid fa-circle-notch"></i> Ringkasan Perangkat</span>
+        <button type="button" class="bento-go" data-goto="devices" aria-label="Buka perangkat">→</button>
+    </div>
     <div class="ring-wrap">
         <svg class="ring-svg" viewBox="0 0 160 160" width="160" height="160" aria-hidden="true">
             <!-- Outer: Total (r=68, C=427.26) -->
@@ -80,6 +84,7 @@
             <span class="ring-legend-value" id="ringLegendHealthy">0</span>
         </button>
     </div>
+    <button type="button" class="bento-go bento-go--wide" data-goto="devices">Lihat perangkat <i class="fa-solid fa-arrow-right"></i></button>
 </div>
 
         <div class="nx-metrics nx-metrics--2">
@@ -165,6 +170,33 @@
                     <i class="fa-solid fa-spinner fa-spin"></i> Memuat...
                 </div>
             </div>
+            <button type="button" class="bento-go bento-go--wide bento-foot" data-goto="alerts">Lihat semua notifikasi <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+
+        <div class="bento-tile bento-map" data-goto="map" role="button" tabindex="0" aria-label="Buka peta perangkat">
+            <div class="bento-head">
+                <span class="bento-title"><i class="fa-solid fa-map-location-dot"></i> Peta Perangkat</span>
+                <span class="bento-go" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+            <div class="bento-map-stage" aria-hidden="true">
+                <span class="bento-pin ok" style="left:18%;top:32%"></span>
+                <span class="bento-pin ok" style="left:42%;top:60%"></span>
+                <span class="bento-pin warn" style="left:63%;top:28%"></span>
+                <span class="bento-pin ok" style="left:79%;top:58%"></span>
+                <span class="bento-pin crit" style="left:54%;top:78%"></span>
+            </div>
+            <span class="bento-tile-sub">Klik untuk zoom ke lokasi perangkat</span>
+        </div>
+
+        <div class="bento-tile bento-graph" data-goto="graph" role="button" tabindex="0" aria-label="Buka analitik">
+            <div class="bento-head">
+                <span class="bento-title"><i class="fa-solid fa-chart-line"></i> Analitik</span>
+                <span class="bento-go" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+            <div class="bento-bars" aria-hidden="true">
+                <span style="height:38%"></span><span style="height:62%"></span><span style="height:50%"></span><span style="height:80%"></span><span style="height:64%"></span><span style="height:92%"></span>
+            </div>
+            <span class="bento-tile-sub">Grafik sensor real-time</span>
         </div>
     </div>
 

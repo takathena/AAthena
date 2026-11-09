@@ -3966,12 +3966,17 @@
         });
         const delTabBtn = $('analyticsTabDeleteBtn');
         if (delTabBtn) delTabBtn.addEventListener('click', deleteAnalyticsTab);
-        document.querySelectorAll('.nx-metric-card.clickable[data-goto]').forEach(card => {
+        document.querySelectorAll('[data-goto]').forEach(card => {
             card.addEventListener('click', () => {
                 const target = card.dataset.goto; const filter = card.dataset.filter;
                 if (filter && target === 'devices') { state.deviceFilter = filter; setDeviceFilter(filter); }
                 showSection(target);
             });
+            if (card.getAttribute('role') === 'button') {
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+                });
+            }
         });
         const activityRefresh = $('activityRefreshBtn');
         if (activityRefresh) activityRefresh.addEventListener('click', loadActivityFeed);

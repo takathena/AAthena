@@ -3741,21 +3741,36 @@
     color: var(--text-3);
 }
 /* ============================================================
-   SYMMETRIC OVERVIEW GRID
+   BENTO OVERVIEW GRID (dashboard)
    ============================================================ */
 .overview-grid {
     display: grid;
-    grid-template-columns: 240px minmax(0, 1.05fr) minmax(0, 1.15fr);
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 14px;
     margin-bottom: 18px;
     align-items: stretch;
 }
 
-.overview-grid > .ring-card,
-.overview-grid > .nx-metrics,
-.overview-grid > .activity-card {
+.overview-grid > .ring-card {
+    grid-column: span 4;
+    grid-row: span 2;
+    min-height: 340px;
+}
+
+.overview-grid > .nx-metrics--2 {
+    grid-column: span 5;
+    grid-row: span 2;
+    margin-bottom: 0;
     height: 100%;
-    min-height: 320px;
+}
+
+.overview-grid > .activity-card {
+    grid-column: span 3;
+    grid-row: span 2;
+    max-height: none;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Metrics 2x2 mengisi penuh */
@@ -3772,6 +3787,26 @@
     min-height: 0;
 }
 
+/* Artefak bento: panah muncul saat hover kartu klik */
+.overview-grid .nx-metric-card.clickable { position: relative; }
+.overview-grid .nx-metric-card.clickable::after {
+    content: '→';
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 13px;
+    color: var(--text-3);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.15s var(--ease), transform 0.15s var(--ease);
+    pointer-events: none;
+}
+.overview-grid .nx-metric-card.clickable:hover::after,
+.overview-grid .nx-metric-card.clickable:focus-visible::after {
+    opacity: 1;
+    transform: translateX(0);
+}
+
 /* Ring card isi penuh */
 .ring-card {
     height: 100%;
@@ -3784,35 +3819,146 @@
     gap: 16px;
 }
 
-/* Activity card isi penuh */
-.activity-card {
-    height: 100%;
-    max-height: none;
-    min-height: 0;
+/* ---------- Bento shared ---------- */
+.bento-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+}
+.bento-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    min-width: 0;
+}
+.bento-title i { color: var(--text-3); font-size: 11px; flex-shrink: 0; }
+.bento-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 8px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-3);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.bento-go:hover, .bento-go:focus-visible { background: var(--surface-2); color: var(--text); }
+.bento-go--wide {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 12px;
+    border: 1px solid var(--hairline);
+    background: var(--surface-2);
+    color: var(--text-2);
+}
+.bento-go--wide:hover { color: var(--text); border-color: var(--text-3); }
+.bento-foot { border-radius: 0; border-left: none; border-right: none; border-bottom: none; }
+
+/* ---------- Bento tile (peta / analitik preview) ---------- */
+.bento-tile {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    padding: 16px;
     display: flex;
     flex-direction: column;
+    gap: 10px;
+    min-height: 148px;
+    cursor: pointer;
+    min-width: 0;
+    transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
 }
+.bento-tile:hover, .bento-tile:focus-visible {
+    border-color: var(--text-3);
+    background: var(--surface-2);
+}
+.bento-tile:focus-visible { outline: 2px solid var(--text-3); outline-offset: 2px; }
+.bento-tile:active { background: var(--surface-2); }
+.overview-grid > .bento-map { grid-column: span 7; }
+.overview-grid > .bento-graph { grid-column: span 5; }
+.bento-tile-sub { font-size: 11.5px; color: var(--text-3); }
+
+/* Peta preview: grid jalan + pin status (dekoratif) */
+.bento-map-stage {
+    position: relative;
+    flex: 1;
+    min-height: 56px;
+    border-radius: var(--radius-md);
+    background:
+        linear-gradient(var(--hairline-soft) 1px, transparent 1px),
+        linear-gradient(90deg, var(--hairline-soft) 1px, transparent 1px),
+        radial-gradient(circle at 30% 40%, var(--accent-ok-bg), transparent 55%),
+        var(--bg-subtle);
+    background-size: 24px 24px, 24px 24px, 100% 100%, 100% 100%;
+    overflow: hidden;
+}
+.bento-pin {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+.bento-pin.ok { background: var(--accent-ok); }
+.bento-pin.warn { background: var(--accent-warn); }
+.bento-pin.crit { background: var(--accent-crit); }
+
+/* Analitik preview: bar mini dekoratif */
+.bento-bars {
+    flex: 1;
+    min-height: 48px;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+.bento-bars span {
+    flex: 1;
+    min-width: 0;
+    border-radius: 3px 3px 0 0;
+    background: var(--surface-3);
+}
+.bento-bars span:nth-child(4), .bento-bars span:nth-child(6) { background: var(--accent-ok); opacity: 0.7; }
 
 @media (max-width: 1280px) {
-    .overview-grid {
-        grid-template-columns: 220px minmax(0, 1fr);
-        grid-auto-rows: auto;
-    }
-    .overview-grid > .activity-card {
-        grid-column: 1 / -1;
-    }
+    .overview-grid > .ring-card { grid-column: span 6; grid-row: span 1; min-height: 300px; }
+    .overview-grid > .nx-metrics--2 { grid-column: span 6; grid-row: span 1; }
+    .overview-grid > .activity-card { grid-column: 1 / -1; grid-row: span 1; max-height: 320px; }
+    .overview-grid > .bento-map { grid-column: span 7; }
+    .overview-grid > .bento-graph { grid-column: span 5; }
 }
 
 @media (max-width: 768px) {
-    .overview-grid {
-        grid-template-columns: 1fr;
-    }
     .overview-grid > .ring-card,
-    .overview-grid > .nx-metrics,
-    .overview-grid > .activity-card {
+    .overview-grid > .nx-metrics--2,
+    .overview-grid > .activity-card,
+    .overview-grid > .bento-map,
+    .overview-grid > .bento-graph {
+        grid-column: 1 / -1;
+        grid-row: auto;
         min-height: 0;
     }
+    .overview-grid > .bento-map,
+    .overview-grid > .bento-graph { min-height: 132px; }
+    .activity-card { max-height: 320px; }
     .ring-card { padding: 16px; }
+}
+
+@media (max-width: 480px) {
+    .overview-grid { gap: 10px; }
+    .bento-tile { padding: 14px; }
+    .nx-metrics--2 { gap: 10px; }
 }
 /* ============================================================
    DEVICE ACTION MENU (⋯ popup)
