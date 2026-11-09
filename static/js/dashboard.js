@@ -695,13 +695,8 @@
 
     function fitBentoMap() {
         if (!state.mapBento) return;
-        const pts = state.devices
-            .filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0))
-            .map(d => [Number(d.latitude), Number(d.longitude)])
-            .filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
-        if (pts.length === 0) return;
-        if (pts.length === 1) { state.mapBento.setView(pts[0], 11); return; }
-        state.mapBento.fitBounds(pts, { padding: [12, 12] });
+        // Semua perangkat di Jawa -> view kunci Jawa, jangan fitBounds (zoom liar di container kecil)
+        state.mapBento.setView([-7.0, 109.5], 7);
     }
 
     function refreshBento() {
