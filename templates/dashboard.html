@@ -108,13 +108,14 @@
         </a>
         {% else %}
         <div class="nav-section">Asisten</div>
-        <a class="nav-item nx-disabled" href="#chatSetup" id="chatDisabledBtn" aria-disabled="true"
+        <div class="nav-item nx-disabled" id="chatDisabledBtn" role="link" aria-disabled="true"
+           aria-label="NEXUS AI belum aktif"
            data-hint="NEXUS AI belum aktif. Set LLM_API_KEY di .env lalu restart container."
            title="NEXUS AI belum aktif — set LLM_API_KEY di .env lalu restart">
             <span class="icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
             <span class="label">NEXUS AI</span>
             <span class="nx-chip-sm">Belum aktif</span>
-        </a>
+        </div>
         {% endif %}
     </nav>
     <div class="sidebar-footer">

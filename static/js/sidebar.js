@@ -152,6 +152,16 @@
                 });
             });
 
+        // AI belum aktif (LLM_API_KEY kosong): item non-klik, klik hanya
+        // menampilkan hint lewat ui.js — pastikan tidak terjadi navigasi.
+        const aiOff = $('chatDisabledBtn');
+        if (aiOff) {
+            aiOff.addEventListener('click', (e) => { e.preventDefault(); });
+            aiOff.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
+            });
+        }
+
         // Handle resize — switch mode
         const onChange = () => applyMode();
         if (mql.addEventListener) mql.addEventListener('change', onChange);

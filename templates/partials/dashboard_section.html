@@ -178,14 +178,10 @@
                 <span class="bento-title"><i class="fa-solid fa-map-location-dot"></i> Peta Perangkat</span>
                 <span class="bento-go" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
             </div>
-            <div class="bento-map-stage" aria-hidden="true">
-                <span class="bento-pin ok" style="left:18%;top:32%"></span>
-                <span class="bento-pin ok" style="left:42%;top:60%"></span>
-                <span class="bento-pin warn" style="left:63%;top:28%"></span>
-                <span class="bento-pin ok" style="left:79%;top:58%"></span>
-                <span class="bento-pin crit" style="left:54%;top:78%"></span>
+            <div class="bento-map-wrap">
+                <div id="mapBento" aria-label="Peta perangkat"></div>
             </div>
-            <span class="bento-tile-sub">Klik untuk zoom ke lokasi perangkat</span>
+            <span class="bento-tile-sub" id="bentoMapSub">Memuat peta…</span>
         </div>
 
         <div class="bento-tile bento-graph" data-goto="graph" role="button" tabindex="0" aria-label="Buka analitik">
@@ -193,10 +189,10 @@
                 <span class="bento-title"><i class="fa-solid fa-chart-line"></i> Analitik</span>
                 <span class="bento-go" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
             </div>
-            <div class="bento-bars" aria-hidden="true">
-                <span style="height:38%"></span><span style="height:62%"></span><span style="height:50%"></span><span style="height:80%"></span><span style="height:64%"></span><span style="height:92%"></span>
+            <div class="bento-chart-wrap">
+                <canvas id="bentoChart"></canvas>
             </div>
-            <span class="bento-tile-sub">Grafik sensor real-time</span>
+            <span class="bento-tile-sub" id="bentoChartSub">Memuat grafik sensor…</span>
         </div>
     </div>
 

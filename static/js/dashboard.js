@@ -15,6 +15,8 @@
         deviceFilter: 'all',
         deviceFilterFull: 'all',
         mapFull: null,
+        mapBento: null,
+        bentoChart: null,
         markerCluster: null,
         marker: null,
         selectedLat: null,
@@ -282,7 +284,7 @@
             }, 100);
         }
         if (section === 'dashboard') {
-            setTimeout(() => { loadActivityFeed(); }, 100);
+            setTimeout(() => { loadActivityFeed(); refreshBento(); }, 100);
         }
         if (section === 'graph') {
             setTimeout(() => {
@@ -365,6 +367,7 @@
         if (onboarding) onboarding.hidden = (summary.total_devices || 0) > 0;
         updateHealthRing(summary);
         if (state.mapFull) loadMarkers(state.mapFull, true);
+        refreshBento();
         updateFilterCounts();
         renderFilteredDevices();
         renderFilteredDevicesFull();
@@ -662,6 +665,128 @@
         updateMapSelectedBanner();
     }
 
+    // ==========================================
+    // BENTO TILES (dashboard): peta Leaflet ke-2 + chart sensor gabungan
+    // ==========================================
+    async function initBentoMap() {
+        if (state.mapBento) return;
+        const el = $('mapBento'); if (!el) return;
+        if (typeof L === 'undefined') {
+            try { if (window.NexusLazy) await window.NexusLazy.loadMapLibs(); } catch (e) {}
+            if (typeof L === 'undefined') {
+                el.innerHTML = '<div class="bento-map-empty">Peta gagal dimuat (offline?). Buka section Peta.</div>';
+                return;
+            }
+        }
+        // Instans kedua, non-interaktif (klik tile -> section map via data-goto)
+        state.mapBento = L.map('mapBento', {
+            scrollWheelZoom: false, dragging: false, zoomControl: false,
+            doubleClickZoom: false, boxZoom: false, keyboard: false,
+            attributionControl: false, tap: false,
+        }).setView([-2.5489, 118.0149], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapBento);
+        registerMapInstance(state.mapBento);
+        loadMarkers(state.mapBento, false, 'bento');
+        fitBentoMap();
+        invalidateMap(state.mapBento);
+    }
+
+    function fitBentoMap() {
+        if (!state.mapBento) return;
+        const pts = state.devices
+            .filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0))
+            .map(d => [d.latitude, d.longitude]);
+        if (pts.length > 1) state.mapBento.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
+        else if (pts.length === 1) state.mapBento.setView(pts[0], 11);
+        else state.mapBento.setView([-2.5489, 118.0149], 5);
+    }
+
+    function refreshBento() {
+        initBentoMap().then(() => {}).catch(() => {});
+        if (state.mapBento) { loadMarkers(state.mapBento, false, 'bento'); fitBentoMap(); invalidateMap(state.mapBento); }
+        const withLoc = state.devices.filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0));
+        const sub = $('bentoMapSub');
+        if (sub) sub.textContent = withLoc.length ? `${withLoc.length} dari ${state.devices.length} perangkat berkoordinat — klik untuk buka peta` : (state.devices.length ? 'Belum ada perangkat berkoordinat' : 'Belum ada perangkat');
+        loadBentoChart();
+    }
+
+    async function loadBentoChart() {
+        const canvas = $('bentoChart');
+        const sub = $('bentoChartSub');
+        if (!canvas) return;
+        if (state.devices.length === 0) { if (sub) sub.textContent = 'Belum ada perangkat'; return; }
+        if (typeof Chart === 'undefined') {
+            try { if (window.NexusLazy) await window.NexusLazy.loadChartLibs(); } catch (e) {}
+            if (typeof Chart === 'undefined') { if (sub) sub.textContent = 'Chart.js gagal dimuat (offline?)'; return; }
+        }
+        // Gabungan history semua perangkat (cap 15 agar tidak banjir request)
+        const hours = 24, limit = 500;
+        const ids = state.devices.slice(0, 15).map(d => d.device_id);
+        try {
+            const results = await Promise.all(ids.map(did =>
+                API.getDeviceHistory(did, { hours, limit }).then(r => r.success ? (r.data.history || []) : []).catch(() => [])
+            ));
+            // Agregat per timestamp per sensor key (rata-rata lintas perangkat)
+            const byTs = {}; // ts -> key -> {sum, n}
+            results.forEach(hist => hist.forEach(item => {
+                const d = item.data || {};
+                Object.keys(d).forEach(k => {
+                    const v = Number(d[k]);
+                    if (!Number.isFinite(v)) return;
+                    byTs[item.timestamp] = byTs[item.timestamp] || {};
+                    const cell = byTs[item.timestamp][k] = byTs[item.timestamp][k] || { sum: 0, n: 0 };
+                    cell.sum += v; cell.n += 1;
+                });
+            }));
+            const tsList = Object.keys(byTs).sort();
+            if (tsList.length === 0) { if (sub) sub.textContent = 'Menunggu data sensor…'; return; }
+            const usedTs = downsampleHistory(tsList, 120);
+            const labels = usedTs.map(ts => {
+                const d = parseDate(ts);
+                try { return d ? d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) : ''; } catch (e) { return ''; }
+            });
+            // Pilih 3 sensor key teratas (prioritas umum, lalu count terbanyak)
+            const keyCounts = {};
+            usedTs.forEach(ts => Object.keys(byTs[ts]).forEach(k => { keyCounts[k] = (keyCounts[k] || 0) + 1; }));
+            const PRIORITY = ['temperature', 'humidity', 'co2', 'lux', 'moisture', 'gas_level', 'smoke', 'voc', 'air_quality'];
+            const keys = PRIORITY.concat(Object.keys(keyCounts).sort((a, b) => (keyCounts[b] || 0) - (keyCounts[a] || 0)))
+                .filter((k, i, arr) => arr.indexOf(k) === i && (keyCounts[k] || 0) >= Math.max(2, usedTs.length * 0.3))
+                .slice(0, 3);
+            if (keys.length === 0) { if (sub) sub.textContent = 'Tidak ada data sensor yang cocok'; return; }
+            const datasets = keys.map((key, i) => {
+                const info = DATA_KEYS[key] || { label: key, unit: '', color: CHART_COLORS[i % CHART_COLORS.length] };
+                const color = info.color || CHART_COLORS[i % CHART_COLORS.length];
+                const vals = usedTs.map(ts => { const c = byTs[ts][key]; return c ? c.sum / c.n : null; });
+                return { label: info.label, data: vals, borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 3, borderWidth: 1.8, spanGaps: true };
+            });
+            if (state.bentoChart) { try { state.bentoChart.destroy(); } catch (e) {} state.bentoChart = null; }
+            const colors = getChartColors();
+            state.bentoChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    animation: { duration: 300, easing: 'easeOutQuart' },
+                    plugins: { legend: { labels: { color: colors.legendColor, font: { size: 10, family: CHART_FONT, weight: '500' }, usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 10 } }, tooltip: { enabled: true } },
+                    scales: {
+                        x: { grid: { color: colors.gridColor, drawBorder: false, drawTicks: false }, border: { display: false }, ticks: { color: colors.labelColor, font: { size: 9.5, family: CHART_FONT }, maxTicksLimit: 6, autoSkip: true } },
+                        y: { grid: { color: colors.gridColor, drawBorder: false, drawTicks: false }, border: { display: false }, ticks: { color: colors.labelColor, font: { size: 9.5, family: CHART_FONT }, padding: 6 } },
+                    },
+                },
+            });
+            // Sub: nilai terbaru per sensor, gabungan semua perangkat
+            const last = usedTs[usedTs.length - 1];
+            const parts = keys.map(k => {
+                const info = DATA_KEYS[k]; const c = byTs[last] && byTs[last][k];
+                if (!c) return null;
+                const avg = c.sum / c.n;
+                return `${info ? info.label : k} ${avg.toFixed(1)}${info && info.unit ? ' ' + info.unit : ''}`;
+            }).filter(Boolean);
+            if (sub) sub.textContent = parts.length ? parts.join(' · ') + ` · ${ids.length} perangkat` : 'Grafik sensor real-time';
+        } catch (e) { console.error('[BentoChart]', e); if (sub) sub.textContent = 'Gagal memuat grafik sensor'; }
+    }
+
     function placeMarkerAt(lat, lng) {
         if (!state.mapFull) return;
         state.selectedLat = lat; state.selectedLng = lng;
@@ -697,7 +822,7 @@
         return { color: safeColor(color), label };
     }
 
-    function loadMarkers(map, useCluster = false) {
+    function loadMarkers(map, useCluster = false, key = null) {
         if (!map || typeof L === 'undefined') return;
         if (state.marker && !state.mapHasUnsavedChange) { map.removeLayer(state.marker); state.marker = null; }
         const validIds = new Set();
@@ -706,7 +831,7 @@
             if (d.latitude === 0 && d.longitude === 0) return;
             validIds.add(d.device_id);
         });
-        const mapKey = useCluster ? 'cluster' : 'main';
+        const mapKey = key || (useCluster ? 'cluster' : 'main');
         for (const [deviceId, entry] of state.markerMap.entries()) {
             if (entry.mapKey !== mapKey) continue;
             if (!validIds.has(deviceId)) {
@@ -728,7 +853,9 @@
                 } catch (e) {}
                 return;
             }
-            const popup = `<div style="font-family:Geist,sans-serif;min-width:200px;"><div style="font-weight:600;margin-bottom:4px;">${escapeHtml(d.device_name)}</div><div style="font-size:11px;color:#888;margin-bottom:6px;font-family:'Geist Mono',monospace;">${escapeHtml(d.device_id)}</div><div style="font-size:11px;margin-bottom:8px;">Status: <b style="color:${escapeHtml(style.color)};">${escapeHtml(style.label)}</b></div><div style="display:flex;gap:6px;"><button data-action="map-select" data-device-id="${escapeHtml(d.device_id)}" style="flex:1;padding:6px 10px;background:#f5f5f5;color:#0a0a0a;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Pilih</button><button data-action="map-view" data-device-id="${escapeHtml(d.device_id)}" style="flex:1;padding:6px 10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Detail</button></div></div>`;
+            const popup = mapKey === 'bento'
+                ? `<div style="font-family:Geist,sans-serif;min-width:140px;"><div style="font-weight:600;margin-bottom:4px;">${escapeHtml(d.device_name)}</div><div style="font-size:11px;">Status: <b style="color:${escapeHtml(style.color)};">${escapeHtml(style.label)}</b></div><div style="font-size:10px;color:#888;margin-top:4px;">Klik tile untuk buka peta</div></div>`
+                : `<div style="font-family:Geist,sans-serif;min-width:200px;"><div style="font-weight:600;margin-bottom:4px;">${escapeHtml(d.device_name)}</div><div style="font-size:11px;color:#888;margin-bottom:6px;font-family:'Geist Mono',monospace;">${escapeHtml(d.device_id)}</div><div style="font-size:11px;margin-bottom:8px;">Status: <b style="color:${escapeHtml(style.color)};">${escapeHtml(style.label)}</b></div><div style="display:flex;gap:6px;"><button data-action="map-select" data-device-id="${escapeHtml(d.device_id)}" style="flex:1;padding:6px 10px;background:#f5f5f5;color:#0a0a0a;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Pilih</button><button data-action="map-view" data-device-id="${escapeHtml(d.device_id)}" style="flex:1;padding:6px 10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Detail</button></div></div>`;
             const marker = L.circleMarker([d.latitude, d.longitude], { radius: 7, color: style.color, fillColor: style.color, fillOpacity: 0.9, weight: 2 }).bindPopup(popup);
             marker.on('popupopen', (e) => {
                 const el = e.popup.getElement();
