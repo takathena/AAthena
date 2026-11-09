@@ -695,7 +695,18 @@
 
     function fitBentoMap() {
         if (!state.mapBento) return;
-        state.mapBento.setView([-7.2, 110.4], 7);
+        const pts = state.devices
+            .filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0))
+            .map(d => [Number(d.latitude), Number(d.longitude)])
+            .filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+        if (pts.length === 0) return;
+        if (pts.length === 1) { state.mapBento.setView(pts[0]); return; }
+        const center = [
+            pts.reduce((sum, p) => sum + p[0], 0) / pts.length,
+            pts.reduce((sum, p) => sum + p[1], 0) / pts.length,
+        ];
+        state.mapBento.fitBounds(pts, { padding: [12, 12] });
+        state.mapBento.setView(center, typeof state.mapBento.getZoom === 'function' ? state.mapBento.getZoom() : undefined);
     }
 
     function refreshBento() {
