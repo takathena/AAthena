@@ -3966,7 +3966,7 @@
         });
         const delTabBtn = $('analyticsTabDeleteBtn');
         if (delTabBtn) delTabBtn.addEventListener('click', deleteAnalyticsTab);
-        document.querySelectorAll('.stat-card.clickable[data-goto]').forEach(card => {
+        document.querySelectorAll('.nx-metric-card.clickable[data-goto]').forEach(card => {
             card.addEventListener('click', () => {
                 const target = card.dataset.goto; const filter = card.dataset.filter;
                 if (filter && target === 'devices') { state.deviceFilter = filter; setDeviceFilter(filter); }
