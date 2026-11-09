@@ -239,6 +239,7 @@
 .nx-settings__header { margin-bottom: 20px; }
 .nx-settings__title { font-size: 20px; font-weight: 600; color: var(--text); margin: 0; }
 .nx-settings__layout { display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: start; }
+.nx-settings__panels { min-width: 0; }
 .nx-settings__tabs { display: flex; flex-direction: column; gap: 2px; }
 .nx-settings__tab {
   display: flex;

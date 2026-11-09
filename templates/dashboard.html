@@ -4,6 +4,9 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/metrics.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/date-range-picker.css') }}">
 {% if chat_enabled %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
 {% endif %}
@@ -259,6 +262,7 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/lazy-load.js') }}"></script>
+<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/alert_rules_builder.js') }}"></script>
 <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ui.js') }}"></script>

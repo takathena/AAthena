@@ -160,15 +160,17 @@ function confirmModal(title, message, onConfirm){
 function openDrawer(){
   const d = document.getElementById('drawer');
   const b = document.getElementById('drawerBackdrop');
-  if(d) d.classList.add('open');
+  if(d){ d.classList.add('open'); d.setAttribute('aria-hidden', 'false'); }
   if(b) b.classList.add('active');
+  const m = document.getElementById('menuBtn'); if(m) m.setAttribute('aria-expanded', 'true');
   document.body.classList.add('drawer-open');
 }
 function closeDrawer(){
   const d = document.getElementById('drawer');
   const b = document.getElementById('drawerBackdrop');
-  if(d) d.classList.remove('open');
+  if(d){ d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
   if(b) b.classList.remove('active');
+  const m = document.getElementById('menuBtn'); if(m) m.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('drawer-open');
 }
 document.addEventListener('keydown', e => {

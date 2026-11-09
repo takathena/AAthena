@@ -19,6 +19,10 @@
 
     function loadScript(url) {
         if (_cache[url]) return _cache[url];
+        // Script yang sudah eager (metrics.js) tidak di-inject ulang; cukup resolve.
+        if (document.querySelector('script[src="' + url + '"]')) {
+            return (_cache[url] = Promise.resolve(url));
+        }
         _cache[url] = new Promise(function (resolve, reject) {
             var s = document.createElement('script');
             s.src = url;
@@ -32,6 +36,11 @@
 
     function loadCSS(url) {
         if (_cache[url]) return _cache[url];
+        // CSS yang sudah eager di <head> (metrics/components/date-range) tidak
+        // di-inject ulang; cukup resolve agar pemanggil lain tetap jalan.
+        if (document.querySelector('link[rel="stylesheet"][href="' + url + '"]')) {
+            return (_cache[url] = Promise.resolve(url));
+        }
         _cache[url] = new Promise(function (resolve, reject) {
             var l = document.createElement('link');
             l.rel = 'stylesheet';
@@ -72,8 +81,8 @@
     function loadSectionAssets(section) {
         if (section === 'map') return loadMapLibs();
         if (section === 'graph' || section === 'analytics') return loadChartLibs();
-        if (section === 'alerts') return Promise.allSettled([loadComponents(), loadMetrics(), loadDateRange()]);
-        if (section === 'dashboard' || section === 'devices' || section === 'settings') return Promise.allSettled([loadComponents(), loadMetrics()]);
+        if (section === 'alerts') return Promise.all([loadComponents(), loadMetrics(), loadDateRange()]);
+        if (section === 'dashboard' || section === 'devices' || section === 'settings') return Promise.all([loadComponents(), loadMetrics()]);
         return Promise.resolve();
     }
 
@@ -85,10 +94,24 @@
         return valid.includes(h) ? h : 'dashboard';
     }
 
+    // Preload awal untuk section aktif (link langsung ke #map/#graph): async, tidak blokir paint.
+    (function preloadInitial(){
+        var h = sectionFromHash();
+        if(h === 'map' || h === 'graph' || h === 'analytics') loadSectionAssets(h).catch(function(){ fail('Gagal memuat aset section. Cek koneksi internet/CDN.'); });
+    })();
+
     // Preload assets untuk section aktif saat hash berubah / nav diklik (desktop & mobile).
     window.addEventListener('hashchange', function () {
         loadSectionAssets(sectionFromHash()).catch(function (e) { fail('Gagal memuat aset section. Cek koneksi internet/CDN.'); });
     }, true);
+
+    // Section pertama langsung preload (direct #settings, restore session) supaya
+    // Leaflet/Chart.js/picker sudah siap tanpa menunggu klik pertama.
+    document.addEventListener('DOMContentLoaded', function () {
+        // Hanya halaman desktop (ada nav [data-section]); mobile punya section sendiri.
+        if (!document.querySelector('[data-section]')) return;
+        loadSectionAssets(sectionFromHash()).catch(function () {});
+    });
 
     document.addEventListener('click', function (e) {
         var nav = e.target.closest && e.target.closest('[data-section]');
