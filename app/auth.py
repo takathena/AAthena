@@ -39,8 +39,6 @@ def _is_api_polling_request():
         '/api/v1/dashboard',
         '/api/v1/devices',
         '/api/v1/alerts',
-        '/api/v1/attendance',
-        '/api/v1/cardholders',
         '/api/v1/dashboards',
         '/api/v1/widgets',
         '/api/v1/analytics-tabs',
