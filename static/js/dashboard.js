@@ -736,6 +736,8 @@
     async function loadBentoChart() {
         const canvas = $('bentoChart');
         const sub = $('bentoChartSub');
+        const badgeCount = $('bentoBadgeCount');
+        if (badgeCount) badgeCount.textContent = `${state.devices.length} perangkat`;
         if (!canvas) return;
         if (state.devices.length === 0) { if (sub) sub.textContent = 'Belum ada perangkat'; return; }
         if (typeof Chart === 'undefined') {
