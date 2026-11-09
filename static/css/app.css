@@ -385,6 +385,9 @@
 /* Hint Ctrl+K di dalam search box — didefinisikan di sini (bukan
    command-palette.css) agar topbar sudah utuh saat paint pertama. */
 .search-box input { padding-right: 48px; }
+.search-box.search-context { cursor: text; }
+.search-box.search-context input { pointer-events: auto; cursor: text; padding-right: 12px; }
+.search-box.search-context .search-box-kbd { display: none; }
 .search-box-kbd {
   position: absolute;
   right: 10px;

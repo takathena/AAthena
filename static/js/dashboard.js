@@ -27,6 +27,7 @@
         dashboardInterval: null,
         deviceSearchTerm: '',
         alertSearchTerm: '',
+        graphSearchTerm: '',
         analyticsTabs: [],
         currentTabId: null,
         isInitialized: false,
@@ -255,10 +256,21 @@
 
         const searchBox = document.querySelector('.search-box');
         const searchInput = $('searchInput');
-        const noSearch = ['map', 'graph', 'settings'];
-        if (searchBox) searchBox.style.display = noSearch.includes(section) ? 'none' : '';
+        const noSearch = ['settings'];
+        const isSearchContext = section === 'map' || section === 'graph';
+        if (searchBox) {
+            searchBox.style.display = noSearch.includes(section) ? 'none' : '';
+            searchBox.classList.toggle('search-context', isSearchContext);
+        }
         if (searchInput) {
-            if (section === 'alerts') {
+            searchInput.readOnly = !isSearchContext;
+            if (section === 'map') {
+                searchInput.value = state.mapSearchTerm || '';
+                searchInput.placeholder = 'Cari device di peta...';
+            } else if (section === 'graph') {
+                searchInput.value = state.graphSearchTerm || '';
+                searchInput.placeholder = 'Cari diagram / perangkat...';
+            } else if (section === 'alerts') {
                 searchInput.value = state.alertSearchTerm || '';
                 searchInput.placeholder = 'Cari alert...';
             } else {
@@ -1680,11 +1692,38 @@
         });
 
         state.charts.forEach(c => renderChartCard(c));
+        applyGraphSearch();
         clampChartsToCanvas();
         resolveCollisions();
         applyAllGeom();
         autoGrowCanvas();
         await loadAllChartDataBatched();
+    }
+
+    function applyGraphSearch() {
+        const term = (state.graphSearchTerm || '').toLowerCase().trim();
+        const grid = $('chartsGrid');
+        let visible = 0;
+        state.charts.forEach(c => {
+            const el = document.getElementById(c.id);
+            if (!el) return;
+            if (!term) { el.style.display = ''; visible++; return; }
+            const hay = [c.title, ...(c.deviceIds || []).flatMap(did => {
+                const d = state.devices.find(x => x.device_id === did);
+                return [did, d ? d.device_name : ''];
+            }), ...Object.keys(c.showData || {}).filter(k => c.showData[k]).flatMap(k => [k, DATA_KEYS[k] ? DATA_KEYS[k].label : ''])]
+                .join(' ').toLowerCase();
+            const match = hay.includes(term);
+            el.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        if (grid) {
+            let note = grid.querySelector('.graph-no-result');
+            if (term && state.charts.length > 0 && visible === 0) {
+                if (!note) { note = document.createElement('div'); note.className = 'graph-no-result empty-charts'; note.style.cssText = 'text-align:center;padding:40px;color:var(--text-3);'; grid.appendChild(note); }
+                note.textContent = 'Tidak ada diagram yang cocok';
+            } else if (note) note.remove();
+        }
     }
 
     function renderChartCard(config) {
@@ -4183,7 +4222,14 @@
         if (searchInput) {
             searchInput.addEventListener('input', () => {
                 const value = searchInput.value;
-                if (state.currentSection === 'alerts') {
+                if (state.currentSection === 'map') {
+                    state.mapSearchTerm = value.trim();
+                    const local = $('mapSearchInput'); if (local && local.value !== value) local.value = value;
+                    renderMapDeviceList();
+                } else if (state.currentSection === 'graph') {
+                    state.graphSearchTerm = value;
+                    applyGraphSearch();
+                } else if (state.currentSection === 'alerts') {
                     state.alertSearchTerm = value;
                     if (window.NexusAlerts && window.NexusAlerts.setSearch) {
                         window.NexusAlerts.setSearch(value);
@@ -4207,7 +4253,11 @@
             let t;
             searchInput.addEventListener('input', e => {
                 clearTimeout(t);
-                t = setTimeout(() => { state.mapSearchTerm = e.target.value.trim(); renderMapDeviceList(); }, 150);
+                t = setTimeout(() => {
+                    state.mapSearchTerm = e.target.value.trim();
+                    const nav = $('searchInput'); if (nav && nav.value !== e.target.value) nav.value = e.target.value;
+                    renderMapDeviceList();
+                }, 150);
             });
         }
         const chips = $('mapFilterChips');

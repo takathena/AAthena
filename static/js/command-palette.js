@@ -639,14 +639,14 @@
         // Cegah input lama menerima fokus saat diklik
         document.addEventListener('mousedown', function (e) {
             const sb = e.target.closest('.search-box');
-            if (!sb) return;
+            if (!sb || sb.classList.contains('search-context')) return;
             e.preventDefault();  // cegah focus ke input
         }, true);
 
         // Klik → buka palette
         document.addEventListener('click', function (e) {
             const sb = e.target.closest('.search-box');
-            if (!sb) return;
+            if (!sb || sb.classList.contains('search-context')) return;
             e.preventDefault();
             e.stopPropagation();
             open();

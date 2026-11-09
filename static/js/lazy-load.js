@@ -133,7 +133,7 @@
 
     document.addEventListener('click', function (e) {
         var sb = e.target.closest && e.target.closest('.search-box');
-        if (!sb) return;
+        if (!sb || sb.classList.contains('search-context')) return;
         if (window.NexusCommandPalette) return; // module sendiri yang menangani (capture)
         e.preventDefault();
         loadCommandPalette().then(function () {
