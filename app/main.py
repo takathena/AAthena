@@ -199,6 +199,13 @@ def create_app(config_override=None):
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         logger.info(f"HTTP {exc.status_code} {request.method} {request.url.path}")
+        # Redirect (mis. HTML auth -> /login): hormati header Location.
+        if exc.status_code in (301, 302, 303, 307, 308):
+            loc = (exc.headers or {}).get('Location', '/login')
+            from fastapi.responses import RedirectResponse as _RR
+            resp = _RR(url=loc, status_code=exc.status_code)
+            resp.set_cookie  # no-op
+            return resp
         detail = exc.detail
         if isinstance(detail, dict) and 'error' in detail:
             return JSONResponse(detail, status_code=exc.status_code)

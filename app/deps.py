@@ -106,7 +106,7 @@ def get_current_user_html(request: Request):
     """Varian HTML: redirect ke /login bila belum login / idle expired."""
     session = request.session
     if 'logged_in' not in session:
-        raise HTTPException(status_code=307, headers={'Location': '/login'})
+        raise HTTPException(status_code=303, headers={'Location': '/login'})
     config = get_config()
     idle_minutes = config.SESSION_IDLE_TIMEOUT_MINUTES
     now_ts = time.time()
@@ -114,7 +114,7 @@ def get_current_user_html(request: Request):
     if last_activity and idle_minutes > 0:
         if now_ts - last_activity > idle_minutes * 60:
             session.clear()
-            raise HTTPException(status_code=307, headers={'Location': '/login'})
+            raise HTTPException(status_code=303, headers={'Location': '/login'})
     if not is_api_polling_request(request):
         session['last_activity'] = now_ts
     return {'user_id': session.get('user_id'),
