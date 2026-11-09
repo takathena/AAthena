@@ -7,6 +7,7 @@ Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route 
 - **Tanggal rilis:** 2026-11-09. Port publik Nginx `4455` + `443` (NAT `4455->443`, `${NGINX_PORT:-4455}:80` + `443:80`); DB fresh mulai dari schema v19.
 - **Restore DB lama:** backup v18 (masih ada `attendance`) bila di-restore dimigrasi otomatis ke v19 (`DROP attendance/cardholders`) saat start berikutnya — aman, user tidak perlu migrasi manual (lihat README § Restore Database).
 - **Rilis image:** `nexus-refactor-nexus-iot:2.0.0` (tag Docker: `docker tag nexus-refactor-nexus-iot:latest nexus-refactor-nexus-iot:2.0.0`), sesuai git tag `v2.0.0`.
+- **Flask dihapus:** `app/api.py`, `app/auth.py`, `app/chat.py`, `app/dashboards.py`, `app/views.py`, `app/extensions.py`, `app/ratelimit.py` dihapus; `app/__init__.py` jadi shim versi (versi tunggal di `app/main.py`); `app/database.py` tanpa Flask `g` (thread-local); `app/permissions.py` + `app/workspace.py` tanpa Flask session; auth/scope/throttle pindah ke `app/deps.py` + `app/routers/*` (FastAPI + Uvicorn, production Gunicorn + UvicornWorker). `ruff check app run.py` hijau. README disinkronkan (badge FastAPI/Uvicorn + Gunicorn 23.0.0, port publik 4455/443, tanpa baris absensi).
 
 ## Unreleased — Refactor bertahap (fondasi)
 

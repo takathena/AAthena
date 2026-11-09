@@ -1,13 +1,15 @@
 """
 NEXUS IoT - Database Layer (connection)
-Schema version 19: multi-user + multi-dashboard (workspace) + analytics tabs + login_failures + audit_log. Absensi dihapus (DROP attendance/cardholders).
+Schema version 19: multi-user + multi-dashboard (workspace) + analytics tabs + login_failures + audit_log.
 Logika migrasi ada di app/migrations.py; modul ini hanya koneksi + init runner.
 """
 import os
 import sqlite3
+import threading
 from contextlib import contextmanager
-from flask import g
 from datetime import datetime, timedelta, timezone
+
+_local = threading.local()
 
 WIB = timezone(timedelta(hours=7))
 
@@ -34,22 +36,25 @@ def _get_db_path():
 
 
 def get_db():
-    if 'db' not in g:
+    db = getattr(_local, 'db', None)
+    if db is None:
         db_path = _get_db_path()
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        g.db = sqlite3.connect(
+        db = sqlite3.connect(
             db_path,
             timeout=30.0,
             check_same_thread=False,
             isolation_level='DEFERRED',
         )
-        _configure_connection(g.db)
-    return g.db
+        _configure_connection(db)
+        _local.db = db
+    return db
 
 
 def close_db(error=None):
-    db = g.pop('db', None)
+    db = getattr(_local, 'db', None)
     if db is not None:
+        _local.db = None
         db.close()
 
 
@@ -73,9 +78,9 @@ def get_db_context():
 SCHEMA_VERSION = 19
 
 # Re-export dari migrasi untuk kompatibilitas import lama.
-from app.migrations import MIGRATIONS, WIB_DEFAULT  # noqa: E402
+from app.migrations import MIGRATIONS, WIB_DEFAULT  # noqa: E402, F401
 # Re-export fungsi migrasi agar `from app.database import _migrate_*` tetap jalan.
-from app.migrations import (  # noqa: E402
+from app.migrations import (  # noqa: E402, F401
     _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4, _migrate_v5,
     _migrate_v6, _migrate_v7, _migrate_v8, _migrate_v9, _migrate_v10,
     _migrate_v11, _migrate_v12, _migrate_v13, _migrate_v14, _migrate_v15,

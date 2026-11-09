@@ -123,11 +123,6 @@ def _detect_interval(conn, device_id):
     return max(AUTO_INTERVAL_FLOOR, min(86400, int(round(median))))
 
 
-def _current_user_id():
-    from flask import session
-    return session.get('user_id')
-
-
 def _validate_username(username):
     if not username or len(username) < 3:
         return 'Username minimal 3 karakter'

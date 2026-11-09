@@ -3,9 +3,6 @@ NEXUS IoT - Entry Point (FastAPI v2.0)
 Usage:
    Development: python run.py
    Production:  gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:5000 run:app
-
-Flask lama (app/__init__.py) tetap ada dan bisa jalan via:
-   python -c "from app import create_app; create_app().run()"
 """
 import logging
 import signal
@@ -52,15 +49,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, shutting down...")
     except Exception:
-        # Fallback sinyal/background bila uvicorn tidak tersedia.
-        logger.exception("Uvicorn failed; coba Flask dev server sebagai fallback.")
-        try:
-            from app import create_app as _create_flask_app
-            _create_flask_app().run(host=config.HOST, port=config.PORT,
-                                    debug=config.DEBUG, use_reloader=False, threaded=True)
-        except Exception as e:
-            logger.error(f"Fallback Flask juga gagal: {e}")
-            raise
+        logger.exception("Uvicorn failed.")
+        raise
     finally:
         try:
             from app.background import stop_background_tasks

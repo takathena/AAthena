@@ -777,8 +777,8 @@ def _migrate_v16(cursor):
 def _migrate_v17(cursor):
     """Workspace: dashboard memiliki perangkat, anggota, dan Telegram sendiri.
 
-    - devices.dashboard_id, cardholders.dashboard_id (kolom biasa, tanpa FK,
-      supaya tidak perlu membangun ulang tabel besar).
+    - devices.dashboard_id (kolom biasa, tanpa FK, supaya tidak perlu
+      membangun ulang tabel besar).
     - dashboard_members: berbagi dashboard dengan peran viewer/editor.
     - dashboard_telegram: bot Telegram per dashboard (token terenkripsi).
     - audit_log: catatan aksi sensitif (hapus data, ubah Telegram, dll).
@@ -857,7 +857,7 @@ def _migrate_v17(cursor):
 
 
 def _migrate_v18(cursor):
-    """Paket A: peran user dan izin absensi.
+    """Paket A: peran user dan izin granular.
 
     - users.role: superadmin | admin | moderator | user.
       Backfill: akun seed (IOT_USERNAME) jadi superadmin; is_admin lain jadi admin;
@@ -865,7 +865,7 @@ def _migrate_v18(cursor):
     - user_permissions: izin eksplisit. Migrasi TIDAK memberi izin ke siapa pun.
     Aman dijalankan ulang (idempotent).
     """
-    print("[DB] v18: peran user dan izin absensi...")
+    print("[DB] v18: peran user dan izin granular...")
 
     cols = [r[1] for r in cursor.execute('PRAGMA table_info(users)').fetchall()]
     if 'role' not in cols:

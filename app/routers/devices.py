@@ -9,9 +9,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from app.api_common import _alert_label, _clean_timestamp
+from app.api_common import _clean_timestamp
 from app.config import get_config
-from app.deps import (client_ip, get_current_user, load_device as _dl,
+from app.deps import (get_current_user, load_device as _dl,
                       pick_write_dashboard as _pw, resolve_scope as _rs,
                       scope_error_response as _se, dashboard_in_sql,
                       device_in_sql)
@@ -838,7 +838,6 @@ async def bulk_import_devices(request: Request):
     from app.database import get_db_context, get_wib_time
     from app.schemas import BulkImportItem
     from app.utils import generate_api_key, hash_api_key
-    from app.deps import audit
     from app.deps import require_admin
     require_admin(request)
     user = get_current_user(request)

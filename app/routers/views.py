@@ -4,7 +4,7 @@ import os
 import time
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_config
@@ -30,7 +30,7 @@ def _tpl(request: Request, name: str, **context):
     def csrf_token():
         return request.cookies.get('csrf_token', '')
 
-    from app.chat import llm_configured
+    from app.routers.chat import llm_configured
     context.update(
         request=request,
         url_for=url_for,
@@ -95,7 +95,6 @@ async def dashboard_by_slug(slug: str, request: Request):
 
     dash, admin = await run_sync(_do)
     if not dash:
-        from app.main import _html_error
         return HTMLResponse(
             '<!doctype html><html><head><meta charset="utf-8">'
             '<title>404 Halaman Tidak Ditemukan</title></head><body>'
@@ -216,7 +215,7 @@ async def login_page(request: Request):
 @limiter.limit(get_config().RATE_LIMIT_LOGIN)
 async def login_submit(request: Request, username: str = Form(...), password: str = Form(...),
                        csrf_token: str = Form(default='')):
-    from app.auth import ensure_user_dashboard
+    from app.deps import ensure_user_dashboard
     config = get_config()
     if not (csrf_token or '').strip():
         return _tpl(request, 'login.html', error='Sesi tidak valid. Muat ulang halaman.')

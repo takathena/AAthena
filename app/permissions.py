@@ -13,12 +13,6 @@ Penentuan admin memakai users.is_admin (sudah dipakai backend sejak v1). Peran
 di kolom role hanya membedakan superadmin, admin, moderator, dan user. Keduanya
 harus selalu konsisten; set_role() menjaga itu.
 """
-from functools import wraps
-
-from flask import jsonify, session
-
-from app.database import get_db_context
-
 ROLE_SUPERADMIN = 'superadmin'
 ROLE_ADMIN = 'admin'
 ROLE_MODERATOR = 'moderator'
@@ -77,27 +71,4 @@ def set_user_permissions(conn, user_id, granted_by):
     """Bersihkan izin eksplisit user. Caller harus commit."""
     conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
     return set()
-
-
-def permission_denied_response():
-    return jsonify({
-        'success': False,
-        'error': PERMISSION_DENIED_ERROR,
-        'code': 'PERMISSION_DENIED',
-    }), 403
-
-
-def permission_required(permission):
-    """Batasi route ke pemegang izin. Pasang SETELAH @login_required."""
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            uid = session.get('user_id')
-            with get_db_context() as conn:
-                allowed = has_permission(conn, uid, permission)
-            if not allowed:
-                return permission_denied_response()
-            return f(*args, **kwargs)
-        return decorated
-    return decorator
 

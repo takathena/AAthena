@@ -1,6 +1,6 @@
 """NEXUS IoT - FastAPI AI Chat via OpenAI-compatible endpoint (dari app/chat.py).
 
-Tool tanpa attendance. POST /api/v1/chat: JSON default, SSE bila diminta
+POST /api/v1/chat: JSON default, SSE bila diminta
 (Accept: text/event-stream / ?stream=1).
 """
 import base64
@@ -15,7 +15,6 @@ import requests
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.config import get_config
 from app.deps import get_current_user, limiter, run_sync, safe_json, client_ip  # noqa: F401
 
 logger = logging.getLogger('nexus')

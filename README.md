@@ -4,7 +4,8 @@ Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan R
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-3.1.3-000000?style=flat-square&logo=flask&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.162.2-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Uvicorn](https://img.shields.io/badge/Uvicorn-0.54.0-499848?style=flat-square&logo=uvicorn&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&logo=sqlite&logoColor=white)
 ![Gunicorn](https://img.shields.io/badge/Gunicorn-23.0.0-499848?style=flat-square&logo=gunicorn&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
@@ -46,7 +47,7 @@ Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan R
 
 NEXUS adalah aplikasi server tunggal yang menerima data sensor dari perangkat IoT melalui HTTP POST, menyimpannya di SQLite (mode WAL), lalu menyajikannya lewat dashboard web dan API JSON. Sistem mendukung banyak pengguna, banyak dashboard per pengguna, banyak tab analitik per dashboard, dan layout chart yang dapat diatur bebas oleh pengguna (drag dan resize).
 
-Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx sebagai reverse proxy, Docker Compose, rate limiting, CSRF protection, hashing API key, background task terkoordinasi via file lock, auto-backup database, dan retensi data per kategori.
+Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn multi-worker dengan UvicornWorker), Nginx sebagai reverse proxy, Docker Compose, rate limiting, CSRF protection, hashing API key, background task terkoordinasi via file lock, auto-backup database, dan retensi data per kategori.
 
 ---
 
@@ -106,14 +107,15 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
 | Layer | Teknologi | Versi |
 |-------|-----------|-------|
 | Bahasa | Python | 3.11 |
-| Web Framework | Flask | 3.1.3 |
+| Web Framework | FastAPI | 0.162.2 |
 | WSGI Server | Gunicorn | 23.0.0 |
+| ASGI Server | Uvicorn | 0.54.0 |
 | Database | SQLite (WAL mode) | Bawaan Python 3.11 |
-| Templating | Jinja2 | 3.1.6 |
-| Form / CSRF | Flask-WTF / WTForms | 1.2.2 / 3.1.2 |
-| Rate Limiting | Flask-Limiter | 3.5.0 |
-| CORS | Flask-CORS | 6.0.5 |
-| Validasi | Marshmallow | 3.22.0 |
+| Templating | Jinja2 (via FastAPI) | 3.1.6 |
+| Form / CSRF | Starlette Session + CSRF double-submit | 1.10.0 |
+| Rate Limiting | SlowAPI | 0.1.10 |
+| CORS | Starlette CORSMiddleware | 1.10.0 |
+| Validasi | Pydantic | 2.14.3 |
 | HTTP Client | Requests | 2.32.3 |
 | Config Loader | python-dotenv | 1.2.3 |
 | WSGI Utilities | Werkzeug | 3.1.8 |
@@ -144,13 +146,13 @@ Dirancang untuk berjalan di lingkungan produksi: Gunicorn multi-worker, Nginx se
                               |
                               v
                     +---------+---------+
-                    |    Nginx :5008    |
+                    |   Nginx :4455/:443  |
                     |  (reverse proxy)  |
                     +---------+---------+
                               |
                               v
                     +---------+---------+
-                    |  Flask + Gunicorn |
+                    | FastAPI + Uvicorn   |
                     |    :5000          |
                     +----+---------+----+
                          |         |
@@ -189,7 +191,7 @@ Alur request:
 
 - Docker Engine 20.10 atau lebih baru
 - Docker Compose v2
-- Port 5008 (atau `NGINX_PORT` yang di-set) tersedia
+- Port 4455 (atau `NGINX_PORT` yang di-set) dan 443 tersedia
 - Minimal 512 MB RAM, 1 GB disarankan
 - Minimal 500 MB disk untuk aplikasi + ruang untuk database dan backup
 
@@ -238,7 +240,7 @@ chown -R 1000:1000 database logs backup
 docker compose up -d --build
 ```
 
-Akses di `http://localhost:5008`.
+Akses di `http://localhost:4455`.
 
 Cek status container:
 
@@ -281,11 +283,11 @@ Semua variabel dibaca dari file `.env` di root proyek. Nilai default ada di `app
 
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
-| `HOST` | `0.0.0.0` | Bind address Flask |
-| `PORT` | `5000` | Port Flask (internal; di Docker tetap 5000, Nginx meneruskan ke sini) |
-| `FLASK_ENV` | `production` | `production`, `development`, atau `testing` |
-| `DEBUG` | `False` | Mode debug Flask |
-| `NGINX_PORT` | `5008` | Port publik Nginx. Dashboard dan firmware ESP32 mengakses lewat port ini |
+| `HOST` | `0.0.0.0` | Bind address FastAPI |
+| `PORT` | `5000` | Port internal FastAPI/uvicorn (di Docker tetap 5000, Nginx meneruskan ke sini) |
+| `FLASK_ENV` | `production` | `production`, `development`, atau `testing` (legacy Flask; dipakai sebagai env mode) |
+| `DEBUG` | `False` | Mode debug FastAPI/uvicorn |
+| `NGINX_PORT` | `4455` | Port publik Nginx (HTTP). Dashboard dan firmware ESP32 mengakses lewat port ini; HTTPS di `443` |
 | `WEB_CONCURRENCY` | `2` | Jumlah worker Gunicorn (Docker). Dibaca Gunicorn dan dipakai untuk peringatan rate limit |
 
 ### Keamanan
@@ -352,7 +354,7 @@ Semua opsional. Kalau tidak diisi, pakai default dari `app/config.py`.
 
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
-| `CORS_ORIGINS` | `http://localhost:5000` (contoh `.env.example`: `http://localhost:5008`) | Origin yang diizinkan, pisah dengan koma. `*` ditolak |
+| `CORS_ORIGINS` | `http://localhost:5000` (contoh `.env.example`: `http://localhost:4455`) | Origin yang diizinkan, pisah dengan koma. `*` ditolak |
 
 ### Rate Limiting
 
@@ -435,7 +437,7 @@ Pada deployment multi-container, `NEXUS_LOCK_DIR` harus menunjuk ke volume yang 
 ```python
 WIFI_SSID = "NamaWiFi"
 WIFI_PASSWORD = "PasswordWiFi"
-API_URL = "http://IP-SERVER:5008/api/v1/data"   # port Nginx (NGINX_PORT); 5000 hanya jika menjalankan Flask langsung
+API_URL = "http://IP-SERVER:4455/api/v1/data"   # port Nginx (NGINX_PORT); 5000 hanya jika menjalankan FastAPI langsung
 DEVICE_ID = "ESP32-001"
 API_KEY = "api-key-dari-dashboard"
 ```
@@ -476,7 +478,7 @@ screen /dev/ttyUSB0 115200
 ### Contoh dengan curl
 
 ```bash
-curl -X POST http://localhost:5008/api/v1/data   # via Nginx; dev langsung ke Flask: :5000 \
+curl -X POST http://localhost:4455/api/v1/data   # via Nginx; dev langsung ke FastAPI: :5000 \
   -H "Content-Type: application/json" \
   -d '{
     "device_id": "ESP32-001",
@@ -613,25 +615,26 @@ Filter untuk `/api/v1/alerts/all`:
 
 ```
 nexus-iot/
-├── app/                          # Package aplikasi Flask
-│   ├── __init__.py               # App factory (helper terpisah), security headers, error handlers
+├── app/                          # Package aplikasi FastAPI
+│   ├── __init__.py               # Shim versi (dari app/main.py)
+│   ├── main.py                   # App factory FastAPI: CORS, CSP/HSTS, Session, CSRF, error handlers, /health
+│   ├── deps.py                   # Dependensi FastAPI: auth/session, workspace scope, throttle
+│   ├── routers/                  # Route FastAPI per domain: ingest, devices, alerts, dashboards, users, system, chat, views
 │   ├── alerts.py                 # Alert state machine
-│   ├── api.py                    # API routes v1 (59 route; helper di api_common.py)
 │   ├── api_common.py             # Helper bersama API (timestamp, device auth, purge)
-│   ├── auth.py                   # Login, session, decorator
 │   ├── background.py             # Background worker + file lock
-│   ├── chat.py                   # NEXUS AI chat + tool calling
 │   ├── config.py                 # Konfigurasi + validasi env (helper _env_*)
-│   ├── dashboards.py             # Dashboard, tab, widget
-│   ├── database.py               # Layer SQLite koneksi + init runner (132 baris)
-│   ├── migrations.py             # Migrasi v1..v18 + registry MIGRATIONS
-│   ├── decorators.py             # Helper decorator
-│   ├── extensions.py             # CORS, CSRF, Limiter
+│   ├── database.py               # Layer SQLite koneksi + init runner
+│   ├── migrations.py             # Migrasi v1..v19 + registry MIGRATIONS
 │   ├── logging_config.py         # Setup log rotating
+│   ├── login_throttle.py         # Throttle login gagal
 │   ├── notifier.py               # Dispatcher Telegram
+│   ├── permissions.py            # Peran dan izin
+│   ├── restore.py                # Restore database tertunda
+│   ├── schemas.py                # Schema Pydantic
 │   ├── utils.py                  # Helper: hash, lock, validator
-│   ├── validators.py             # Marshmallow schema
-│   └── views.py                  # Web routes HTML
+│   ├── validators.py             # Schema validasi
+│   └── workspace.py              # Scope multi-dashboard
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                # Lint + pytest di GitHub Actions
@@ -910,8 +913,6 @@ Interval: `BACKUP_INTERVAL_HOURS` jam. Jeda boot: 30 detik, lalu backup langsung
 
 `POST /api/v1/system/restore` (admin) **tidak menimpa database yang sedang berjalan**. Endpoint memverifikasi file backup, membuat `pre-restore-*.db`, lalu menyiapkan `<DB_PATH>.restore-pending` dan penanda `<DB_PATH>.restore-marker`. Restore diterapkan saat proses **start berikutnya**, sebelum koneksi database dibuka: `-wal`/`-shm` dihapus, database diganti, penanda dibuang. Hentikan semua worker lalu start ulang (`docker compose restart nexus-iot`). Jika database masih dipakai proses lain, penerapan ditunda sampai start berikutnya dan dicatat di log.
 
-> **CATATAN RESTORE (v2.0.0):** backup DB lama versi v18 (masih ada tabel `attendance`/`cardholders`) bila di-restore akan **dimigrasi otomatis ke v19** (`DROP TABLE attendance`/`cardholders`) saat aplikasi start — aman, user tidak perlu migrasi manual. Data lain (devices, sensor, alerts, dashboards, users) ikut ter-restore apa adanya.
-
 ### Status dan Heartbeat
 
 Setiap task mencatat heartbeat (tabel `user_settings`, kunci `bg_hb_*`) yang ditampilkan di `/api/v1/system/info` → `background`. Sebuah task ditandai `stale` bila heartbeat terakhirnya lebih tua dari 3× intervalnya.
@@ -998,9 +999,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Akses publik di port `NGINX_PORT` (default 5008). Port Flask tidak ter-expose ke host, hanya ke network internal Docker.
+Akses publik di port `NGINX_PORT` (default 4455) dan `443` (HTTPS). Port internal FastAPI/uvicorn (5000) tidak ter-expose ke host, hanya ke network internal Docker.
 
-**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container Flask (Nginx tetap menyajikan `./static`). Rilis v2.0.0 diterbitkan sebagai image `nexus-refactor-nexus-iot:2.0.0` (tag Docker dari `nexus-refactor-nexus-iot:latest`, sesuai git tag `v2.0.0`). Perubahan kode butuh build ulang:
+**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container FastAPI (Nginx tetap menyajikan `./static`). Rilis v2.0.0 diterbitkan sebagai image `nexus-refactor-nexus-iot:2.0.0` (tag Docker dari `nexus-refactor-nexus-iot:latest`, sesuai git tag `v2.0.0`). Perubahan kode butuh build ulang:
 
 ```bash
 git pull
@@ -1097,7 +1098,7 @@ server {
 }
 ```
 
-Catatan: aplikasi menggunakan `ProxyFix` middleware sehingga `request.remote_addr` dan scheme (`http` atau `https`) tetap akurat di belakang reverse proxy.
+Catatan: aplikasi membaca `X-Forwarded-For` di belakang reverse proxy (lihat `app/deps.py:client_ip`) sehingga IP asli klien tetap tercatat.
 
 ### HTTPS
 
@@ -1203,7 +1204,7 @@ Aplikasi mengirim header berikut pada setiap response:
 
 ### Input Validation
 
-- Payload device divalidasi dengan Marshmallow schema: panjang string, regex untuk Device ID, range untuk integer.
+- Payload device divalidasi dengan Pydantic schema (`app/schemas.py`): panjang string, regex untuk Device ID, range untuk integer.
 - Alert rules divalidasi sebelum disimpan: struktur object, min lebih kecil dari max, nilai numerik.
 - SQL injection dicegah dengan parameterized query di semua layer database.
 - XSS dicegah dengan escaping di template Jinja2 dan di JavaScript (fungsi `escapeHtml`).
@@ -1262,7 +1263,7 @@ Solusi:
 
 ```bash
 docker compose logs nexus-iot | tail -50
-curl -v http://localhost:5008/health
+curl -v http://localhost:4455/health
 ```
 
 Jika `/health` mengembalikan 503, cek file log untuk detail error.
@@ -1338,9 +1339,9 @@ Pastikan endpoint upstream berjalan dan API key valid.
 
 Gejala: user dari IP berbeda dianggap IP yang sama.
 
-Penyebab: Nginx tidak mengirim header `X-Forwarded-For`, atau `ProxyFix` tidak dikonfigurasi.
+Penyebab: Nginx tidak mengirim header `X-Forwarded-For`.
 
-Solusi: pastikan Nginx mengirim header `X-Real-IP` dan `X-Forwarded-For`, dan pastikan aplikasi menggunakan `ProxyFix` (sudah aktif secara default di `app/__init__.py`).
+Solusi: pastikan Nginx mengirim header `X-Real-IP` dan `X-Forwarded-For`; aplikasi membaca IP dari header tersebut (`app/deps.py:client_ip`).
 
 ### Memory usage terus naik
 
@@ -1437,7 +1438,7 @@ Dependensi dev tidak dipasang di image Docker (`Dockerfile` hanya memasang `requ
 
 ### Versi
 
-Versi aplikasi didefinisikan satu kali di `app/__init__.py` (`__version__`) dan dipakai oleh `/health`, `/system/info` (kartu **Versi Aplikasi** di UI), serta dicek oleh tes terhadap badge README dan judul CHANGELOG.
+Versi aplikasi didefinisikan satu kali di `app/main.py` (`__version__`) dan dipakai oleh `/health`, `/system/info` (kartu **Versi Aplikasi** di UI), serta dicek oleh tes terhadap badge README dan judul CHANGELOG.
 Saat menaikkan versi: ubah `__version__`, badge di README, dan tambahkan judul `## V<versi>` di CHANGELOG, lalu jalankan `make test`.
 
 ---

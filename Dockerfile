@@ -33,7 +33,6 @@ COPY --chown=nexus:nexus . /app
 ENV PATH=/home/nexus/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    FLASK_ENV=production \
     PORT=5000 \
     WEB_CONCURRENCY=2
 

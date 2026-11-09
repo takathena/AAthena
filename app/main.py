@@ -1,7 +1,7 @@
-"""NEXUS IoT - FastAPI application factory (Opsi A, v2.0 core).
+"""NEXUS IoT - FastAPI application factory (v2.0 core).
 
-Flask app/__init__.py tetap jadi default; FastAPI jalan berdampingan di
-`uvicorn app.main:app`. Fitur: CORS, CSP/HSTS, SessionMiddleware starlette,
+FastAPI jalan via `uvicorn app.main:app` / `run:app` (gunicorn+uvicorn).
+Fitur: CORS, CSP/HSTS, SessionMiddleware starlette,
 CSRF double-submit (exempt POST /api/v1/data), SlowAPI, exception handlers
 JSON/HTML, /health /ready, lifespan init_db + background tasks.
 """
@@ -162,7 +162,7 @@ def create_app(config_override=None):
     app.include_router(dashboards.router)
     app.include_router(chat.router)
     app.include_router(views.router)
-    # File statik untuk template HTML (Flask sebelumnya menyajikan /static).
+    # File statik untuk template HTML (disajikan via StaticFiles).
     import os
     from fastapi.staticfiles import StaticFiles
     _static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static')

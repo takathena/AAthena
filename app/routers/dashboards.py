@@ -141,7 +141,7 @@ async def list_dashboards(request: Request):
             rows = conn.execute(_LIST_SQL, {'uid': user_id}).fetchall()
         if not rows:
             try:
-                from app.auth import ensure_user_dashboard
+                from app.deps import ensure_user_dashboard
                 ensure_user_dashboard(user_id, username)
                 with get_db_context() as conn:
                     rows = conn.execute(_LIST_SQL, {'uid': user_id}).fetchall()

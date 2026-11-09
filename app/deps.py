@@ -10,7 +10,7 @@ import asyncio
 import time
 
 from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -145,18 +145,59 @@ def is_admin_sync(user_id) -> bool:
 # LOGIN THROTTLE HOOK (app/login_throttle.py)
 # ==========================================
 async def check_login_throttle(username: str, ip: str) -> int:
-    from app import login_throttle
+    import app.login_throttle as login_throttle
     return await run_sync(login_throttle.check_locked, username, ip)
 
 
 async def record_login_failure(username: str, ip: str) -> None:
-    from app import login_throttle
+    import app.login_throttle as login_throttle
     await run_sync(login_throttle.record_failure, username, ip, get_config())
 
 
 async def clear_login_failures(username: str, ip: str) -> None:
-    from app import login_throttle
+    import app.login_throttle as login_throttle
     await run_sync(login_throttle.clear_failures, username, ip)
+
+
+def ensure_user_dashboard(user_id, username):
+    from app.database import get_db_context
+    with get_db_context() as conn:
+        existing = conn.execute(
+            '''SELECT id FROM dashboards
+               WHERE user_id = ?
+               ORDER BY is_default DESC, id ASC LIMIT 1''',
+            (user_id,)
+        ).fetchone()
+        if existing:
+            return existing['id']
+        orphan = conn.execute(
+            '''SELECT id FROM dashboards
+               WHERE user_id IS NULL
+               ORDER BY is_default DESC, id ASC LIMIT 1'''
+        ).fetchone()
+        if orphan:
+            conn.execute(
+                'UPDATE dashboards SET user_id = ? WHERE user_id IS NULL',
+                (user_id,)
+            )
+            conn.commit()
+            return orphan['id']
+        slug = f"u{user_id}-default"
+        cur = conn.execute('''
+            INSERT INTO dashboards (slug, name, description, icon, is_default, user_id)
+            VALUES (?, 'Dashboard Utama', 'Dashboard bawaan', 'fa-chart-pie', 1, ?)
+        ''', (slug, user_id))
+        conn.commit()
+        return cur.lastrowid
+
+
+def purge_dashboard(conn, dashboard_id):
+    """Hapus dashboard beserta isinya (widget, tab, anggota, Telegram)."""
+    conn.execute('DELETE FROM widgets WHERE dashboard_id = ?', (dashboard_id,))
+    conn.execute('DELETE FROM analytics_tabs WHERE dashboard_id = ?', (dashboard_id,))
+    conn.execute('DELETE FROM dashboard_members WHERE dashboard_id = ?', (dashboard_id,))
+    conn.execute('DELETE FROM dashboard_telegram WHERE dashboard_id = ?', (dashboard_id,))
+    conn.execute('DELETE FROM dashboards WHERE id = ?', (dashboard_id,))
 
 
 # ==========================================

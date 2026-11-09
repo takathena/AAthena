@@ -292,7 +292,7 @@ async def delete_user(user_id: int, request: Request):
                         f'{orphan} perangkat milik user ini. Buat '
                         f'dashboard dulu, lalu hapus ulang user.')}, status_code=409)
             moved_devices = 0
-            from app.dashboards import purge_dashboard
+            from app.deps import purge_dashboard
             for did in dash_ids:
                 moved_devices += conn.execute(
                     'UPDATE devices SET dashboard_id = ? WHERE dashboard_id = ?',
