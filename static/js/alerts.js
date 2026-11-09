@@ -554,7 +554,7 @@
         const statusText = isActive && !isHealthy ? 'Aktif' : 'Selesai';
 
         const checkboxHtml = (isActive && !isHealthy && ackId !== null) ? `
-            <label class="alert-row-check" onclick="event.stopPropagation();">
+            <label class="alert-row-check">
                 <input type="checkbox" class="alert-checkbox" data-alert-id="${ackId}" ${isChecked ? 'checked' : ''}>
             </label>
         ` : '<div style="width:20px;flex-shrink:0;"></div>';

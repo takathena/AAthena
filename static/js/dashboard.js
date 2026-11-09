@@ -671,16 +671,21 @@
         updateMapSelectedBanner();
     }
 
+    function safeColor(c) {
+        return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(String(c || '')) ? c : '#737373';
+    }
+
     function getDeviceMapStyle(d) {
-        let color = '#737373'; let label = (d.status || 'offline').toUpperCase();
+        let color = '#737373'; let label = 'OFFLINE';
         if (d.status === 'offline') { color = '#ef4444'; label = 'OFFLINE'; }
         else if (d.has_alert && d.top_alert_severity) {
-            if (d.top_alert_severity === 'danger') color = '#ef4444';
-            else if (d.top_alert_severity === 'warning') color = '#f97316';
-            else if (d.top_alert_severity === 'info') color = '#8b5cf6';
-            label = d.top_alert_severity.toUpperCase();
+            const sev = String(d.top_alert_severity).toLowerCase();
+            if (sev === 'danger') { color = '#ef4444'; label = 'DANGER'; }
+            else if (sev === 'warning') { color = '#f97316'; label = 'WARNING'; }
+            else if (sev === 'info') { color = '#8b5cf6'; label = 'INFO'; }
+            else { color = '#8b5cf6'; label = 'INFO'; }
         } else if (d.status === 'online') { color = '#22c55e'; label = 'ONLINE'; }
-        return { color, label };
+        return { color: safeColor(color), label };
     }
 
     function loadMarkers(map, useCluster = false) {
@@ -714,8 +719,20 @@
                 } catch (e) {}
                 return;
             }
-            const popup = `<div style="font-family:Geist,sans-serif;min-width:200px;"><div style="font-weight:600;margin-bottom:4px;">${escapeHtml(d.device_name)}</div><div style="font-size:11px;color:#888;margin-bottom:6px;font-family:'Geist Mono',monospace;">${escapeHtml(d.device_id)}</div><div style="font-size:11px;margin-bottom:8px;">Status: <b style="color:${style.color};">${style.label}</b></div><div style="display:flex;gap:6px;"><button onclick="window.__nexusMapSelect('${escapeHtml(d.device_id)}')" style="flex:1;padding:6px 10px;background:#f5f5f5;color:#0a0a0a;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Pilih</button><button onclick="window.__nexusMapView('${escapeHtml(d.device_id)}')" style="flex:1;padding:6px 10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Detail</button></div></div>`;
+            const popup = `<div style="font-family:Geist,sans-serif;min-width:200px;"><div style="font-weight:600;margin-bottom:4px;">${escapeHtml(d.device_name)}</div><div style="font-size:11px;color:#888;margin-bottom:6px;font-family:'Geist Mono',monospace;">${escapeHtml(d.device_id)}</div><div style="font-size:11px;margin-bottom:8px;">Status: <b style="color:${escapeHtml(style.color)};">${escapeHtml(style.label)}</b></div><div style="display:flex;gap:6px;"><button data-action="map-select" data-device-id="${escapeHtml(d.device_id)}" style="flex:1;padding:6px 10px;background:#f5f5f5;color:#0a0a0a;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Pilih</button><button data-action="map-view" data-device-id="${escapeHtml(d.device_id)}" style="flex:1;padding:6px 10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Detail</button></div></div>`;
             const marker = L.circleMarker([d.latitude, d.longitude], { radius: 7, color: style.color, fillColor: style.color, fillOpacity: 0.9, weight: 2 }).bindPopup(popup);
+            marker.on('popupopen', (e) => {
+                const el = e.popup.getElement();
+                if (!el || el.__bound) return;
+                el.__bound = true;
+                el.querySelectorAll('[data-action="map-select"],[data-action="map-view"]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.dataset.deviceId;
+                        if (btn.dataset.action === 'map-select') window.__nexusMapSelect(id);
+                        else window.__nexusMapView(id);
+                    });
+                });
+            });
             marker.on('click', () => selectMapDevice(d.device_id, { zoom: false, placeMarker: false }));
             if (useCluster && state.markerCluster) state.markerCluster.addLayer(marker);
             else marker.addTo(map);

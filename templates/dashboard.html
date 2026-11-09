@@ -20,11 +20,7 @@
 <meta name="is-admin" content="{{ '1' if is_admin else '0' }}">
 {% if view_all %}<meta name="view-all" content="1">{% endif %}
 
-<script>
-    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(navigator.userAgent) || window.innerWidth <= 768) {
-        window.location.href = '/mobile';
-    }
-</script>
+<script src="{{ url_for('static', filename='js/dashboard-redirect.js') }}"></script>
 
 <style>
     #dashboardSection,
@@ -37,23 +33,7 @@
     }
 </style>
 
-<script>
-    (function() {
-        var hash = (window.location.hash || '').replace('#', '').trim();
-        var valid = ['dashboard', 'map', 'graph', 'devices', 'alerts', 'settings'];
-        var isSettingsHash = /^settings(\/[a-z-]+)?$/.test(hash);
-        if (!valid.includes(hash) && !isSettingsHash) {
-            try {
-                var saved = sessionStorage.getItem('nexus-last-section');
-                hash = (saved && valid.includes(saved)) ? saved : 'dashboard';
-            } catch (e) { hash = 'dashboard'; }
-        }
-        if (!isSettingsHash && window.location.hash !== '#' + hash) {
-            try { history.replaceState(null, '', '#' + hash); } catch (e) {}
-        }
-        window.__NEXUS_INITIAL_SECTION = isSettingsHash ? 'settings' : hash;
-    })();
-</script>
+<script src="{{ url_for('static', filename='js/dashboard-init.js') }}"></script>
 
 <svg width="0" height="0" style="position:absolute">
     <defs>

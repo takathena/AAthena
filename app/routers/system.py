@@ -7,7 +7,7 @@ import sqlite3
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.api_common import (_clean_timestamp, _parse_purge_request, _purge_preview,
+from app.api_common import (_clean_timestamp, _parse_purge_request,
                             _purge_where, PURGE_BATCH, PURGE_TABLES)
 from app.config import get_config
 from app.deps import (audit, get_current_user, limiter, require_admin,

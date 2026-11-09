@@ -15,7 +15,11 @@ from slowapi.util import get_remote_address
 
 from app.config import get_config
 
-limiter = Limiter(key_func=get_remote_address)
+# key_func=get_remote_address (IP socket, bukan X-Forwarded-For seperti
+# client_ip) agar klien tidak bisa memalsukan identitas lewat header.
+# storage_uri dari config agar kuota konsisten antar-worker (redis), bukan memory://.
+limiter = Limiter(key_func=get_remote_address,
+                  storage_uri=get_config().RATE_LIMIT_STORAGE)
 
 ROLE_RANK = {'viewer': 1, 'editor': 2, 'owner': 3}
 
@@ -339,9 +343,31 @@ async def device_role(conn, device_row, user_id):
     return await get_dashboard_role(conn, device_row['dashboard_id'], user_id)
 
 
+# Kolom devices yang boleh dipilih via param columns (anti-SQLi: SELECT
+# tidak bisa memakai bind param untuk nama kolom).
+DEVICE_COLUMNS = frozenset({
+    'id', 'device_id', 'device_name', 'device_type', 'location', 'latitude',
+    'longitude', 'description', 'status', 'last_seen', 'created_at',
+    'last_ip', 'firmware_version', 'offline_timeout', 'expected_interval',
+    'alert_rules', 'offline_alert_severity', 'interval_manual',
+    'dashboard_id',
+})
+
+
 async def load_device(conn, request: Request, user_id, device_id, minimum='viewer', columns='*'):
     """Return (row, None) atau (None, JSONResponse denial)."""
-    cols = columns if 'dashboard_id' in columns or columns == '*' else columns + ', dashboard_id'
+    if columns == '*':
+        cols = ', '.join(sorted(DEVICE_COLUMNS))
+    else:
+        parts = [c.strip() for c in columns.split(',') if c.strip()] \
+            if isinstance(columns, str) else []
+        if not parts or any(c not in DEVICE_COLUMNS for c in parts):
+            return None, JSONResponse(
+                {'success': False, 'error': 'Kolom tidak valid'}, status_code=400)
+        parts = list(dict.fromkeys(parts))
+        if 'dashboard_id' not in parts:
+            parts.append('dashboard_id')
+        cols = ', '.join(parts)
     row = await (await conn.execute(
         f'SELECT {cols} FROM devices WHERE device_id = ?', (device_id,)
     )).fetchone()

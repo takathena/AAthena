@@ -13,10 +13,10 @@
             </div>
         </div>
         <div class="chat-header-actions">
-            <button class="chat-icon-btn" onclick="NexusChat.clear()" title="Bersihkan percakapan">
+            <button class="chat-icon-btn" data-click="NexusChat.clear" title="Bersihkan percakapan">
                 <i class="fa-solid fa-broom"></i>
             </button>
-            <button class="chat-icon-btn" onclick="NexusChat.toggle()" title="Tutup panel">
+            <button class="chat-icon-btn" data-click="NexusChat.toggle" title="Tutup panel">
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
         </div>
@@ -85,7 +85,7 @@
                     <span class="chat-composer-btn-label">Attach</span>
                 </button>
 
-                <button class="chat-send" id="chatSend" type="button" onclick="NexusChat.send()" aria-label="Kirim">
+                <button class="chat-send" id="chatSend" type="button" data-click="NexusChat.send" aria-label="Kirim">
                     <i class="fa-solid fa-arrow-up"></i>
                 </button>
             </div>
@@ -93,4 +93,4 @@
     </div>
 </aside>
 
-<div id="chatBackdrop" class="chat-backdrop" onclick="NexusChat.toggle()"></div>
+<div id="chatBackdrop" class="chat-backdrop" data-click="NexusChat.toggle"></div>

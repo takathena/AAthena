@@ -909,6 +909,28 @@ def _migrate_v19(cursor):
     print("[DB] v19: attendance & cardholders dibuang")
 
 
+def _migrate_v20(cursor):
+    """Partial unique index: satu alert aktif per (device_id, alert_type).
+
+    Dedupe dulu (keep latest MAX(id), deactivate older), baru buat index.
+    Aman dijalankan ulang (idempotent).
+    """
+    print("[DB] v20: dedupe active alerts + partial unique index...")
+    deactivated = cursor.execute('''
+        UPDATE alerts SET is_active = 0
+        WHERE is_active = 1 AND id NOT IN (
+            SELECT MAX(id) FROM alerts WHERE is_active = 1
+            GROUP BY device_id, alert_type
+        )
+    ''').rowcount
+    print(f"[DB] v20: deactivated {deactivated} duplicate active alerts")
+    cursor.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_active_unique
+        ON alerts (device_id, alert_type) WHERE is_active = 1
+    ''')
+    print("[DB] v20: partial unique index idx_alerts_active_unique ready")
+
+
 # Registry migrasi urut. app/database.py (_init_db_inner) memakai daftar ini.
 MIGRATIONS = [
     (1, _migrate_v1),
@@ -930,6 +952,7 @@ MIGRATIONS = [
     (17, _migrate_v17),
     (18, _migrate_v18),
     (19, _migrate_v19),
+    (20, _migrate_v20),
 ]
 
 # Re-export untuk kompatibilitas: nama lama yang sempat diimpor langsung.
@@ -938,5 +961,5 @@ __all__ = [
     "_migrate_v1", "_migrate_v2", "_migrate_v3", "_migrate_v4", "_migrate_v5",
     "_migrate_v6", "_migrate_v7", "_migrate_v8", "_migrate_v9", "_migrate_v10",
     "_migrate_v11", "_migrate_v12", "_migrate_v13", "_migrate_v14", "_migrate_v15",
-    "_migrate_v16", "_migrate_v17", "_migrate_v18", "_migrate_v19", "_rebuild_fk_tables",
+    "_migrate_v16", "_migrate_v17", "_migrate_v18", "_migrate_v19", "_migrate_v20", "_rebuild_fk_tables",
 ]

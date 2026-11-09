@@ -13,7 +13,7 @@ def _env_bool(name, default):
     raw = os.getenv(name)
     if raw is None or raw.strip() == '':
         return default
-    return raw.strip().lower() == 'true'
+    return raw.strip().lower() in ('true', '1', 'yes', 'on')
 
 
 def _env_int(name, default):
@@ -159,9 +159,13 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')
 
+    # CSP: 'unsafe-inline' dipertahankan HANYA untuk style (template masih ada
+    # inline <style>/style attributes). Script sudah bebas inline handler.
+    # Jalur hapus total: pindah inline style ke file statik eksternal (atau hash),
+    # lalu hapus token dari env CSP_* di bawah.
     CSP_SCRIPT_SRC = os.getenv(
         'CSP_SCRIPT_SRC',
-        "'self' 'unsafe-inline' "
+        "'self' "
         "https://cdnjs.cloudflare.com https://unpkg.com "
         "https://cdn.jsdelivr.net https://fonts.googleapis.com"
     )
@@ -247,6 +251,10 @@ class Config:
 
         if not cls.IOT_PASSWORD:
             errors.append("IOT_PASSWORD wajib di-set di .env")
+        elif len(cls.IOT_PASSWORD) < 8:
+            errors.append("IOT_PASSWORD minimal 8 karakter")
+        elif cls.IOT_PASSWORD.startswith('CHANGE_ME'):
+            errors.append("IOT_PASSWORD masih placeholder CHANGE_ME*, ganti dengan yang kuat!")
         elif cls.IOT_PASSWORD in ('admin', 'password', 'change-me-to-strong-password'):
             errors.append("IOT_PASSWORD masih default, ganti dengan yang kuat!")
 
@@ -296,7 +304,7 @@ class TestingConfig(Config):
     WTF_CSRF_ENABLED = False
     SESSION_COOKIE_SECURE = False
     IOT_USERNAME = 'test'
-    IOT_PASSWORD = 'test'
+    IOT_PASSWORD = 'test-password-for-testing'
     SECRET_KEY = 'test-secret-key-for-testing-only-32chars-minimum'
 
 

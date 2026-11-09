@@ -60,17 +60,22 @@ def explicit_permissions(conn, user_id):
 
 def effective_permissions(conn, user_id):
     """Semua izin yang berlaku saat ini untuk user (dibaca dari DB setiap kali)."""
-    return set()
+    return explicit_permissions(conn, user_id)
 
 
 def has_permission(conn, user_id, permission):
     return permission in effective_permissions(conn, user_id)
 
 
-def set_user_permissions(conn, user_id, granted_by):
-    """Bersihkan izin eksplisit user. Caller harus commit."""
+def set_user_permissions(conn, user_id, permissions, granted_by=None):
+    """Replace explicit permissions. Caller must commit."""
     conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
-    return set()
+    for p in permissions:
+        conn.execute(
+            'INSERT INTO user_permissions (user_id, permission, granted_by) VALUES (?, ?, ?)',
+            (user_id, p, granted_by),
+        )
+    return set(permissions)
 
 
 async def get_user_info_async(conn, user_id):
@@ -96,10 +101,15 @@ async def explicit_permissions_async(conn, user_id):
 
 
 async def effective_permissions_async(conn, user_id):
-    return set()
+    return await explicit_permissions_async(conn, user_id)
 
 
-async def set_user_permissions_async(conn, user_id, granted_by):
+async def set_user_permissions_async(conn, user_id, permissions, granted_by=None):
     await conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
-    return set()
+    for p in permissions:
+        await conn.execute(
+            'INSERT INTO user_permissions (user_id, permission, granted_by) VALUES (?, ?, ?)',
+            (user_id, p, granted_by),
+        )
+    return set(permissions)
 

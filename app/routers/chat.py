@@ -3,6 +3,7 @@
 POST /api/v1/chat: JSON default, SSE bila diminta
 (Accept: text/event-stream / ?stream=1).
 """
+import asyncio
 import base64
 import csv
 import io
@@ -422,7 +423,7 @@ async def chat(request: Request):
     messages = sanitize_messages(payload.get('messages'))
     if not messages:
         return JSONResponse({'success': False, 'error': 'messages wajib diisi'}, status_code=400)
-    result, status = _chat_loop(messages, request, user['user_id'])
+    result, status = await asyncio.to_thread(_chat_loop, messages, request, user['user_id'])
     wants_sse = ('text/event-stream' in (request.headers.get('accept') or '')
                  or request.query_params.get('stream') == '1')
     if wants_sse:
@@ -443,7 +444,7 @@ async def chat_health(request: Request):
     def _probe():
         try:
             r = requests.get(f"{LLM_BASE_URL.rstrip('/')}/models",
-                             headers={'Authorization': f'Bearer {LLM_API_KEY}'}, timeout=5)
+                             headers={'Authorization': f'Bearer {LLM_API_KEY}'}, timeout=min(LLM_TIMEOUT, 10))
             r.raise_for_status()
             data = r.json()
             models = [m.get('id') for m in data.get('data', [])]
@@ -453,5 +454,5 @@ async def chat_health(request: Request):
             return {'success': False, 'configured': True, 'upstream_ok': False,
                     'error': f'Upstream offline: {type(e).__name__}'}, 503
 
-    body, code = _probe()
+    body, code = await asyncio.to_thread(_probe)
     return JSONResponse(body, status_code=code)

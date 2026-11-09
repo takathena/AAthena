@@ -10,9 +10,10 @@
     'use strict';
 
     const metaTag = document.querySelector('meta[name="csrf-token"]');
-    const CSRF_TOKEN = metaTag ? metaTag.content : '';
+    const getCsrf = () => (document.querySelector('meta[name="csrf-token"]')||{}).content||'';
+    const csrf = () => getCsrf();
 
-    if (!CSRF_TOKEN) console.warn('[API] CSRF token tidak ditemukan.');
+    if (!metaTag || !metaTag.content) console.warn('[API] CSRF token tidak ditemukan.');
 
     // Scope dashboard: setiap request /api/v1/* membawa dashboard yang sedang dilihat
     // (meta dashboard-id; "all" = tampilan admin semua perangkat).
@@ -98,15 +99,23 @@
         };
 
         if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-            headers['X-CSRFToken'] = CSRF_TOKEN;
+            headers['X-CSRFToken'] = csrf();
         }
 
-        return fetch(url, {
+        const res = await fetch(url, {
             ...options,
             method,
             headers,
             credentials: 'same-origin'
         });
+        if (res.status === 401) {
+            const path = window.location.pathname || '';
+            if (!path.startsWith('/login') && !path.startsWith('/register')) {
+                clearClientSession();
+                window.location.href = '/login';
+            }
+        }
+        return res;
     }
 
     function clearClientSession() {

@@ -19,6 +19,7 @@ WIB = timezone(timedelta(hours=7))
 _notify_queue = None  # asyncio.Queue, dibuat lazily di event loop aktif
 _worker_task = None
 _recent_notifications = {}
+_pending_tasks = set()
 DEDUP_WINDOW_SECONDS = 60
 
 SEVERITY_EMOJI = {'info': 'ℹ️', 'warning': '⚠️', 'danger': '🔥', 'healthy': '✅'}
@@ -86,14 +87,18 @@ def _format_message(event, html_mode=True):
     return "\n".join(lines)
 
 
+def _resp_json(resp):
+    try:
+        return resp.json() or {}
+    except ValueError:
+        return {}
+
+
 def _is_parse_error(resp):
     """True bila Telegram menolak teks karena entitas/markup tidak bisa di-parse."""
     if resp.status_code != 400:
         return False
-    try:
-        desc = (resp.json() or {}).get('description', '')
-    except ValueError:
-        return False
+    desc = _resp_json(resp).get('description', '')
     return "can't parse entities" in str(desc).lower()
 
 
@@ -163,7 +168,7 @@ async def _send_telegram(event, token=None, chat_id=None):
             try:
                 resp = await client.post(url, json=payload)
                 if resp.status_code == 200:
-                    data = resp.json()
+                    data = _resp_json(resp)
                     if data.get('ok'):
                         return True, None
                     return False, f"telegram_api_error: {data.get('description')}"
@@ -178,7 +183,7 @@ async def _send_telegram(event, token=None, chat_id=None):
                     fell_back = True
                     continue  # tidak menghabiskan jatah retry
                 if resp.status_code == 429:
-                    retry_after = resp.json().get('parameters', {}).get('retry_after', 5)
+                    retry_after = (_resp_json(resp).get('parameters') or {}).get('retry_after', 5)
                     await asyncio.sleep(retry_after)
                     attempt += 1
                     continue
@@ -207,10 +212,12 @@ def _is_duplicate(event):
     expired = [k for k, t in _recent_notifications.items() if now - t > DEDUP_WINDOW_SECONDS]
     for k in expired:
         del _recent_notifications[k]
-    if h in _recent_notifications:
-        return True
-    _recent_notifications[h] = now
-    return False
+    return h in _recent_notifications
+
+
+def _mark_notified(event):
+    import time
+    _recent_notifications[_event_hash(event)] = time.time()
 
 
 def _should_notify(event):
@@ -257,6 +264,7 @@ async def _dispatch_one(event, target=None):
     else:
         ok, err = await _send_telegram(event)
     if ok:
+        _mark_notified(event)
         logger.info(f"📨 Telegram sent ({kind}): {event.get('device_id')}/{event.get('alert_type')}")
     else:
         logger.warning(f"Telegram failed ({kind}): {err}")
@@ -302,7 +310,9 @@ def notify_alert_event(event):
             return
         await _enqueue(event, target)
 
-    asyncio.get_running_loop().create_task(_prepare_and_enqueue())
+    task = asyncio.get_running_loop().create_task(_prepare_and_enqueue())
+    _pending_tasks.add(task)
+    task.add_done_callback(_pending_tasks.discard)
 
 
 async def send_test_notification(token=None, chat_id=None):

@@ -17,14 +17,15 @@
 {% endif %}
 </head>
 <body>
+<a class="skip-link" id="skipLink" href="#main-content" style="position:absolute;left:-9999px;top:0;background:#fff;color:#000;padding:8px 14px;z-index:9999;border-radius:0 0 8px 0">Lewati ke konten utama</a>
 
 <!-- ============ HEADER ============ -->
 <header class="app-hdr">
-  <button class="hdr-icon-btn" id="menuBtn" onclick="openDrawer()" aria-label="Menu" aria-expanded="false" aria-controls="drawer">
+  <button class="hdr-icon-btn" id="menuBtn" data-click="openDrawer" aria-label="Menu" aria-expanded="false" aria-controls="drawer">
     <i class="fa-solid fa-bars"></i>
   </button>
 
-  <button class="hdr-logo" onclick="event.preventDefault(); go('dashboard');" aria-label="NEXUS">
+  <button class="hdr-logo" data-click="go" data-arg="dashboard" data-prevent="1" aria-label="NEXUS">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 2.5l8.5 4.9v9.2L12 21.5 3.5 16.6V7.4z"/>
       <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>
@@ -34,13 +35,13 @@
     </svg>
   </button>
 
-  <button class="hdr-icon-btn" onclick="toggleTheme()" aria-label="Theme">
+  <button class="hdr-icon-btn" data-click="toggleTheme" aria-label="Theme">
     <i class="fa-solid fa-moon" id="themeIcon"></i>
   </button>
 </header>
 
 <!-- ============ DRAWER NAV ============ -->
-<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+<div class="drawer-backdrop" id="drawerBackdrop" data-click="closeDrawer"></div>
 
 <aside class="drawer" id="drawer" aria-hidden="true">
   <div class="drawer-header">
@@ -56,36 +57,36 @@
   <nav class="drawer-nav">
     <div class="drawer-section">Menu Utama</div>
 
-    <button class="drawer-item active" data-tab="dashboard" onclick="go('dashboard')">
+    <button class="drawer-item active" data-tab="dashboard" data-click="go" data-arg="dashboard">
       <i class="fa-solid fa-house"></i>
       <span>Dashboard</span>
     </button>
 
-    <button class="drawer-item" data-tab="map" onclick="go('map')">
+    <button class="drawer-item" data-tab="map" data-click="go" data-arg="map">
       <i class="fa-solid fa-map"></i>
       <span>Peta Lokasi</span>
     </button>
 
-    <button class="drawer-item" data-tab="analytics" onclick="go('analytics')">
+    <button class="drawer-item" data-tab="analytics" data-click="go" data-arg="analytics">
       <i class="fa-solid fa-chart-line"></i>
       <span>Analitik</span>
     </button>
 
     <div class="drawer-section">Manajemen</div>
 
-    <button class="drawer-item" data-tab="devices" onclick="go('devices')">
+    <button class="drawer-item" data-tab="devices" data-click="go" data-arg="devices">
       <i class="fa-solid fa-microchip"></i>
       <span>Perangkat</span>
       <span class="drawer-badge" id="drawerDeviceBadge">0</span>
     </button>
 
-    <button class="drawer-item" data-tab="alerts" onclick="go('alerts')">
+    <button class="drawer-item" data-tab="alerts" data-click="go" data-arg="alerts">
       <i class="fa-solid fa-bell"></i>
       <span>Alert Center</span>
       <span class="drawer-badge" id="drawerAlertBadge">0</span>
     </button>
 
-    <button class="drawer-item" onclick="openDashboardSwitcher()">
+    <button class="drawer-item" data-click="openDashboardSwitcher">
       <i class="fa-solid fa-layer-group"></i>
       <span>Ganti Dashboard</span>
     </button>
@@ -95,22 +96,22 @@
       Admin
     </div>
 
-    <button class="drawer-item drawer-admin-item" data-tab="admin" onclick="openAdminPanel()" style="display:none;">
+    <button class="drawer-item drawer-admin-item" data-tab="admin" data-click="openAdminPanel" style="display:none;">
       <i class="fa-solid fa-shield-halved"></i>
       <span>Panel Admin</span>
     </button>
   </nav>
 
   <div class="drawer-footer">
-    <button class="drawer-item" onclick="openChangePassword()">
+    <button class="drawer-item" data-click="openChangePassword">
       <i class="fa-solid fa-key"></i>
       <span>Ganti Password</span>
     </button>
-    <button class="drawer-item" onclick="openSystemInfo()">
+    <button class="drawer-item" data-click="openSystemInfo">
       <i class="fa-solid fa-circle-info"></i>
       <span>Info Sistem</span>
     </button>
-    <button class="drawer-item drawer-item-danger" onclick="logout()">
+    <button class="drawer-item drawer-item-danger" data-click="logout">
       <i class="fa-solid fa-arrow-right-from-bracket"></i>
       <span>Logout</span>
     </button>
@@ -118,7 +119,7 @@
 </aside>
 
 <!-- ============ MAIN ============ -->
-<main>
+<main id="main-content" tabindex="-1">
 
   <!-- ============ DASHBOARD ============ -->
   <section id="s-dashboard" class="section active">
@@ -127,13 +128,13 @@
         <h1 class="page-title">Dashboard</h1>
         <div class="page-sub" id="dashSwitcherSub">—</div>
       </div>
-      <button class="page-action" onclick="loadDashboard()" aria-label="Refresh">
+      <button class="page-action" data-click="loadDashboard" aria-label="Refresh">
         <i class="fa-solid fa-rotate"></i>
       </button>
     </div>
 
     <!-- Active Dashboard info -->
-    <div class="active-dashboard-banner" id="activeDashboardBanner" onclick="openDashboardSwitcher()">
+    <div class="active-dashboard-banner" id="activeDashboardBanner" data-click="openDashboardSwitcher">
       <span class="active-dashboard-icon">
         <i class="fa-solid fa-layer-group" id="activeDashboardIcon"></i>
       </span>
@@ -163,47 +164,47 @@
     </div>
 
     <div class="stat-list">
-      <div class="stat-row" onclick="go('devices',{filter:'all'})">
-        <div class="stat-row-icon"><i class="fa-solid fa-server"></i></div>
-        <div class="stat-row-info">
-          <div class="stat-row-label">Total Perangkat</div>
-          <div class="stat-row-value" id="sTotal">0</div>
-        </div>
+      <button type="button" class="stat-row" data-click="go" data-arg="devices" data-filter="all" aria-label="Total Perangkat — lihat semua perangkat" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="stat-row-icon"><i class="fa-solid fa-server"></i></span>
+        <span class="stat-row-info">
+          <span class="stat-row-label">Total Perangkat</span>
+          <span class="stat-row-value" id="sTotal">0</span>
+        </span>
         <i class="fa-solid fa-chevron-right stat-row-chev"></i>
-      </div>
+      </button>
 
-      <div class="stat-row" onclick="go('devices',{filter:'online'})">
-        <div class="stat-row-icon"><i class="fa-solid fa-wifi"></i></div>
-        <div class="stat-row-info">
-          <div class="stat-row-label">Online</div>
-          <div class="stat-row-value stat-row-value-ok" id="sOnline">0</div>
-        </div>
+      <button type="button" class="stat-row" data-click="go" data-arg="devices" data-filter="online" aria-label="Online — lihat perangkat online" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="stat-row-icon"><i class="fa-solid fa-wifi"></i></span>
+        <span class="stat-row-info">
+          <span class="stat-row-label">Online</span>
+          <span class="stat-row-value stat-row-value-ok" id="sOnline">0</span>
+        </span>
         <i class="fa-solid fa-chevron-right stat-row-chev"></i>
-      </div>
+      </button>
 
-      <div class="stat-row" onclick="go('devices',{filter:'offline'})">
-        <div class="stat-row-icon"><i class="fa-solid fa-power-off"></i></div>
-        <div class="stat-row-info">
-          <div class="stat-row-label">Offline</div>
-          <div class="stat-row-value stat-row-value-crit" id="sOffline">0</div>
-        </div>
+      <button type="button" class="stat-row" data-click="go" data-arg="devices" data-filter="offline" aria-label="Offline — lihat perangkat offline" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="stat-row-icon"><i class="fa-solid fa-power-off"></i></span>
+        <span class="stat-row-info">
+          <span class="stat-row-label">Offline</span>
+          <span class="stat-row-value stat-row-value-crit" id="sOffline">0</span>
+        </span>
         <i class="fa-solid fa-chevron-right stat-row-chev"></i>
-      </div>
+      </button>
 
-      <div class="stat-row" onclick="go('alerts')">
-        <div class="stat-row-icon"><i class="fa-solid fa-bell"></i></div>
-        <div class="stat-row-info">
-          <div class="stat-row-label">Alert Aktif</div>
-          <div class="stat-row-value stat-row-value-warn" id="sAlert">0</div>
-        </div>
+      <button type="button" class="stat-row" data-click="go" data-arg="alerts" aria-label="Alert Aktif — lihat alert" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="stat-row-icon"><i class="fa-solid fa-bell"></i></span>
+        <span class="stat-row-info">
+          <span class="stat-row-label">Alert Aktif</span>
+          <span class="stat-row-value stat-row-value-warn" id="sAlert">0</span>
+        </span>
         <i class="fa-solid fa-chevron-right stat-row-chev"></i>
-      </div>
+      </button>
     </div>
 
     <div class="group">
       <div class="group-header">
         <div class="group-title"><i class="fa-solid fa-bolt"></i> Aktivitas Terbaru</div>
-        <button class="group-action" onclick="loadActivity()" aria-label="Refresh">
+        <button class="group-action" data-click="loadActivity" aria-label="Refresh">
           <i class="fa-solid fa-rotate"></i>
         </button>
       </div>
@@ -217,16 +218,16 @@
         <h2 class="page-title-sm">Perangkat</h2>
         <div class="page-sub" id="deviceCountSub">—</div>
       </div>
-      <button class="page-action" onclick="openAddDevice()" aria-label="Tambah">
+      <button class="page-action" data-click="openAddDevice" aria-label="Tambah">
         <i class="fa-solid fa-plus"></i>
       </button>
     </div>
 
     <div class="chips" id="filterChips">
-      <button class="chip active" data-f="all" onclick="setFilter('all')">Semua <span class="chip-count" id="cAll">0</span></button>
-      <button class="chip" data-f="online" onclick="setFilter('online')">Online <span class="chip-count" id="cOnline">0</span></button>
-      <button class="chip" data-f="offline" onclick="setFilter('offline')">Offline <span class="chip-count" id="cOffline">0</span></button>
-      <button class="chip" data-f="alert" onclick="setFilter('alert')">Alert <span class="chip-count" id="cAlert">0</span></button>
+      <button class="chip active" data-f="all" data-click="setFilter" data-arg="all">Semua <span class="chip-count" id="cAll">0</span></button>
+      <button class="chip" data-f="online" data-click="setFilter" data-arg="online">Online <span class="chip-count" id="cOnline">0</span></button>
+      <button class="chip" data-f="offline" data-click="setFilter" data-arg="offline">Offline <span class="chip-count" id="cOffline">0</span></button>
+      <button class="chip" data-f="alert" data-click="setFilter" data-arg="alert">Alert <span class="chip-count" id="cAlert">0</span></button>
     </div>
 
     <div class="group">
@@ -243,7 +244,7 @@
         <h1 class="page-title">Peta</h1>
         <div class="page-sub">Lokasi perangkat</div>
       </div>
-      <button class="page-action" onclick="initMap(true)" aria-label="Reload peta">
+      <button class="page-action" data-click="initMap" data-arg="true" aria-label="Reload peta">
         <i class="fa-solid fa-rotate"></i>
       </button>
     </div>
@@ -257,13 +258,13 @@
             <div class="map-banner-coord" id="mapBannerCoord">—</div>
           </div>
         </div>
-        <button class="btn-soft" onclick="clearMapSel()"><i class="fa-solid fa-xmark"></i></button>
-        <button class="btn-save" id="mapSaveBtn" onclick="saveMapLoc()" disabled>
+        <button class="btn-soft" data-click="clearMapSel"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-save" id="mapSaveBtn" data-click="saveMapLoc" disabled>
           Simpan
         </button>
       </div>
       <div id="mMapFull"></div>
-      <button class="map-reset-btn" onclick="resetMapView()" title="Reset View" aria-label="Reset View">
+      <button class="map-reset-btn" data-click="resetMapView" title="Reset View" aria-label="Reset View">
         <i class="fa-solid fa-arrows-to-circle"></i>
       </button>
     </div>
@@ -275,10 +276,10 @@
       </div>
 
       <div class="chips" id="mapChips">
-        <button class="chip active" data-mf="all" onclick="setMapFilter('all')">Semua</button>
-        <button class="chip" data-mf="online" onclick="setMapFilter('online')">Online</button>
-        <button class="chip" data-mf="offline" onclick="setMapFilter('offline')">Offline</button>
-        <button class="chip" data-mf="alert" onclick="setMapFilter('alert')">Alert</button>
+        <button class="chip active" data-mf="all" data-click="setMapFilter" data-arg="all">Semua</button>
+        <button class="chip" data-mf="online" data-click="setMapFilter" data-arg="online">Online</button>
+        <button class="chip" data-mf="offline" data-click="setMapFilter" data-arg="offline">Offline</button>
+        <button class="chip" data-mf="alert" data-click="setMapFilter" data-arg="alert">Alert</button>
       </div>
     </div>
 
@@ -297,10 +298,10 @@
         <div class="page-sub" id="chartCountSub">—</div>
       </div>
       <div class="page-actions">
-        <button class="page-action" onclick="resetChartsLayout()" title="Reset Layout" aria-label="Reset Layout">
+        <button class="page-action" data-click="resetChartsLayout" title="Reset Layout" aria-label="Reset Layout">
           <i class="fa-solid fa-arrows-rotate"></i>
         </button>
-        <button class="page-action page-action-primary" onclick="openChart()" aria-label="Tambah Diagram">
+        <button class="page-action page-action-primary" data-click="openChart" aria-label="Tambah Diagram">
           <i class="fa-solid fa-plus"></i>
         </button>
       </div>
@@ -352,20 +353,20 @@
         <div class="page-sub" id="deviceSubFull">—</div>
       </div>
       <div class="page-actions">
-        <button class="page-action" onclick="openBulkImport()" title="Bulk Import" id="bulkImportBtnM" style="display:none;">
+        <button class="page-action" data-click="openBulkImport" title="Bulk Import" id="bulkImportBtnM" style="display:none;">
           <i class="fa-solid fa-file-import"></i>
         </button>
-        <button class="page-action page-action-primary" onclick="openAddDevice()" aria-label="Tambah">
+        <button class="page-action page-action-primary" data-click="openAddDevice" aria-label="Tambah">
           <i class="fa-solid fa-plus"></i>
         </button>
       </div>
     </div>
 
     <div class="chips" id="deviceChips">
-      <button class="chip active" data-f="all" onclick="setFilterFull('all')">Semua</button>
-      <button class="chip" data-f="online" onclick="setFilterFull('online')">Online</button>
-      <button class="chip" data-f="offline" onclick="setFilterFull('offline')">Offline</button>
-      <button class="chip" data-f="alert" onclick="setFilterFull('alert')">Alert</button>
+      <button class="chip active" data-f="all" data-click="setFilterFull" data-arg="all">Semua</button>
+      <button class="chip" data-f="online" data-click="setFilterFull" data-arg="online">Online</button>
+      <button class="chip" data-f="offline" data-click="setFilterFull" data-arg="offline">Offline</button>
+      <button class="chip" data-f="alert" data-click="setFilterFull" data-arg="alert">Alert</button>
     </div>
 
     <div class="group">
@@ -383,13 +384,13 @@
         <div class="page-sub" id="alertSub">—</div>
       </div>
       <div class="page-actions">
-        <button class="page-action" onclick="openAlertTrend()" title="Trend" aria-label="Trend">
+        <button class="page-action" data-click="openAlertTrend" title="Trend" aria-label="Trend">
           <i class="fa-solid fa-chart-column"></i>
         </button>
-        <button class="page-action" onclick="openAlertHistory()" title="Riwayat" aria-label="Riwayat">
+        <button class="page-action" data-click="openAlertHistory" title="Riwayat" aria-label="Riwayat">
           <i class="fa-solid fa-clock-rotate-left"></i>
         </button>
-        <button class="page-action" onclick="markAllVisibleAlerts()" title="Tandai Semua" aria-label="Tandai Semua">
+        <button class="page-action" data-click="markAllVisibleAlerts" title="Tandai Semua" aria-label="Tandai Semua">
           <i class="fa-solid fa-check-double"></i>
         </button>
       </div>
@@ -474,13 +475,13 @@
     <div class="alert-date-filter">
       <div class="adf-group">
         <label for="alertDateStart">Dari</label>
-        <input type="date" id="alertDateStart" onchange="applyAlertDateFilter()">
+        <input type="date" id="alertDateStart">
       </div>
       <div class="adf-group">
         <label for="alertDateEnd">Sampai</label>
-        <input type="date" id="alertDateEnd" onchange="applyAlertDateFilter()">
+        <input type="date" id="alertDateEnd">
       </div>
-      <button class="adf-reset" onclick="resetAlertDateFilter()" title="Reset" aria-label="Reset filter">
+      <button class="adf-reset" data-click="resetAlertDateFilter" title="Reset" aria-label="Reset filter">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
@@ -491,7 +492,7 @@
         <span>Pilih Semua</span>
       </label>
       <span class="count" id="alertSelectedCount">0 dipilih</span>
-      <button class="btn btn-ok" onclick="bulkAckAlerts()">
+      <button class="btn btn-ok" data-click="bulkAckAlerts">
         <i class="fa-solid fa-check-double"></i> Tandai
       </button>
     </div>
@@ -517,7 +518,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3>Tambah Perangkat</h3>
-      <button class="modal-close" onclick="closeModal('m-add')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-add"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="field"><label>Device ID</label><input type="text" id="addId" placeholder="ESP32-001"></div>
@@ -559,14 +560,14 @@
         <span class="field-hint">Kosong = global</span>
       </div>
       <div id="addRules" class="rules"><div class="rule-empty">Belum ada custom rule</div></div>
-      <button class="rule-add" onclick="addRule('add')">
+      <button class="rule-add" data-click="addRule" data-arg="add">
         <i class="fa-solid fa-plus"></i> Tambah Sensor
       </button>
     </div>
 
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-add')">Batal</button>
-      <button class="btn btn-primary" onclick="submitAddDevice()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-add">Batal</button>
+      <button class="btn btn-primary" data-click="submitAddDevice">Simpan</button>
     </div>
   </div>
 </div>
@@ -576,7 +577,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3>Konfigurasi</h3>
-      <button class="modal-close" onclick="closeModal('m-edit')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-edit"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <input type="hidden" id="editId">
     <div class="field"><label>Nama Perangkat</label><input type="text" id="editName" placeholder="Sensor Suhu"></div>
@@ -618,18 +619,18 @@
       </div>
       <div id="editRules" class="rules"><div class="rule-empty">Belum ada custom rule</div></div>
       <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="rule-add" onclick="addRule('edit')" style="flex:1;">
+        <button class="rule-add" data-click="addRule" data-arg="edit" style="flex:1;">
           <i class="fa-solid fa-plus"></i> Tambah Sensor
         </button>
-        <button class="btn btn-ghost" onclick="resetDeviceAlertRules()" style="flex:0 0 auto;padding:10px 12px;">
+        <button class="btn btn-ghost" data-click="resetDeviceAlertRules" style="flex:0 0 auto;padding:10px 12px;">
           <i class="fa-solid fa-rotate-left"></i> Reset
         </button>
       </div>
     </div>
 
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-edit')">Batal</button>
-      <button class="btn btn-primary" onclick="submitEditConfig()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-edit">Batal</button>
+      <button class="btn btn-primary" data-click="submitEditConfig">Simpan</button>
     </div>
   </div>
 </div>
@@ -639,7 +640,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3 id="chartModalTitle">Tambah Diagram</h3>
-      <button class="modal-close" onclick="closeModal('m-chart')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-chart"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <input type="hidden" id="editChartId">
     <div class="field"><label>Judul Diagram</label><input type="text" id="chartTitle" placeholder="Contoh: Suhu Ruang Server"></div>
@@ -672,8 +673,8 @@
       <div class="cb-grid" id="chartDataCbs"></div>
     </div>
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-chart')">Batal</button>
-      <button class="btn btn-primary" onclick="saveChart()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-chart">Batal</button>
+      <button class="btn btn-primary" data-click="saveChart">Simpan</button>
     </div>
   </div>
 </div>
@@ -683,19 +684,19 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3>API Key</h3>
-      <button class="modal-close" onclick="closeApiKeyModal()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeApiKeyModal"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <p style="font-size:13px;color:var(--text-2);margin-bottom:14px;line-height:1.5;">
       Simpan API Key ini, hanya muncul sekali:
     </p>
     <div style="background:var(--surface-2);border-radius:12px;padding:15px;display:flex;gap:10px;align-items:center;">
       <code id="apiKeyValue" style="flex:1;font-size:12.5px;color:var(--text);word-break:break-all;font-family:var(--mono);line-height:1.5;font-weight:600;"></code>
-      <button class="btn-soft" onclick="copyApiKey()" style="flex-shrink:0;padding:9px 13px;">
+      <button class="btn-soft" data-click="copyApiKey" style="flex-shrink:0;padding:9px 13px;">
         <i class="fa-solid fa-copy"></i>
       </button>
     </div>
     <div class="actions">
-      <button class="btn btn-primary" onclick="closeApiKeyModal()">Saya Sudah Simpan</button>
+      <button class="btn btn-primary" data-click="closeApiKeyModal">Saya Sudah Simpan</button>
     </div>
   </div>
 </div>
@@ -705,7 +706,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3 id="deleteTitle">Hapus</h3>
-      <button class="modal-close" onclick="closeModal('m-delete')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-delete"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <p id="deleteText" style="font-size:13.5px;color:var(--text-2);margin-bottom:16px;line-height:1.5;"></p>
     <div class="field">
@@ -713,8 +714,8 @@
       <input type="text" id="deleteInput" autocomplete="off">
     </div>
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-delete')">Batal</button>
-      <button class="btn btn-danger" id="deleteConfirm" disabled onclick="confirmDelete()">Hapus</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-delete">Batal</button>
+      <button class="btn btn-danger" id="deleteConfirm" disabled data-click="confirmDelete">Hapus</button>
     </div>
   </div>
 </div>
@@ -724,17 +725,17 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3 id="tabModalTitle">Tab Analitik</h3>
-      <button class="modal-close" onclick="closeModal('m-tab')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-tab"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <input type="hidden" id="tabMode" value="new">
     <input type="hidden" id="tabId" value="">
     <div class="field"><label>Nama Tab</label><input type="text" id="tabName" placeholder="Contoh: Suhu"></div>
     <div class="actions" style="align-items:center;">
-      <button class="btn btn-danger hidden" id="tabDeleteBtn" style="flex:0 0 auto;padding:12px 14px;" onclick="deleteTab()">
+      <button class="btn btn-danger hidden" id="tabDeleteBtn" style="flex:0 0 auto;padding:12px 14px;" data-click="deleteTab">
         <i class="fa-solid fa-trash"></i>
       </button>
-      <button class="btn btn-ghost" onclick="closeModal('m-tab')">Batal</button>
-      <button class="btn btn-primary" onclick="saveTab()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-tab">Batal</button>
+      <button class="btn btn-primary" data-click="saveTab">Simpan</button>
     </div>
   </div>
 </div>
@@ -744,19 +745,19 @@
   <div class="modal-inner" style="padding-top:14px;">
     <div class="modal-head" style="margin-bottom:8px;">
       <h3 id="sheetTitle" style="font-size:15px;">Device</h3>
-      <button class="modal-close" onclick="closeModal('m-sheet')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-sheet"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div style="display:flex;flex-direction:column;gap:2px;">
-      <button class="sheet-item" onclick="sheetAction('detail')">
+      <button class="sheet-item" data-click="sheetAction" data-arg="detail">
         <i class="fa-solid fa-circle-info"></i> Lihat Detail
       </button>
-      <button class="sheet-item" onclick="sheetAction('config')">
+      <button class="sheet-item" data-click="sheetAction" data-arg="config">
         <i class="fa-solid fa-sliders"></i> Konfigurasi
       </button>
-      <button class="sheet-item warn" onclick="sheetAction('key')">
+      <button class="sheet-item warn" data-click="sheetAction" data-arg="key">
         <i class="fa-solid fa-key"></i> Regenerate API Key
       </button>
-      <button class="sheet-item danger" onclick="sheetAction('delete')">
+      <button class="sheet-item danger" data-click="sheetAction" data-arg="delete">
         <i class="fa-solid fa-trash"></i> Hapus Perangkat
       </button>
     </div>
@@ -770,29 +771,29 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-shield-halved"></i> Panel Admin</h3>
-      <button class="modal-close" onclick="closeModal('m-admin')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-admin"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <button class="sheet-item" onclick="closeModal('m-admin');openGlobalRules()">
+      <button class="sheet-item" data-click="closeModal" data-arg="m-admin" data-then="openGlobalRules">
         <i class="fa-solid fa-sliders"></i> Global Alert Rules
       </button>
-      <button class="sheet-item" onclick="closeModal('m-admin');openBulkImport()">
+      <button class="sheet-item" data-click="closeModal" data-arg="m-admin" data-then="openBulkImport">
         <i class="fa-solid fa-file-import"></i> Bulk Import Device
       </button>
-      <button class="sheet-item" onclick="closeModal('m-admin');openUserManagement()">
+      <button class="sheet-item" data-click="closeModal" data-arg="m-admin" data-then="openUserManagement">
         <i class="fa-solid fa-users"></i> Kelola User
       </button>
-      <button class="sheet-item" onclick="closeModal('m-admin');openBackupPanel()">
+      <button class="sheet-item" data-click="closeModal" data-arg="m-admin" data-then="openBackupPanel">
         <i class="fa-solid fa-database"></i> Backup Database
       </button>
-      <button class="sheet-item" onclick="closeModal('m-admin');openRestore()">
+      <button class="sheet-item" data-click="closeModal" data-arg="m-admin" data-then="openRestore">
         <i class="fa-solid fa-rotate-left"></i> Restore Database
       </button>
-      <button class="sheet-item warn" onclick="closeModal('m-admin');openCleanup()">
+      <button class="sheet-item warn" data-click="closeModal" data-arg="m-admin" data-then="openCleanup">
         <i class="fa-solid fa-broom"></i> Cleanup Data Lama
       </button>
-      <button class="sheet-item" onclick="closeModal('m-admin');openNotifConfig()">
+      <button class="sheet-item" data-click="closeModal" data-arg="m-admin" data-then="openNotifConfig">
         <i class="fa-solid fa-bell"></i> Konfigurasi Notifikasi
       </button>
     </div>
@@ -804,13 +805,13 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-layer-group"></i> Pilih Dashboard</h3>
-      <button class="modal-close" onclick="closeModal('m-dash-switch')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-dash-switch"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="dash-switch-list" id="dashSwitchList">
       <div class="loading"><div class="spinner"></div></div>
     </div>
     <div class="actions" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="closeModal('m-dash-switch');openDashboardForm()" style="width:100%;">
+      <button class="btn btn-primary" data-click="closeModal" data-arg="m-dash-switch" data-then="openDashboardForm" style="width:100%;">
         <i class="fa-solid fa-plus"></i> Dashboard Baru
       </button>
     </div>
@@ -822,7 +823,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3 id="dashFormTitle">Dashboard Baru</h3>
-      <button class="modal-close" onclick="closeModal('m-dash-form')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-dash-form"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <input type="hidden" id="dashFormId" value="">
     <div class="field"><label>Nama Dashboard</label><input type="text" id="dashFormName" placeholder="Monitoring Suhu"></div>
@@ -855,11 +856,11 @@
       </label>
     </div>
     <div class="actions" style="align-items:center;">
-      <button class="btn btn-danger hidden" id="dashFormDeleteBtn" style="flex:0 0 auto;padding:12px 14px;" onclick="deleteDashboard()">
+      <button class="btn btn-danger hidden" id="dashFormDeleteBtn" style="flex:0 0 auto;padding:12px 14px;" data-click="deleteDashboard">
         <i class="fa-solid fa-trash"></i>
       </button>
-      <button class="btn btn-ghost" onclick="closeModal('m-dash-form')">Batal</button>
-      <button class="btn btn-primary" onclick="saveDashboard()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-dash-form">Batal</button>
+      <button class="btn btn-primary" data-click="saveDashboard">Simpan</button>
     </div>
   </div>
 </div>
@@ -869,7 +870,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3 id="userModalTitle"><i class="fa-solid fa-users"></i> Kelola User</h3>
-      <button class="modal-close" onclick="closeModal('m-users')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-users"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div id="userListView">
@@ -877,7 +878,7 @@
         <div class="loading"><div class="spinner"></div></div>
       </div>
       <div class="actions" style="margin-top:14px;">
-        <button class="btn btn-primary" onclick="openUserForm(null)" style="width:100%;">
+        <button class="btn btn-primary" data-click="openUserForm" data-arg="null" style="width:100%;">
           <i class="fa-solid fa-plus"></i> Tambah User
         </button>
       </div>
@@ -899,8 +900,8 @@
       </div>
       <div id="userFormError" style="display:none;background:var(--accent-crit-bg);border:1px solid var(--accent-crit);color:var(--accent-crit);padding:9px 12px;border-radius:var(--radius-md);font-size:12.5px;font-weight:500;margin-top:8px;"></div>
       <div class="actions">
-        <button class="btn btn-ghost" onclick="switchUserView('list')">Batal</button>
-        <button class="btn btn-primary" id="userSaveBtn" onclick="saveUserForm()">Simpan</button>
+        <button class="btn btn-ghost" data-click="switchUserView" data-arg="list">Batal</button>
+        <button class="btn btn-primary" id="userSaveBtn" data-click="saveUserForm">Simpan</button>
       </div>
     </div>
   </div>
@@ -911,7 +912,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-database"></i> Backup Database</h3>
-      <button class="modal-close" onclick="closeModal('m-backup')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-backup"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="backup-info-bar">
@@ -929,7 +930,7 @@
       </div>
     </div>
 
-    <button class="btn btn-primary" id="backupNowBtn" onclick="triggerBackup()" style="width:100%;margin-bottom:14px;">
+    <button class="btn btn-primary" id="backupNowBtn" data-click="triggerBackup" style="width:100%;margin-bottom:14px;">
       <i class="fa-solid fa-cloud-arrow-up"></i> Backup Sekarang
     </button>
 
@@ -949,7 +950,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-crit);"></i> Restore Database</h3>
-      <button class="modal-close" onclick="closeModal('m-restore')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-restore"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div style="background:var(--accent-crit-bg);border:1px solid var(--accent-crit);border-radius:var(--radius-md);padding:12px;margin-bottom:14px;font-size:12px;color:var(--accent-crit);font-weight:500;line-height:1.55;">
@@ -973,8 +974,8 @@
     <div id="restoreError" style="display:none;background:var(--accent-crit-bg);border:1px solid var(--accent-crit);color:var(--accent-crit);padding:9px 12px;border-radius:var(--radius-md);font-size:12.5px;margin-top:10px;"></div>
 
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-restore')">Batal</button>
-      <button class="btn btn-danger" id="restoreConfirmBtn" onclick="submitRestore()" disabled>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-restore">Batal</button>
+      <button class="btn btn-danger" id="restoreConfirmBtn" data-click="submitRestore" disabled>
         <i class="fa-solid fa-triangle-exclamation"></i> Restore
       </button>
     </div>
@@ -986,14 +987,14 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-file-import"></i> Bulk Import</h3>
-      <button class="modal-close" onclick="closeModal('m-bulk')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-bulk"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="bulk-import-tabs">
-      <button class="bulk-import-tab active" data-mode="paste" onclick="switchBulkView('paste')">
+      <button class="bulk-import-tab active" data-mode="paste" data-click="switchBulkView" data-arg="paste">
         <i class="fa-solid fa-paste"></i> Paste JSON
       </button>
-      <button class="bulk-import-tab" data-mode="csv" onclick="switchBulkView('csv')">
+      <button class="bulk-import-tab" data-mode="csv" data-click="switchBulkView" data-arg="csv">
         <i class="fa-solid fa-file-csv"></i> Upload CSV
       </button>
     </div>
@@ -1002,7 +1003,7 @@
       <div class="field">
         <div class="field-row">
           <label>Array JSON Device</label>
-          <button type="button" onclick="fillBulkSample()" style="font-size:10.5px;color:var(--accent-info);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;">
+          <button type="button" data-click="fillBulkSample" style="font-size:10.5px;color:var(--accent-info);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;">
             <i class="fa-solid fa-wand-magic-sparkles"></i> Isi contoh
           </button>
         </div>
@@ -1015,7 +1016,7 @@
     <div id="bulkCsvView" style="display:none;">
       <div class="field">
         <label>Upload File CSV</label>
-        <div class="bulk-import-dropzone" id="bulkDropzone" onclick="document.getElementById('bulkFileInput').click()">
+        <div class="bulk-import-dropzone" id="bulkDropzone" data-click="click" data-arg="bulkFileInput">
           <i class="fa-solid fa-cloud-arrow-up"></i>
           <div>
             <b>Klik untuk pilih CSV</b>
@@ -1025,7 +1026,7 @@
         </div>
         <div id="bulkFileName" style="margin-top:10px;font-size:11px;color:var(--text-3);font-family:var(--mono);display:none;"></div>
       </div>
-      <button type="button" onclick="downloadBulkTemplate()" style="background:none;border:none;color:var(--accent-info);font-size:12px;font-family:inherit;padding:0;cursor:pointer;">
+      <button type="button" data-click="downloadBulkTemplate" style="background:none;border:none;color:var(--accent-info);font-size:12px;font-family:inherit;padding:0;cursor:pointer;">
         <i class="fa-solid fa-download"></i> Download template
       </button>
     </div>
@@ -1041,8 +1042,8 @@
     <div id="bulkError" style="display:none;background:var(--accent-crit-bg);border:1px solid var(--accent-crit);color:var(--accent-crit);padding:9px 12px;border-radius:var(--radius-md);font-size:12.5px;margin-top:10px;"></div>
 
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-bulk')">Batal</button>
-      <button class="btn btn-primary" id="bulkSubmitBtn" onclick="submitBulkImport()">
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-bulk">Batal</button>
+      <button class="btn btn-primary" id="bulkSubmitBtn" data-click="submitBulkImport">
         <i class="fa-solid fa-upload"></i> Import
       </button>
     </div>
@@ -1054,7 +1055,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-circle-check" style="color:var(--accent-ok);"></i> Hasil Import</h3>
-      <button class="modal-close" onclick="closeModal('m-bulk-result')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-bulk-result"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="bulk-result-summary" id="bulkResultSummary"></div>
@@ -1067,10 +1068,10 @@
       </div>
       <div class="bulk-result-list" id="bulkResultCreatedList"></div>
       <div style="display:flex;gap:6px;margin-top:10px;">
-        <button class="btn btn-ghost" onclick="copyBulkKeys()" style="flex:1;font-size:12px;">
+        <button class="btn btn-ghost" data-click="copyBulkKeys" style="flex:1;font-size:12px;">
           <i class="fa-solid fa-copy"></i> Copy Keys
         </button>
-        <button class="btn btn-ghost" onclick="downloadBulkCsv()" style="flex:1;font-size:12px;">
+        <button class="btn btn-ghost" data-click="downloadBulkCsv" style="flex:1;font-size:12px;">
           <i class="fa-solid fa-download"></i> CSV
         </button>
       </div>
@@ -1095,7 +1096,7 @@
     </div>
 
     <div class="actions" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="closeModal('m-bulk-result')" style="width:100%;">Tutup</button>
+      <button class="btn btn-primary" data-click="closeModal" data-arg="m-bulk-result" style="width:100%;">Tutup</button>
     </div>
   </div>
 </div>
@@ -1105,7 +1106,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-sliders"></i> Global Alert Rules</h3>
-      <button class="modal-close" onclick="closeModal('m-global-rules')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-global-rules"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div style="background:var(--surface-2);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:14px;font-size:11.5px;color:var(--text-2);line-height:1.5;">
@@ -1119,11 +1120,11 @@
     </div>
 
     <div class="actions" style="margin-top:14px;">
-      <button class="btn btn-danger hidden" id="globalRulesResetBtn" onclick="resetGlobalRules()" style="flex:0 0 auto;padding:12px 14px;">
+      <button class="btn btn-danger hidden" id="globalRulesResetBtn" data-click="resetGlobalRules" style="flex:0 0 auto;padding:12px 14px;">
         <i class="fa-solid fa-rotate-left"></i>
       </button>
-      <button class="btn btn-ghost" onclick="closeModal('m-global-rules')">Batal</button>
-      <button class="btn btn-primary" id="globalRulesSaveBtn" onclick="saveGlobalRules()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-global-rules">Batal</button>
+      <button class="btn btn-primary" id="globalRulesSaveBtn" data-click="saveGlobalRules">Simpan</button>
     </div>
   </div>
 </div>
@@ -1133,7 +1134,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-bell"></i> Konfigurasi Notifikasi</h3>
-      <button class="modal-close" onclick="closeModal('m-notif')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-notif"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="notifConfigBody">
       <div class="loading"><div class="spinner"></div></div>
@@ -1146,7 +1147,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-circle-info"></i> Info Sistem</h3>
-      <button class="modal-close" onclick="closeModal('m-system')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-system"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="systemInfoBody">
       <div class="loading"><div class="spinner"></div></div>
@@ -1159,7 +1160,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-key"></i> Ganti Password</h3>
-      <button class="modal-close" onclick="closeModal('m-chpw')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-chpw"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="field">
       <label>Password Lama</label>
@@ -1175,8 +1176,8 @@
     </div>
     <div id="cpError" style="display:none;background:var(--accent-crit-bg);border:1px solid var(--accent-crit);color:var(--accent-crit);padding:9px 12px;border-radius:var(--radius-md);font-size:12.5px;margin-top:8px;"></div>
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-chpw')">Batal</button>
-      <button class="btn btn-primary" id="cpSaveBtn" onclick="submitChangePassword()">Simpan</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-chpw">Batal</button>
+      <button class="btn btn-primary" id="cpSaveBtn" data-click="submitChangePassword">Simpan</button>
     </div>
   </div>
 </div>
@@ -1186,18 +1187,18 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Alert</h3>
-      <button class="modal-close" onclick="closeModal('m-alert-history')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-alert-history"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="alert-history-filters-m">
       <div class="field" style="margin-bottom:0;">
         <label>Perangkat</label>
-        <select id="historyDeviceFilter" onchange="loadAlertHistory()">
+        <select id="historyDeviceFilter">
           <option value="">Semua</option>
         </select>
       </div>
       <div class="field" style="margin-bottom:0;">
         <label>Severity</label>
-        <select id="historySeverityFilter" onchange="loadAlertHistory()">
+        <select id="historySeverityFilter">
           <option value="">Semua</option>
           <option value="danger">Bahaya</option>
           <option value="warning">Peringatan</option>
@@ -1209,7 +1210,7 @@
       <div class="loading"><div class="spinner"></div></div>
     </div>
     <div class="actions" style="margin-top:14px;">
-      <button class="btn btn-ghost" onclick="closeModal('m-alert-history')" style="width:100%;">Tutup</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-alert-history" style="width:100%;">Tutup</button>
     </div>
   </div>
 </div>
@@ -1219,11 +1220,11 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-chart-column"></i> Trend Alert</h3>
-      <button class="modal-close" onclick="closeModal('m-alert-trend')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-alert-trend"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="alert-trend-range-m">
-      <button class="trend-range-btn active" data-hours="24" onclick="setTrendRange(24, this)">24 Jam</button>
-      <button class="trend-range-btn" data-hours="168" onclick="setTrendRange(168, this)">7 Hari</button>
+      <button class="trend-range-btn active" data-hours="24" data-click="setTrendRange" data-arg="24" data-self="1">24 Jam</button>
+      <button class="trend-range-btn" data-hours="168" data-click="setTrendRange" data-arg="168" data-self="1">7 Hari</button>
     </div>
     <div class="alert-trend-body-m">
       <canvas id="mobileTrendCanvas"></canvas>
@@ -1240,11 +1241,11 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3 id="confirmTitle">Konfirmasi</h3>
-      <button class="modal-close" onclick="closeModal('m-confirm')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-confirm"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <p id="confirmMessage" style="font-size:13.5px;color:var(--text-2);margin-bottom:16px;line-height:1.55;"></p>
     <div class="actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-confirm')">Batal</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-confirm">Batal</button>
       <button class="btn btn-danger" id="confirmActionBtn">Ya, Lanjutkan</button>
     </div>
   </div>
@@ -1252,7 +1253,7 @@
 
 {% if chat_enabled %}
 <!-- FAB Chat Mobile -->
-<button class="chat-fab-mobile" onclick="NexusChat.toggle()" aria-label="Buka Chatbot" title="NEXUS AI">
+<button class="chat-fab-mobile" data-click="NexusChat.toggle" aria-label="Buka Chatbot" title="NEXUS AI">
   <i class="fa-solid fa-wand-magic-sparkles"></i>
 </button>
 
@@ -1265,6 +1266,7 @@
 <script src="{{ url_for('static', filename='js/error-handler.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 {% if chat_enabled %}<script src="{{ url_for('static', filename='js/chat.js') }}"></script>{% endif %}
+<script src="{{ url_for('static', filename='js/ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>

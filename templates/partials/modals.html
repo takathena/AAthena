@@ -133,7 +133,7 @@
             <div id="addAlertRulesBuilder" class="alert-rules-builder">
                 <div class="alert-rule-empty">Belum ada custom rule. Pakai global default.</div>
             </div>
-            <button type="button" class="btn-add-rule" onclick="addAlertRule('add')">
+            <button type="button" class="btn-add-rule" data-click="addAlertRule" data-arg="add">
                 <i class="fa-solid fa-plus"></i> Tambah Sensor
             </button>
         </div>
@@ -238,7 +238,7 @@
                 <div class="alert-rule-empty">Belum ada custom rule. Pakai global default.</div>
             </div>
             <div style="display:flex;gap:8px;margin-top:8px;">
-                <button type="button" class="btn-add-rule" onclick="addAlertRule('edit')" style="flex:1;">
+                <button type="button" class="btn-add-rule" data-click="addAlertRule" data-arg="edit" style="flex:1;">
                     <i class="fa-solid fa-plus"></i> Tambah Sensor
                 </button>
                 <button type="button" class="btn btn-secondary" id="resetAlertRulesBtn"

@@ -40,6 +40,20 @@ def _matches_backup_pattern(name, patterns):
 HEARTBEAT_PREFIX = 'bg_hb_'
 STALE_FACTOR = 3                   # stale bila heartbeat lebih tua dari 3x interval
 CLEANUP_INTERVAL = 86400
+CLEANUP_CHUNK = 10000
+
+
+async def _delete_chunks(conn, sql, params, chunk=CLEANUP_CHUNK):
+    """Hapus baris per chunk agar satu DELETE raksasa tidak mengunci tabel lama."""
+    total = 0
+    while True:
+        cur = await conn.execute(sql, (*params, chunk))
+        n = cur.rowcount
+        total += n
+        await conn.commit()
+        if n < chunk:
+            break
+    return total
 
 
 # ==========================================
@@ -316,13 +330,13 @@ async def check_device_status():
 
             for device_id, severity in to_offline:
                 try:
-                    await asyncio.to_thread(create_offline_alert, device_id, severity)
+                    await create_offline_alert(device_id, severity)
                 except Exception as e:
                     logger.error(f"Failed to create offline alert: {e}", exc_info=True)
 
             for device_id in to_online:
                 try:
-                    await asyncio.to_thread(clear_offline_alert, device_id)
+                    await clear_offline_alert(device_id)
                 except Exception as e:
                     logger.error(f"Failed to clear offline alert: {e}", exc_info=True)
 
@@ -369,38 +383,34 @@ async def cleanup_old_data():
                 total_deleted = 0
                 results = {}
 
-                cur = await conn.execute(
-                    'DELETE FROM sensor_data WHERE timestamp < ?',
-                    (cutoff_sensor,)
-                )
-                results['sensor_data'] = cur.rowcount
-                total_deleted += cur.rowcount
+                results['sensor_data'] = await _delete_chunks(
+                    conn,
+                    'DELETE FROM sensor_data WHERE rowid IN '
+                    '(SELECT rowid FROM sensor_data WHERE timestamp < ? LIMIT ?)',
+                    (cutoff_sensor,))
+                total_deleted += results['sensor_data']
 
-                cur = await conn.execute(
-                    'DELETE FROM alert_history WHERE created_at < ?',
-                    (cutoff_history,)
-                )
-                results['alert_history'] = cur.rowcount
-                total_deleted += cur.rowcount
+                results['alert_history'] = await _delete_chunks(
+                    conn,
+                    'DELETE FROM alert_history WHERE rowid IN '
+                    '(SELECT rowid FROM alert_history WHERE created_at < ? LIMIT ?)',
+                    (cutoff_history,))
+                total_deleted += results['alert_history']
 
-                cur = await conn.execute(
-                    'DELETE FROM device_status_log WHERE created_at < ?',
-                    (cutoff_log,)
-                )
-                results['device_status_log'] = cur.rowcount
-                total_deleted += cur.rowcount
+                results['device_status_log'] = await _delete_chunks(
+                    conn,
+                    'DELETE FROM device_status_log WHERE rowid IN '
+                    '(SELECT rowid FROM device_status_log WHERE created_at < ? LIMIT ?)',
+                    (cutoff_log,))
+                total_deleted += results['device_status_log']
 
-                cur = await conn.execute(
-                    '''DELETE FROM alerts
-                       WHERE is_active = 0
-                       AND updated_at IS NOT NULL
-                       AND updated_at < ?''',
-                    (cutoff_history,)
-                )
-                results['alerts_inactive'] = cur.rowcount
-                total_deleted += cur.rowcount
-
-                await conn.commit()
+                results['alerts_inactive'] = await _delete_chunks(
+                    conn,
+                    'DELETE FROM alerts WHERE rowid IN '
+                    '(SELECT rowid FROM alerts '
+                    'WHERE is_active = 0 AND updated_at IS NOT NULL AND updated_at < ? LIMIT ?)',
+                    (cutoff_history,))
+                total_deleted += results['alerts_inactive']
 
                 if total_deleted > 0:
                     details = ', '.join(

@@ -34,6 +34,9 @@ docker-compose.yml
 htmlcov/
 .coverage
 
+# Secrets perangkat ESP32 (kredensial WiFi/API key) — jangan masuk image
+esp32/secrets.py
+
 # Dev/CI saja (tidak masuk image produksi)
 requirements-dev.txt
 ruff.toml

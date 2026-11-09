@@ -4,7 +4,15 @@
 (function () {
     'use strict';
 
+    function safeColor(color) {
+        const c = String(color == null ? '' : color).trim();
+        if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(c)) return c;
+        if (/^var\(--[a-zA-Z0-9-_]+\)$/.test(c)) return c;
+        return '#22c55e';
+    }
+
     function buildSparkline(values, color) {
+        color = safeColor(color);
         if (!Array.isArray(values) || values.length < 2) {
             return '<svg viewBox="0 0 84 40" preserveAspectRatio="none">' +
                 '<line x1="4" y1="30" x2="80" y2="30" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/></svg>';
@@ -44,7 +52,7 @@
     function renderSparkline(key, values, color) {
         const el = document.querySelector('[data-spark="' + key + '"]');
         if (!el) return;
-        el.innerHTML = buildSparkline(values, color || '#22c55e');
+        el.innerHTML = buildSparkline(values, safeColor(color));
     }
 
     function setValue(key, value) {

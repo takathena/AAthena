@@ -42,6 +42,9 @@ class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers['Strict-Transport-Security'] = (
                 'max-age=31536000; includeSubDomains'
             )
+        # CSP: 'unsafe-inline' disuplai dari config.CSP_* (sementara, karena
+        # template masih inline). Hapus token itu hanya setelah inline
+        # <script>/<style> dipindah ke file statik eksternal (atau nonce/hash).
         csp = (
             f"default-src 'self'; "
             f"script-src {config.CSP_SCRIPT_SRC}; "
@@ -105,6 +108,8 @@ async def lifespan(app: FastAPI):
         config.validate()
     except ValueError as e:
         raise SystemExit(1) from e
+    from app.restore import apply_pending_restore
+    apply_pending_restore(config.DB_PATH)
     from app.database import init_db
     init_result = init_db()
     if init_result is not None:

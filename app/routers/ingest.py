@@ -1,7 +1,6 @@
 """NEXUS IoT - Device-facing endpoint (dari app/api.py receive_data)."""
 import json
 import logging
-from datetime import timedelta
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse

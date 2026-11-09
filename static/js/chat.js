@@ -33,7 +33,9 @@
         let s = String(text)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
 
         const codeBlocks = [];
         s = s.replace(/```(?:[a-z]*\n)?([\s\S]*?)```/g, (_, code) => {
@@ -82,7 +84,12 @@
 
         s = s.replace(
             /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-            '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+            (m, label, url) => {
+                let u;
+                try { u = new URL(url.replace(/&amp;/g, '&')); } catch (e) { return label; }
+                if (u.protocol !== 'http:' && u.protocol !== 'https:') return label;
+                return '<a href="' + u.href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+            }
         );
 
         s = s.replace(/\x00CB(\d+)\x00/g, (_, i) =>

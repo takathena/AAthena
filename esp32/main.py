@@ -105,7 +105,8 @@ def send_data(sensor_data):
         response = urequests.post(
             API_URL,
             data=ujson.dumps(payload),
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
+            timeout=10
         )
         status = response.status_code
         body = response.text

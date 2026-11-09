@@ -345,6 +345,13 @@ async def update_user_permissions(user_id: int, request: Request):
     await require_admin(request)
     from app.database import get_db_context
     user = get_current_user(request)
+    payload = await safe_json(request)
+    raw_permissions = payload.get('permissions') if isinstance(payload, dict) else None
+    if not isinstance(raw_permissions, list) or not all(isinstance(p, str) for p in raw_permissions):
+        return JSONResponse(
+            {'success': False, 'error': 'permissions harus array string'},
+            status_code=400)
+    permissions = sorted({p.strip() for p in raw_permissions if p.strip()})
 
     async def _do():
         async with get_db_context() as conn:
@@ -358,7 +365,8 @@ async def update_user_permissions(user_id: int, request: Request):
                      'error': 'Admin dan superadmin sudah punya semua izin'},
                     status_code=400), None
             before = sorted(await perm.explicit_permissions_async(conn, user_id))
-            after = sorted(await perm.set_user_permissions_async(conn, user_id, user['user_id']))
+            after = sorted(await perm.set_user_permissions_async(
+                conn, user_id, permissions, user['user_id']))
             username = (await (await conn.execute(
                 'SELECT username FROM users WHERE id = ?', (user_id,))).fetchone())['username']
             if before != after:

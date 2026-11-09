@@ -13,22 +13,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    <style>.skip-link{position:absolute;left:-9999px;top:0;background:#fff;color:#000;padding:8px 14px;z-index:9999;border-radius:0 0 8px 0}.skip-link:focus{left:0}</style>
 
     {% block extra_css %}{% endblock %}
 
-    <script>
-        (function() {
-            try {
-                var savedTheme = localStorage.getItem('nexus-theme') || 'dark';
-                document.documentElement.setAttribute('data-theme', savedTheme);
-            } catch (e) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
-        })();
-    </script>
+    <script src="{{ url_for('static', filename='js/theme-init.js') }}"></script>
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Lewati ke konten utama</a>
+    <main id="main-content" tabindex="-1">
     {% block content %}{% endblock %}
+    </main>
 
     {% block app_scripts %}
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>

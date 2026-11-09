@@ -3,6 +3,12 @@
    Batch 7 integrated
    ============================================================ */
 const CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+const deviceId = (document.querySelector('meta[name="device-id"]') || {}).content || '';
+
+/* Skip link: bound via JS (no inline handlers, CSP-safe). */
+const skipLink = document.getElementById('skipLink');
+skipLink?.addEventListener('focus', () => { skipLink.style.left = '0'; });
+skipLink?.addEventListener('blur', () => { skipLink.style.left = '-9999px'; });
 
 /* ---------- Sensor meta ---------- */
 const SENSOR_META = {

@@ -37,3 +37,13 @@ jobs:
 
       - name: Tests (pytest)
         run: python -m pytest -q
+
+      - name: Docker build
+        run: docker build -t nexus:ci .
+
+      - name: Nginx config check
+        run: >-
+          docker run --rm --add-host nexus-iot:127.0.0.1
+          -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+          -v "$PWD/nginx/conf.d:/etc/nginx/conf.d:ro"
+          nginx:alpine nginx -t

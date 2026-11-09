@@ -1,16 +1,48 @@
 /* ============================================================
    NEXUS Mobile v8.0 — Batch 1-9 synced with desktop
    ============================================================ */
-const CSRF = (document.querySelector('meta[name="csrf-token"]')||{}).content||'';
+const getCsrf = () => (document.querySelector('meta[name="csrf-token"]')||{}).content||'';
+const csrf = () => getCsrf();
+const escAttr = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+let __deviceDelegated = false;
+function bindDeviceActions(){
+  if(__deviceDelegated) return;
+  __deviceDelegated = true;
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if(!el || el.dataset.action === 'view-device' || el.dataset.action === 'acknowledge') return;
+    const id = el.dataset.deviceId;
+    if(!id) return;
+    if(el.dataset.action === 'open'){ openDevice(id); }
+    else if(el.dataset.action === 'sheet'){ e.stopPropagation(); openSheet(id); }
+    else if(el.dataset.action === 'map'){ selectMapDevice(id); }
+  });
+}
+bindDeviceActions();
+
+/* Skip link + date/history filters: bound via JS (no inline handlers, CSP-safe). */
+const skipLink = document.getElementById('skipLink');
+skipLink?.addEventListener('focus', () => { skipLink.style.left = '0'; });
+skipLink?.addEventListener('blur', () => { skipLink.style.left = '-9999px'; });
+document.getElementById('alertDateStart')?.addEventListener('change', () => applyAlertDateFilter());
+document.getElementById('alertDateEnd')?.addEventListener('change', () => applyAlertDateFilter());
+document.getElementById('historyDeviceFilter')?.addEventListener('change', () => loadAlertHistory());
+document.getElementById('historySeverityFilter')?.addEventListener('change', () => loadAlertHistory());
 
 async function api(url, opts = {}){
   const m = (opts.method||'GET').toUpperCase();
   const h = { 'Accept':'application/json', ...(opts.headers||{}) };
   if(opts.body && !h['Content-Type']) h['Content-Type'] = 'application/json';
-  if(['POST','PUT','DELETE','PATCH'].includes(m)) h['X-CSRFToken'] = CSRF;
+  if(['POST','PUT','DELETE','PATCH'].includes(m)) h['X-CSRFToken'] = csrf();
   const dashScope = ((document.querySelector('meta[name="dashboard-id"]')||{}).content||'').trim();
   if(dashScope && String(url).startsWith('/api/v1/') && !h['X-Dashboard-Id']) h['X-Dashboard-Id'] = dashScope;
-  return fetch(url, { ...opts, method:m, headers:h, credentials:'same-origin' });
+  const res = await fetch(url, { ...opts, method:m, headers:h, credentials:'same-origin' });
+  if(res.status === 401){
+    try{ sessionStorage.removeItem('nexus_back_url'); sessionStorage.removeItem('nexus-last-section'); }catch(_){}
+    if(!(window.location.pathname||'').startsWith('/login')) window.location.href = '/login';
+  }
+  return res;
 }
 
 /* ===== State ===== */
@@ -178,14 +210,22 @@ document.addEventListener('keydown', e => {
 });
 
 /* ===== Modal ===== */
+let __lastFocused = null;
 function openModal(id){
   const el = document.getElementById(id);
-  if(el){ el.classList.add('open'); document.body.classList.add('modal-open'); }
+  if(!el) return;
+  __lastFocused = document.activeElement;
+  el.classList.add('open');
+  document.body.classList.add('modal-open');
+  const f = el.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if(f) f.focus();
 }
 function closeModal(id){
   const el = document.getElementById(id);
   if(el) el.classList.remove('open');
   if(!document.querySelector('.modal.open')) document.body.classList.remove('modal-open');
+  if(__lastFocused && document.contains(__lastFocused)) __lastFocused.focus();
+  __lastFocused = null;
 }
 document.querySelectorAll('.modal').forEach(m => {
   m.addEventListener('click', e => { if(e.target === m) closeModal(m.id); });
@@ -234,7 +274,7 @@ function go(name, opts = {}){
 }
 async function doLogout(){
   try{
-    await fetch('/logout', { method:'POST', credentials:'same-origin', headers:{ 'X-CSRFToken': CSRF } });
+    await fetch('/logout', { method:'POST', credentials:'same-origin', headers:{ 'X-CSRFToken': csrf() } });
     window.location.href = '/login';
   }catch(e){
     if(window.showToast) window.showToast('Gagal logout. Periksa koneksi lalu coba lagi.', 'error');
@@ -372,13 +412,13 @@ function renderDeviceRows(list, targetId){
     const type = d.device_type || 'Universal';
     const loc = d.location || d.latest_wifi_ssid || '—';
     const uptime = fmtUp(d.latest_uptime_seconds || 0);
-    return `<div class="row" onclick="openDevice('${esc(d.device_id)}')">
+    return `<div class="row" data-action="open" data-device-id="${escAttr(d.device_id)}">
       <span class="row-status ${st}"></span>
       <div class="row-main">
         <div class="row-title">${esc(d.device_name)}</div>
         <div class="row-sub"><span class="badge-type">${esc(type)}</span>${esc(d.device_id)} · ${esc(loc)} · ${uptime}</div>
       </div>
-      <button class="row-more" onclick="event.stopPropagation();openSheet('${esc(d.device_id)}')">
+      <button class="row-more" data-action="sheet" data-device-id="${escAttr(d.device_id)}">
         <i class="fa-solid fa-ellipsis"></i>
       </button>
     </div>`;
@@ -420,7 +460,7 @@ async function loadActivity(){
     }
     const icons = {danger:'fa-fire',warning:'fa-triangle-exclamation',info:'fa-circle-info',online:'fa-circle-check',offline:'fa-power-off'};
     c.innerHTML = top.map(ev => `
-      <div class="activity-item" onclick="openDevice('${esc(ev.dev)}')">
+      <div class="activity-item" data-action="open" data-device-id="${escAttr(ev.dev)}">
         <div class="activity-icon ${ev.sev}"><i class="fa-solid ${icons[ev.sev] || 'fa-bell'}"></i></div>
         <div class="activity-body">
           <div class="activity-text"><strong>${esc(ev.title)}</strong> — ${esc(String(ev.msg).slice(0,70))}</div>
@@ -506,7 +546,7 @@ function renderMapList(){
   c.innerHTML = list.map(d => {
     const s = mapStyle(d);
     const hasLoc = d.latitude && d.longitude && !(d.latitude === 0 && d.longitude === 0);
-    return `<div class="row" onclick="selectMapDevice('${esc(d.device_id)}')">
+    return `<div class="row" data-action="map" data-device-id="${escAttr(d.device_id)}">
       <span class="row-status" style="background:${s.color};box-shadow:0 0 0 3px ${s.color}22;"></span>
       <div class="row-main">
         <div class="row-title">${esc(d.device_name)}</div>
@@ -675,11 +715,11 @@ function renderTabs(){
     <div class="ios-dd-item ${t.id === currentTabId ? 'active' : ''}" data-tab-id="${t.id}" style="cursor:pointer;">
       <i class="fa-solid ${esc(t.icon || 'fa-chart-line')}"></i>
       <span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;">${esc(t.name)}</span>
-      <span class="tab-actions" style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation();">
-        <button type="button" class="tab-action-btn" onclick="event.stopPropagation();editTabMobile(${t.id}, '${esc(t.name).replace(/'/g, "\\'")}')" title="Edit">
+      <span class="tab-actions" style="display:flex;gap:2px;flex-shrink:0;">
+        <button type="button" class="tab-action-btn" data-action="edit-tab" data-tab-id="${t.id}" title="Edit">
           <i class="fa-solid fa-pen"></i>
         </button>
-        <button type="button" class="tab-action-btn" onclick="event.stopPropagation();confirmDeleteTabMobile(${t.id})" title="Hapus">
+        <button type="button" class="tab-action-btn" data-action="delete-tab" data-tab-id="${t.id}" title="Hapus">
           <i class="fa-solid fa-trash"></i>
         </button>
       </span>
@@ -696,8 +736,24 @@ function renderTabs(){
     item.addEventListener('click', (e) => {
       if (e.target.closest('.tab-actions')) return;
       e.stopPropagation();
-      switchTab(parseInt(item.dataset.tabId));
+      switchTab(parseInt(item.dataset.tabId, 10));
       if (dd) dd.classList.remove('open');
+    });
+  });
+  menu.querySelectorAll('[data-action="edit-tab"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.tabId, 10);
+      if (!Number.isFinite(id)) return;
+      const tab = tabs.find(t => t.id === id);
+      openTabModal('edit', id, tab ? tab.name : '');
+    });
+  });
+  menu.querySelectorAll('[data-action="delete-tab"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.tabId, 10);
+      if (Number.isFinite(id)) confirmDeleteTabMobile(id);
     });
   });
   const addBtn = menu.querySelector('[data-action="new-tab"]');
@@ -816,13 +872,19 @@ async function loadCharts(){
             <div class="chart-sub">${esc(deviceNames)}${dataLabels ? ' · ' + esc(dataLabels) : ''}</div>
           </div>
           <div class="chart-actions">
-            <button class="chart-act" onclick="openChart('${ch.id}')"><i class="fa-solid fa-pen"></i></button>
-            <button class="chart-act danger" onclick="removeChart('${ch.id}')"><i class="fa-solid fa-trash"></i></button>
+            <button class="chart-act" data-action="open-chart" data-chart-id="${escAttr(ch.id)}"><i class="fa-solid fa-pen"></i></button>
+            <button class="chart-act danger" data-action="remove-chart" data-chart-id="${escAttr(ch.id)}"><i class="fa-solid fa-trash"></i></button>
           </div>
         </div>
         <div class="chart-canvas"><canvas id="${ch.id}_c"></canvas></div>
       </div>`;
     }).join('');
+    c.querySelectorAll('[data-action="open-chart"]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); openChart(btn.dataset.chartId); });
+    });
+    c.querySelectorAll('[data-action="remove-chart"]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); removeChart(btn.dataset.chartId); });
+    });
     await loadChartsData();
   }catch(e){ console.error(e); c.innerHTML = '<div class="empty"><div class="empty-title">Koneksi gagal</div></div>'; }
 }
@@ -1202,7 +1264,7 @@ function renderAlertRow(a){
   const typeLabel = a.label || alertTypeLabel(a.alert_type);
 
   const checkHtml = canAck
-    ? `<label class="alert-check" onclick="event.stopPropagation();">
+    ? `<label class="alert-check">
          <input type="checkbox" class="alert-cb" data-alert-id="${id}" ${isChecked?'checked':''}>
        </label>`
     : `<div class="alert-check hidden"></div>`;
@@ -1696,13 +1758,17 @@ function addRule(mode){
   item.innerHTML = `
     <div class="rule-head">
       <select class="rule-select">${Object.entries(PRESETS).map(([k,v]) => `<option value="${k}" ${k===avail?'selected':''}>${v.label}</option>`).join('')}</select>
-      <button class="rule-remove" onclick="this.closest('.rule').remove();checkRulesEmpty('${mode}')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="rule-remove" data-action="remove-rule" data-mode="${escAttr(mode)}"><i class="fa-solid fa-xmark"></i></button>
     </div>
     ${sevRow('healthy', p.defaults.healthy)}
     ${sevRow('warning', p.defaults.warning)}
     ${sevRow('danger', p.defaults.danger)}
   `;
   c.appendChild(item);
+  item.querySelector('.rule-remove').addEventListener('click', function(){
+    this.closest('.rule')?.remove();
+    checkRulesEmpty(this.dataset.mode);
+  });
   item.querySelector('.rule-select').addEventListener('change', function(){
     const pr = PRESETS[this.value];
     item.querySelectorAll('.rule-sev').forEach(row => {
@@ -1752,13 +1818,17 @@ function populateRules(mode, rules){
     item.innerHTML = `
       <div class="rule-head">
         <select class="rule-select">${Object.entries(PRESETS).map(([k,v]) => `<option value="${k}" ${k===key?'selected':''}>${v.label}</option>`).join('')}</select>
-        <button class="rule-remove" onclick="this.closest('.rule').remove();checkRulesEmpty('${mode}')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="rule-remove" data-action="remove-rule" data-mode="${escAttr(mode)}"><i class="fa-solid fa-xmark"></i></button>
       </div>
       ${rule.healthy ? sevRow('healthy', rule.healthy) : ''}
       ${rule.warning ? sevRow('warning', rule.warning) : ''}
       ${rule.danger ? sevRow('danger', rule.danger) : ''}
     `;
     c.appendChild(item);
+    item.querySelector('.rule-remove').addEventListener('click', function(){
+      this.closest('.rule')?.remove();
+      checkRulesEmpty(this.dataset.mode);
+    });
   });
 }
 
@@ -1805,18 +1875,39 @@ async function loadDashboardList(){
     listEl.innerHTML = dashboardsList.map(db => {
       const isActive = db.id === currentDashboardId;
       const isDefault = db.is_default === 1;
-      return `<div class="dash-switch-item ${isActive?'active':''}" onclick="switchDashboard(${db.id})">
+      return `<div class="dash-switch-item ${isActive?'active':''}" data-action="switch-dashboard" data-dashboard-id="${db.id}">
         <span class="dash-switch-icon"><i class="fa-solid ${esc(db.icon || 'fa-chart-line')}"></i></span>
         <div class="dash-switch-info">
           <div class="dash-switch-name">${esc(db.name)} ${isDefault ? '<span style="color:var(--accent-warn);font-size:11px;">★</span>' : ''}</div>
           <div class="dash-switch-slug">${esc(db.slug)}</div>
         </div>
-        <div class="dash-switch-actions" onclick="event.stopPropagation();">
-          ${!isDefault ? `<button class="dash-act-btn" onclick="setDashDefault(${db.id})" title="Set Default"><i class="fa-solid fa-star"></i></button>` : ''}
-          <button class="dash-act-btn" onclick="openDashboardForm(${db.id})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+        <div class="dash-switch-actions">
+          ${!isDefault ? `<button class="dash-act-btn" data-action="set-default" data-dashboard-id="${db.id}" title="Set Default"><i class="fa-solid fa-star"></i></button>` : ''}
+          <button class="dash-act-btn" data-action="edit-dashboard" data-dashboard-id="${db.id}" title="Edit"><i class="fa-solid fa-pen"></i></button>
         </div>
       </div>`;
     }).join('');
+    listEl.querySelectorAll('[data-action="switch-dashboard"]').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.dash-switch-actions')) return;
+        const id = parseInt(item.dataset.dashboardId, 10);
+        if (Number.isFinite(id)) switchDashboard(id);
+      });
+    });
+    listEl.querySelectorAll('[data-action="set-default"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.dashboardId, 10);
+        if (Number.isFinite(id)) setDashDefault(id);
+      });
+    });
+    listEl.querySelectorAll('[data-action="edit-dashboard"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.dashboardId, 10);
+        if (Number.isFinite(id)) openDashboardForm(id);
+      });
+    });
   }catch(e){ listEl.innerHTML = '<div class="empty"><div class="empty-title">Gagal memuat</div></div>'; }
 }
 
@@ -1977,7 +2068,7 @@ async function loadUsers(){
       const isMe = currentUser && u.id === currentUser.id;
       const adminBadge = u.is_admin ? '<span class="user-badge admin">Admin</span>' : '<span class="user-badge">User</span>';
       const meBadge = isMe ? '<span class="user-badge me">Anda</span>' : '';
-      const delBtn = !isMe ? `<button class="user-act-btn danger" onclick="deleteUser(${u.id}, '${esc(u.username)}')"><i class="fa-solid fa-trash"></i></button>` : '';
+      const delBtn = !isMe ? `<button class="user-act-btn danger" data-action="delete-user" data-user-id="${u.id}"><i class="fa-solid fa-trash"></i></button>` : '';
       return `<div class="user-card">
         <div class="user-avatar ${u.is_admin ? 'admin' : ''}">
           <i class="fa-solid ${u.is_admin ? 'fa-shield-halved' : 'fa-user'}"></i>
@@ -1987,11 +2078,23 @@ async function loadUsers(){
           <div class="user-username">@${esc(u.username)}</div>
         </div>
         <div class="user-actions">
-          <button class="user-act-btn" onclick="openUserForm(${u.id})"><i class="fa-solid fa-pen"></i></button>
+          <button class="user-act-btn" data-action="edit-user" data-user-id="${u.id}"><i class="fa-solid fa-pen"></i></button>
           ${delBtn}
         </div>
       </div>`;
     }).join('');
+    listEl.querySelectorAll('[data-action="edit-user"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.userId, 10);
+        if (Number.isFinite(id)) openUserForm(id);
+      });
+    });
+    listEl.querySelectorAll('[data-action="delete-user"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.userId, 10);
+        if (Number.isFinite(id)) deleteUser(id);
+      });
+    });
   }catch(e){ listEl.innerHTML = '<div class="empty"><div class="empty-title">Gagal memuat</div></div>'; }
 }
 
@@ -2068,7 +2171,9 @@ async function saveUserForm(){
 }
 
 function deleteUser(id, username){
-  confirmModal('Hapus User', `Hapus user @${username}? Semua dashboard miliknya akan ikut terhapus.`, async () => {
+  const u = userListCache.find(x => x.id === id);
+  const name = username != null ? username : (u ? u.username : '');
+  confirmModal('Hapus User', `Hapus user @${name}? Semua dashboard miliknya akan ikut terhapus.`, async () => {
     const r = await api(`/api/v1/users/${id}`, { method: 'DELETE' });
     const d = await r.json();
     if(d.success){ toast('User dihapus'); await loadUsers(); }
@@ -2581,7 +2686,7 @@ async function openNotifConfig(){
         <div class="notif-config-row"><span class="notif-config-label">Chat ID</span><span class="notif-config-value ${vc(tg.has_chat_id)}">${tg.has_chat_id ? '✓ Ada' : '✗ Kosong'}</span></div>
       </div>
       <div style="margin-top:14px;">
-        <button class="btn btn-primary" onclick="testNotifTelegram()" style="width:100%;" ${!tg.enabled ? 'disabled' : ''}>
+        <button class="btn btn-primary" id="testNotifBtn" style="width:100%;" ${!tg.enabled ? 'disabled' : ''}>
           <i class="fa-solid fa-paper-plane"></i> Test Telegram
         </button>
       </div>
@@ -2590,6 +2695,8 @@ async function openNotifConfig(){
           <i class="fa-solid fa-circle-info"></i> Aktifkan <code style="font-family:var(--mono);">NOTIFY_ENABLED=True</code> di .env
         </div>` : ''}
     `;
+    const testBtn = document.getElementById('testNotifBtn');
+    if (testBtn) testBtn.addEventListener('click', () => testNotifTelegram());
   }catch(e){ body.innerHTML = '<div class="empty"><div class="empty-title">Koneksi gagal</div></div>'; }
 }
 

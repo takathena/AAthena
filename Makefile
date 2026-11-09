@@ -17,7 +17,7 @@ VENV        := venv
 PYTHON      := $(VENV)/bin/python
 PIP         := $(VENV)/bin/pip
 PORT        := $(shell grep '^PORT' .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo 5000)
-NGINX_PORT  := $(shell grep '^NGINX_PORT' .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo 5008)
+NGINX_PORT  := $(shell grep '^NGINX_PORT' .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo 4455)
 
 help:
 	@echo "$(GREEN)NEXUS IoT - Available Commands$(NC)"
@@ -79,14 +79,18 @@ run:
 run-prod:
 	@if [ ! -f .env ]; then echo "$(RED).env tidak ada!$(NC)"; exit 1; fi
 	@echo "$(GREEN)Starting production server (Gunicorn)...$(NC)"
-	$(VENV)/bin/gunicorn -w 4 -k gthread --threads 4 -b 0.0.0.0:$(PORT) \
+	$(VENV)/bin/gunicorn -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$(PORT) \
+		--timeout 60 --graceful-timeout 30 --keep-alive 5 \
+		--max-requests 1000 --max-requests-jitter 100 \
 		--access-logfile - --error-logfile - run:app
 
 backup:
 	@mkdir -p backup
+	# Nama iot_manual-*.db (bukan manual-*.db) agar ikut retensi/pembersihan
+	# app (BACKUP_RETENTION_DAYS/BACKUP_MIN_KEEP, pola iot_*.db) + UI backup.
 	$(PYTHON) -c "import sqlite3; from datetime import datetime; \
 		src=sqlite3.connect('database/iot.db'); \
-		dst=sqlite3.connect(f'backup/manual-{datetime.now():%Y%m%d_%H%M%S}.db'); \
+		dst=sqlite3.connect(f'backup/iot_manual-{datetime.now():%Y%m%d_%H%M%S}.db'); \
 		src.backup(dst); dst.close(); src.close(); \
 		print('Backup done')"
 

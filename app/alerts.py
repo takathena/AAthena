@@ -485,6 +485,8 @@ async def check_and_create_alerts(device_id, sensor_data):
     pending_notifications = []
 
     async with get_db_async() as conn:
+        # Lock tulis sejak awal: tutup race read-modify-write dup alert aktif.
+        await conn.execute('BEGIN IMMEDIATE')
         alert_rules = await get_device_alert_rules(conn, device_id)
 
         for key, value in sensor_data.items():

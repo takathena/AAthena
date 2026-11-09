@@ -11,7 +11,9 @@ services:
       - ./database:/app/database
       - ./logs:/app/logs
       - ./backup:/app/backup
-      - ./.env:/app/.env:ro
+    env_file:
+      - path: .env
+        required: false
       # Kode aplikasi ada di dalam image (rebuild: docker compose up -d --build).
       # Mount kode untuk development ada di docker-compose.override.yml.
     environment:
@@ -41,18 +43,24 @@ services:
     restart: unless-stopped
     ports:
       - "${NGINX_PORT:-4455}:80"
-      - "443:80"
+      # TLS: aktifkan setelah sertifikat di-mount ke /etc/nginx/certs dan
+      # blok `listen 443 ssl` di nginx/conf.d/nexus.conf di-uncomment
+      # (HTTP :80 lalu di-redirect ke HTTPS :443 di sana).
+      # - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./static:/static:ro
+      # TLS: uncomment bersama blok `listen 443 ssl` di nginx/conf.d/nexus.conf.
+      # Taruh cert di ./certs/ {fullchain.pem, privkey.pem}, lalu recreate nginx.
+      # - ./certs:/etc/nginx/certs:ro
     depends_on:
       nexus-iot:
         condition: service_healthy
     networks:
       - nexus-network
     healthcheck:
-      test: ["CMD", "nginx", "-t"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

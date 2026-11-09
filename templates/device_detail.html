@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#1a1d23">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="device-id" content="{{ device_id }}">
 <title>Detail Perangkat — NEXUS</title>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -12,6 +13,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/device-detail.css') }}">
 </head>
 <body>
+<a class="skip-link" id="skipLink" href="#main-content" style="position:absolute;left:-9999px;top:0;background:#fff;color:#000;padding:8px 14px;z-index:9999;border-radius:0 0 8px 0">Lewati ke konten utama</a>
 
 <header class="hdr">
   <button class="hdr-back" id="btnBack">
@@ -19,7 +21,7 @@
     <span>Kembali</span>
   </button>
   <div class="hdr-actions">
-    <button class="hdr-btn" onclick="toggleTheme()" aria-label="Toggle Theme">
+    <button class="hdr-btn" data-click="toggleTheme" aria-label="Toggle Theme">
       <i class="fa-solid fa-moon" id="themeIcon"></i>
     </button>
     <div class="hdr-export-wrap">
@@ -48,7 +50,7 @@
   </div>
 </header>
 
-<main>
+<main id="main-content" tabindex="-1">
 
   <div class="device-hero">
     <div class="device-icon"><i class="fa-solid fa-microchip"></i></div>
@@ -135,26 +137,26 @@
       <div class="group-title"><i class="fa-solid fa-sliders"></i> Pengaturan</div>
     </div>
     <div class="group-body" style="padding-top:0;">
-      <div class="action-row" onclick="regenKey()">
-        <div class="action-row-left">
+      <button type="button" class="action-row" data-click="regenKey" aria-label="Regenerate API Key" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="action-row-left">
           <i class="icon fa-solid fa-key"></i>
-          <div class="action-row-text">
-            <div class="action-row-title">Regenerate API Key</div>
-            <div class="action-row-sub">Buat key baru, key lama tidak akan berfungsi</div>
-          </div>
-        </div>
+          <span class="action-row-text">
+            <span class="action-row-title" style="display:block">Regenerate API Key</span>
+            <span class="action-row-sub" style="display:block">Buat key baru, key lama tidak akan berfungsi</span>
+          </span>
+        </span>
         <i class="fa-solid fa-chevron-right action-row-chevron"></i>
-      </div>
-      <div class="action-row danger" onclick="openDelete()">
-        <div class="action-row-left">
+      </button>
+      <button type="button" class="action-row danger" data-click="openDelete" aria-label="Hapus Perangkat" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="action-row-left">
           <i class="icon fa-solid fa-trash"></i>
-          <div class="action-row-text">
-            <div class="action-row-title">Hapus Perangkat</div>
-            <div class="action-row-sub">Hapus permanen beserta data sensor</div>
-          </div>
-        </div>
+          <span class="action-row-text">
+            <span class="action-row-title" style="display:block">Hapus Perangkat</span>
+            <span class="action-row-sub" style="display:block">Hapus permanen beserta data sensor</span>
+          </span>
+        </span>
         <i class="fa-solid fa-chevron-right action-row-chevron"></i>
-      </div>
+      </button>
     </div>
   </div>
 
@@ -164,17 +166,17 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-key"></i> API Key Baru</h3>
-      <button class="modal-close" onclick="closeModal('m-key')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-key"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <p class="modal-desc">Simpan key ini, hanya muncul sekali. Update firmware perangkat dengan key baru.</p>
     <div class="api-key-box">
       <code id="keyValue"></code>
-      <button class="btn-soft" onclick="copyKey()" style="flex-shrink:0;padding:9px 13px;" title="Copy">
+      <button class="btn-soft" data-click="copyKey" style="flex-shrink:0;padding:9px 13px;" title="Copy">
         <i class="fa-solid fa-copy"></i>
       </button>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-primary" onclick="closeModal('m-key')">Saya Sudah Simpan</button>
+      <button class="btn btn-primary" data-click="closeModal" data-arg="m-key">Saya Sudah Simpan</button>
     </div>
   </div>
 </div>
@@ -183,7 +185,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h3><i class="fa-solid fa-trash" style="color:var(--accent-crit);"></i> Hapus Perangkat</h3>
-      <button class="modal-close" onclick="closeModal('m-del')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" data-click="closeModal" data-arg="m-del"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <p class="modal-desc" id="delDesc">Perangkat ini akan dihapus permanen beserta semua data sensornya.</p>
     <div class="modal-field">
@@ -191,16 +193,16 @@
       <input type="text" id="delInput" placeholder="Ketik Device ID..." autocomplete="off" autocorrect="off" spellcheck="false">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('m-del')">Batal</button>
-      <button class="btn btn-danger" id="delBtn" disabled onclick="confirmDelete()">Hapus</button>
+      <button class="btn btn-ghost" data-click="closeModal" data-arg="m-del">Batal</button>
+      <button class="btn btn-danger" id="delBtn" disabled data-click="confirmDelete">Hapus</button>
     </div>
   </div>
 </div>
 
 <!-- Chart.js dimuat lazy via lazy-load.js (NexusLazy.loadChartLibs), bukan eager di sini -->
-<script>const deviceId = '{{ device_id }}';</script>
 <script src="{{ url_for('static', filename='js/lazy-load.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/device-detail.js') }}"></script>
 </body>
 </html>

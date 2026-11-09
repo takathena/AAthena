@@ -110,7 +110,7 @@ def close_db(error=None):
     return None
 
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 # Re-export dari migrasi untuk kompatibilitas import lama.
 from app.migrations import MIGRATIONS, WIB_DEFAULT  # noqa: E402, F401

@@ -79,7 +79,7 @@ def update_device_status(device_id, status, ip=None):
             import asyncio as _aio
             _r = clear_offline_alert(device_id)
             try:
-                loop = _aio.get_running_loop()  # type: ignore[attr-defined]
+                _aio.get_running_loop()  # type: ignore[attr-defined]
             except RuntimeError:
                 _aio.run(_r)
             else:
