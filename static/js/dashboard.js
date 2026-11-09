@@ -4076,6 +4076,7 @@
                     showSection('devices');
                 } else if (key === 'activeAlerts') {
                     showSection('alerts');
+                }
             }
         });
     }
