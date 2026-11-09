@@ -1,7 +1,7 @@
 """C3 + C4 — global rules dibaca mesin alert; rules per-device menimpa sebagian."""
 import json
 
-from app.alerts import get_device_alert_rules, invalidate_global_rules_cache
+from app.alerts import get_device_alert_rules_sync as get_device_alert_rules, invalidate_global_rules_cache
 from app.database import get_db_context, get_wib_time
 from tests.conftest import active_alert_types, post_data
 

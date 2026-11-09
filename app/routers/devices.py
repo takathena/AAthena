@@ -666,17 +666,32 @@ async def get_device_alert_rules_endpoint(device_id: str, request: Request):
     from app.alerts import get_device_alert_rules
     user = get_current_user(request)
 
-    def _do():
-        with get_db_context() as conn:
+    async def _do():
+        async with get_db_context() as conn:
             device, denied = _dl(conn, request, user['user_id'], device_id, 'viewer',
                                  'device_id, alert_rules')
             if denied:
                 return denied, None, None
-            rules = get_device_alert_rules(conn, device_id)
+            rules = await get_device_alert_rules(conn, device_id)
             is_custom = device['alert_rules'] is not None
         return None, rules, is_custom
 
-    err, rules, is_custom = await run_sync(_do)
+    async def _run():
+        # _dl butuh conn untuk load_device; berpindah agar karena get_device_alert_rules kini async
+        # buat wrapper agar _dl tetap sync via run_sync terpisah? gunakan direct:
+        from app.database import get_db_context as _gd
+        with _gd() as conn:
+            device, denied = _dl(conn, request, user['user_id'], device_id, 'viewer',
+                                 'device_id, alert_rules')
+            if denied:
+                return denied, None, None
+            is_custom = device['alert_rules'] is not None
+        from app.alerts import get_db_async
+        async with get_db_async() as aconn:
+            rules = await get_device_alert_rules(aconn, device_id)
+        return None, rules, is_custom
+
+    err, rules, is_custom = await _run()
     if err is not None:
         return err
     return JSONResponse({'success': True, 'device_id': device_id,

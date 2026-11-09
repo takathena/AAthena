@@ -8,7 +8,6 @@ import secrets
 import logging
 import hmac
 import hashlib
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger('nexus')
@@ -79,53 +78,74 @@ def parse_datetime(value):
 # ✅ FIX #10: process_lock tidak swallow exception
 # Kalau lock gagal karena error sistem (bukan karena lock dipegang proses lain),
 # kita raise supaya caller tahu.
-@contextmanager
-def process_lock(name, blocking=True):
-    """Cross-process file lock.
+class process_lock:
+    """Cross-process file lock (dual sync/async context manager).
 
     Yield True jika lock didapat, False jika lock dipegang proses lain.
     Raise OSError jika ada error sistem (permission, disk, dll).
+    Dipakai sebagai:
+        with process_lock('name'): ...
+        async with process_lock('name'): ...
     """
-    lock_dir = os.environ.get('NEXUS_LOCK_DIR', '/tmp')
-    try:
-        os.makedirs(lock_dir, exist_ok=True)
-    except Exception:
-        lock_dir = '/tmp'
 
-    lock_path = os.path.join(lock_dir, f'nexus-{name}.lock')
-    lock_file = None
-    acquired = False
+    def __init__(self, name, blocking=True):
+        self.name = name
+        self.blocking = blocking
+        self._lock_file = None
+        self._acquired = False
 
-    try:
-        lock_file = open(lock_path, 'w')
-    except OSError as e:
-        # Tidak bisa buka file lock → error sistem, raise
-        logger.error(f"process_lock({name}): cannot open lock file: {e}")
-        raise
+    def _open(self):
+        lock_dir = os.environ.get('NEXUS_LOCK_DIR', '/tmp')
+        try:
+            os.makedirs(lock_dir, exist_ok=True)
+        except Exception:
+            lock_dir = '/tmp'
 
-    try:
+        lock_path = os.path.join(lock_dir, f'nexus-{self.name}.lock')
+        try:
+            self._lock_file = open(lock_path, 'w')
+        except OSError as e:
+            # Tidak bisa buka file lock → error sistem, raise
+            logger.error(f"process_lock({self.name}): cannot open lock file: {e}")
+            raise
+
         flags = fcntl.LOCK_EX
-        if not blocking:
+        if not self.blocking:
             flags |= fcntl.LOCK_NB
         try:
-            fcntl.flock(lock_file, flags)
-            acquired = True
+            fcntl.flock(self._lock_file, flags)
+            self._acquired = True
         except (IOError, OSError):
             # Lock dipegang proses lain → yield False, bukan raise
-            acquired = False
+            self._acquired = False
+        return self._acquired
 
-        yield acquired
-    finally:
-        if lock_file is not None:
+    def _close(self):
+        if self._lock_file is not None:
             try:
-                if acquired:
-                    fcntl.flock(lock_file, fcntl.LOCK_UN)
+                if self._acquired:
+                    fcntl.flock(self._lock_file, fcntl.LOCK_UN)
             except Exception:
                 pass
             try:
-                lock_file.close()
+                self._lock_file.close()
             except Exception:
                 pass
+            self._lock_file = None
+
+    def __enter__(self):
+        return self._open()
+
+    def __exit__(self, exc_type, exc, tb):
+        self._close()
+        return False
+
+    async def __aenter__(self):
+        return self._open()
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self._close()
+        return False
 
 
 VALID_ALERT_SEVERITIES = ['healthy', 'info', 'warning', 'danger']

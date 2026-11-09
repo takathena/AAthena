@@ -1,18 +1,19 @@
 """
-NEXUS IoT - Background Tasks
+NEXUS IoT - Background Tasks (native async FastAPI)
 Hanya satu worker yang menjalankan background tasks (file lock). Worker lain terus
 mencoba mengambil alih secara berkala bila pemegang lock mati. Setiap task mencatat
 heartbeat di tabel user_settings supaya status terlihat dari /system/info.
 """
+import asyncio
 import fnmatch
 import json
 import os
 import re
-import sqlite3
-import threading
-import time
 import logging
+import time
 from datetime import datetime, timedelta
+
+import aiosqlite
 
 from app.config import get_config
 from app.database import get_db_context, get_wib_time
@@ -21,8 +22,8 @@ from app.alerts import create_offline_alert, clear_offline_alert
 
 logger = logging.getLogger('nexus')
 
-shutdown_event = threading.Event()
-_bg_lock = threading.Lock()
+shutdown_event = None  # asyncio.Event, dibuat di start_background_tasks
+_bg_tasks = []
 
 LOCK_RETRY_SECONDS = 30
 BACKUP_STARTUP_DELAY = 30          # jeda kecil saat boot sebelum backup pertama
@@ -51,7 +52,6 @@ class BackgroundLock:
         self.lock_dir = lock_dir or os.environ.get('NEXUS_LOCK_DIR', '/tmp')
         self.name = name
         self._file = None
-        self._guard = threading.Lock()
 
     @property
     def path(self):
@@ -63,46 +63,44 @@ class BackgroundLock:
 
     def try_acquire(self):
         import fcntl
-        with self._guard:
-            if self._file is not None:
-                return False
-            try:
-                os.makedirs(self.lock_dir, exist_ok=True)
-            except Exception:
-                self.lock_dir = '/tmp'
-            f = None
-            try:
-                # 'a+' agar membuka file TIDAK menghapus isi (pid pemilik) milik proses lain
-                f = open(self.path, 'a+')
-                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                f.seek(0)
-                f.truncate()
-                f.write(f"pid={os.getpid()}\n")
-                f.flush()
-                self._file = f
-                return True
-            except (IOError, OSError):
-                if f is not None:
-                    try:
-                        f.close()
-                    except Exception:
-                        pass
-                return False
+        if self._file is not None:
+            return False
+        try:
+            os.makedirs(self.lock_dir, exist_ok=True)
+        except Exception:
+            self.lock_dir = '/tmp'
+        f = None
+        try:
+            # 'a+' agar membuka file TIDAK menghapus isi (pid pemilik) milik proses lain
+            f = open(self.path, 'a+')
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            f.seek(0)
+            f.truncate()
+            f.write(f"pid={os.getpid()}\n")
+            f.flush()
+            self._file = f
+            return True
+        except (IOError, OSError):
+            if f is not None:
+                try:
+                    f.close()
+                except Exception:
+                    pass
+            return False
 
     def release(self):
         import fcntl
-        with self._guard:
-            if self._file is None:
-                return
-            try:
-                fcntl.flock(self._file, fcntl.LOCK_UN)
-            except Exception:
-                pass
-            try:
-                self._file.close()
-            except Exception:
-                pass
-            self._file = None
+        if self._file is None:
+            return
+        try:
+            fcntl.flock(self._file, fcntl.LOCK_UN)
+        except Exception:
+            pass
+        try:
+            self._file.close()
+        except Exception:
+            pass
+        self._file = None
 
     def read_owner_pid(self):
         """pid yang tertulis di file lock (None bila tidak ada/tidak terbaca)."""
@@ -117,46 +115,51 @@ class BackgroundLock:
 _lock = BackgroundLock()
 
 
-def wait_for_lock(lock, stop_event, on_acquire, retry_seconds=LOCK_RETRY_SECONDS, log=None):
+async def wait_for_lock(lock, stop_event, on_acquire, retry_seconds=LOCK_RETRY_SECONDS, log=None):
     """Coba ambil lock berkala sampai berhasil atau stop_event di-set.
 
     Return True bila lock didapat (on_acquire sudah dipanggil), False bila dihentikan.
     """
     log = log or logger
-    while not stop_event.wait(retry_seconds):
+    while True:
         if lock.try_acquire():
             log.info(f"Background lock diambil alih (pid={os.getpid()})")
             on_acquire()
             return True
-    return False
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=retry_seconds)
+        except asyncio.TimeoutError:
+            continue
+        return False
 
 
 # ==========================================
 # HEARTBEAT
 # ==========================================
-def record_heartbeat(task):
+async def record_heartbeat(task):
     """Catat waktu terakhir `task` berjalan. Tidak boleh membuat task gagal."""
     try:
         value = json.dumps({'ts': time.time(), 'pid': os.getpid()})
-        with get_db_context() as conn:
-            conn.execute('''
+        async with get_db_context() as conn:
+            await conn.execute('''
                 INSERT INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value,
                                                updated_at = excluded.updated_at
             ''', (HEARTBEAT_PREFIX + task, value, get_wib_time()))
-            conn.commit()
+            await conn.commit()
     except Exception as e:
         logger.warning(f"Heartbeat '{task}' gagal dicatat: {e}")
 
 
-def _read_heartbeats():
+async def _read_heartbeats():
     out = {}
     try:
-        with get_db_context() as conn:
-            rows = conn.execute(
+        async with get_db_context() as conn:
+            cur = await conn.execute(
                 "SELECT key, value FROM user_settings WHERE key LIKE ?",
                 (HEARTBEAT_PREFIX + '%',)
-            ).fetchall()
+            )
+            rows = await cur.fetchall()
         for row in rows:
             try:
                 out[row['key'][len(HEARTBEAT_PREFIX):]] = json.loads(row['value'])
@@ -171,11 +174,11 @@ def _iso_wib(ts):
     return (datetime.utcfromtimestamp(ts) + timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
 
 
-def get_background_status(config=None, now=None):
+async def get_background_status(config=None, now=None):
     """Ringkasan status background tasks untuk /system/info."""
     config = config or get_config()
     now = time.time() if now is None else now
-    beats = _read_heartbeats()
+    beats = await _read_heartbeats()
 
     intervals = {
         'status_check': max(1, config.CHECK_INTERVAL),
@@ -212,9 +215,9 @@ def get_background_status(config=None, now=None):
     }
 
 
-def _log_status_change(conn, device_id, status, reason=''):
+async def _log_status_change(conn, device_id, status, reason=''):
     try:
-        conn.execute('''
+        await conn.execute('''
             INSERT INTO device_status_log (device_id, status, reason, created_at)
             VALUES (?, ?, ?, ?)
         ''', (device_id, status, reason, get_wib_time()))
@@ -241,7 +244,7 @@ def _compute_offline_timeout(device, config):
     return config.OFFLINE_TIMEOUT
 
 
-def check_device_status():
+async def check_device_status():
     config = get_config()
     logger.info(f"Status checker started (interval={config.CHECK_INTERVAL}s, "
                 f"fallback_timeout={config.OFFLINE_TIMEOUT}s)")
@@ -252,13 +255,14 @@ def check_device_status():
             to_offline = []   # (device_id, severity)
             to_online = []    # device_id
 
-            with get_db_context() as conn:
-                devices = conn.execute('''
+            async with get_db_context() as conn:
+                cur = await conn.execute('''
                     SELECT device_id, last_seen, status,
                            offline_timeout, expected_interval,
                            offline_alert_severity
                     FROM devices
-                ''').fetchall()
+                ''')
+                devices = await cur.fetchall()
 
                 for device in devices:
                     device_id = device['device_id']
@@ -270,9 +274,9 @@ def check_device_status():
 
                     if not last_seen:
                         if current_status != 'offline':
-                            conn.execute('UPDATE devices SET status = ? WHERE device_id = ?',
-                                         ('offline', device_id))
-                            _log_status_change(conn, device_id, 'offline', 'never_seen')
+                            await conn.execute('UPDATE devices SET status = ? WHERE device_id = ?',
+                                               ('offline', device_id))
+                            await _log_status_change(conn, device_id, 'offline', 'never_seen')
                         continue
 
                     last_seen_dt = parse_datetime(last_seen)
@@ -282,55 +286,59 @@ def check_device_status():
                     time_diff = (current_time - last_seen_dt).total_seconds()
 
                     if time_diff > timeout and current_status != 'offline':
-                        conn.execute('UPDATE devices SET status = ? WHERE device_id = ?',
-                                     ('offline', device_id))
-                        _log_status_change(conn, device_id, 'offline',
-                                           f'timeout_{int(time_diff)}s')
+                        await conn.execute('UPDATE devices SET status = ? WHERE device_id = ?',
+                                           ('offline', device_id))
+                        await _log_status_change(conn, device_id, 'offline',
+                                                 f'timeout_{int(time_diff)}s')
                         logger.info(f"Device {device_id} OFFLINE (timeout={timeout}s)")
                         to_offline.append((device_id, severity))
 
                     elif time_diff <= timeout and current_status == 'offline':
-                        conn.execute('UPDATE devices SET status = ? WHERE device_id = ?',
-                                     ('online', device_id))
-                        _log_status_change(conn, device_id, 'online', 'recovered')
+                        await conn.execute('UPDATE devices SET status = ? WHERE device_id = ?',
+                                           ('online', device_id))
+                        await _log_status_change(conn, device_id, 'online', 'recovered')
                         logger.info(f"Device {device_id} back online")
                         to_online.append(device_id)
 
                     elif current_status == 'offline' and time_diff > timeout:
-                        raised = conn.execute('''
+                        cur2 = await conn.execute('''
                             SELECT 1 FROM alert_history
                             WHERE device_id = ? AND alert_type = 'offline'
                               AND action IN ('created', 'acknowledged')
                               AND created_at >= ?
                             LIMIT 1
-                        ''', (device_id, last_seen)).fetchone()
+                        ''', (device_id, last_seen))
+                        raised = await cur2.fetchone()
                         if not raised:
                             to_offline.append((device_id, severity))
 
-                conn.commit()
+                await conn.commit()
 
             for device_id, severity in to_offline:
                 try:
-                    create_offline_alert(device_id, severity)
+                    await asyncio.to_thread(create_offline_alert, device_id, severity)
                 except Exception as e:
                     logger.error(f"Failed to create offline alert: {e}", exc_info=True)
 
             for device_id in to_online:
                 try:
-                    clear_offline_alert(device_id)
+                    await asyncio.to_thread(clear_offline_alert, device_id)
                 except Exception as e:
                     logger.error(f"Failed to clear offline alert: {e}", exc_info=True)
 
         except Exception as e:
             logger.error(f"Status checker error: {e}", exc_info=True)
 
-        record_heartbeat('status_check')
-        shutdown_event.wait(config.CHECK_INTERVAL)
+        await record_heartbeat('status_check')
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=config.CHECK_INTERVAL)
+        except asyncio.TimeoutError:
+            pass
 
     logger.info("Status checker stopped")
 
 
-def cleanup_old_data():
+async def cleanup_old_data():
     """Cleanup data lama di 4 tabel dengan retention berbeda."""
     config = get_config()
     retention_sensor = config.DATA_RETENTION_DAYS
@@ -343,9 +351,12 @@ def cleanup_old_data():
         f"status_log={retention_log}d)"
     )
 
-    if shutdown_event.wait(300):
+    try:
+        await asyncio.wait_for(shutdown_event.wait(), timeout=300)
         logger.info("Data cleanup stopped (early shutdown)")
         return
+    except asyncio.TimeoutError:
+        pass
 
     while not shutdown_event.is_set():
         try:
@@ -354,42 +365,42 @@ def cleanup_old_data():
             cutoff_history = now - timedelta(days=retention_history)
             cutoff_log = now - timedelta(days=retention_log)
 
-            with get_db_context() as conn:
+            async with get_db_context() as conn:
                 total_deleted = 0
                 results = {}
 
-                r = conn.execute(
+                cur = await conn.execute(
                     'DELETE FROM sensor_data WHERE timestamp < ?',
                     (cutoff_sensor,)
                 )
-                results['sensor_data'] = r.rowcount
-                total_deleted += r.rowcount
+                results['sensor_data'] = cur.rowcount
+                total_deleted += cur.rowcount
 
-                r = conn.execute(
+                cur = await conn.execute(
                     'DELETE FROM alert_history WHERE created_at < ?',
                     (cutoff_history,)
                 )
-                results['alert_history'] = r.rowcount
-                total_deleted += r.rowcount
+                results['alert_history'] = cur.rowcount
+                total_deleted += cur.rowcount
 
-                r = conn.execute(
+                cur = await conn.execute(
                     'DELETE FROM device_status_log WHERE created_at < ?',
                     (cutoff_log,)
                 )
-                results['device_status_log'] = r.rowcount
-                total_deleted += r.rowcount
+                results['device_status_log'] = cur.rowcount
+                total_deleted += cur.rowcount
 
-                r = conn.execute(
+                cur = await conn.execute(
                     '''DELETE FROM alerts
                        WHERE is_active = 0
                        AND updated_at IS NOT NULL
                        AND updated_at < ?''',
                     (cutoff_history,)
                 )
-                results['alerts_inactive'] = r.rowcount
-                total_deleted += r.rowcount
+                results['alerts_inactive'] = cur.rowcount
+                total_deleted += cur.rowcount
 
-                conn.commit()
+                await conn.commit()
 
                 if total_deleted > 0:
                     details = ', '.join(
@@ -399,19 +410,22 @@ def cleanup_old_data():
 
                 if total_deleted > 1000:
                     logger.info("Running VACUUM to reclaim space...")
-                    conn.execute('VACUUM')
+                    await conn.execute('VACUUM')
                     logger.info("VACUUM complete")
 
         except Exception as e:
             logger.error(f"Cleanup error: {e}", exc_info=True)
 
-        record_heartbeat('cleanup')
-        shutdown_event.wait(CLEANUP_INTERVAL)
+        await record_heartbeat('cleanup')
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=CLEANUP_INTERVAL)
+        except asyncio.TimeoutError:
+            pass
 
     logger.info("Data cleanup stopped")
 
 
-def create_backup_file(backup_dir, db_path, prefix='iot'):
+async def create_backup_file(backup_dir, db_path, prefix='iot'):
     """Buat backup konsisten (sqlite backup API). Nama file memakai waktu WIB.
 
     Return path file backup.
@@ -420,14 +434,9 @@ def create_backup_file(backup_dir, db_path, prefix='iot'):
     timestamp = get_wib_time().strftime('%Y%m%d_%H%M%S')
     backup_path = os.path.join(backup_dir, f'{prefix}_{timestamp}.db')
 
-    source = sqlite3.connect(db_path, timeout=30.0)
-    dest = sqlite3.connect(backup_path)
-    try:
-        with dest:
-            source.backup(dest)
-    finally:
-        dest.close()
-        source.close()
+    async with aiosqlite.connect(db_path, timeout=30.0) as source, \
+            aiosqlite.connect(backup_path) as dest:
+        await source.backup(dest)
     return backup_path
 
 
@@ -482,7 +491,7 @@ def seconds_until_next_backup(backup_dir, interval_hours, now=None):
     return max(0, int(newest + interval - now))
 
 
-def backup_database():
+async def backup_database():
     config = get_config()
     if not config.BACKUP_ENABLED:
         logger.info("Backup disabled")
@@ -492,9 +501,12 @@ def backup_database():
                 f"retention={config.BACKUP_RETENTION_DAYS}d, min_keep={config.BACKUP_MIN_KEEP})")
 
     # Jeda kecil agar boot tidak terbebani; setelah itu backup langsung bila jatuh tempo.
-    if shutdown_event.wait(BACKUP_STARTUP_DELAY):
+    try:
+        await asyncio.wait_for(shutdown_event.wait(), timeout=BACKUP_STARTUP_DELAY)
         logger.info("Backup task stopped (early shutdown)")
         return
+    except asyncio.TimeoutError:
+        pass
 
     first = True
     while not shutdown_event.is_set():
@@ -507,15 +519,18 @@ def backup_database():
                 logger.info(f"Backup terakhir masih baru, backup berikutnya {due_in}s lagi")
                 wait_s = due_in
             else:
-                backup_path = create_backup_file(config.BACKUP_DIR, config.DB_PATH)
+                backup_path = await create_backup_file(config.BACKUP_DIR, config.DB_PATH)
                 size_mb = os.path.getsize(backup_path) / (1024 * 1024)
                 logger.info(f"Backup created: {backup_path} ({size_mb:.2f} MB)")
                 prune_backups(config.BACKUP_DIR, config.BACKUP_RETENTION_DAYS,
                               config.BACKUP_MIN_KEEP)
         except Exception as e:
             logger.error(f"Backup failed: {e}", exc_info=True)
-        record_heartbeat('backup')
-        shutdown_event.wait(wait_s)
+        await record_heartbeat('backup')
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=wait_s)
+        except asyncio.TimeoutError:
+            pass
 
     logger.info("Backup task stopped")
 
@@ -537,25 +552,18 @@ def _acquire_background_lock():
     return False
 
 
-def _start_task_threads():
-    threads = []
-    for target, name in [
-        (check_device_status, 'status-checker'),
-        (cleanup_old_data, 'data-cleanup'),
-        (backup_database, 'db-backup'),
-    ]:
-        t = threading.Thread(target=target, name=name, daemon=True)
-        t.start()
-        threads.append(t)
-    logger.info(f"Started {len(threads)} background tasks (this worker owns the lock)")
-    return threads
+def _start_task_coros():
+    return [
+        asyncio.get_running_loop().create_task(check_device_status(), name='status-checker'),
+        asyncio.get_running_loop().create_task(cleanup_old_data(), name='data-cleanup'),
+        asyncio.get_running_loop().create_task(backup_database(), name='db-backup'),
+    ]
 
 
-def start_background_tasks():
-    global shutdown_event
-
-    with _bg_lock:
-        shutdown_event = threading.Event()
+async def start_background_tasks():
+    """Mulai 3 asyncio tasks (status checker, cleanup, backup) via lifespan FastAPI."""
+    global shutdown_event, _bg_tasks
+    shutdown_event = asyncio.Event()
 
     config = get_config()
     if not config.BACKGROUND_TASKS_ENABLED:
@@ -563,20 +571,32 @@ def start_background_tasks():
         return []
 
     if _acquire_background_lock():
-        return _start_task_threads()
+        _bg_tasks = _start_task_coros()
+        logger.info(f"Started {len(_bg_tasks)} background tasks (this worker owns the lock)")
+        return _bg_tasks
 
     # Lock dipegang worker lain: pantau, ambil alih bila pemegangnya mati.
-    stop_event = shutdown_event
-    watcher = threading.Thread(
-        target=wait_for_lock,
-        args=(_lock, stop_event, _start_task_threads),
-        name='bg-lock-watcher', daemon=True,
-    )
-    watcher.start()
-    return [watcher]
+    loop = asyncio.get_running_loop()
+
+    def _on_acquire():
+        _bg_tasks.extend(_start_task_coros())
+
+    watcher = loop.create_task(
+        wait_for_lock(_lock, shutdown_event, _on_acquire), name='bg-lock-watcher')
+    _bg_tasks = [watcher]
+    return _bg_tasks
 
 
-def stop_background_tasks():
+async def stop_background_tasks():
     logger.info("Stopping background tasks...")
-    shutdown_event.set()
+    if shutdown_event is not None:
+        shutdown_event.set()
+    for task in list(_bg_tasks):
+        task.cancel()
+    for task in list(_bg_tasks):
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+    _bg_tasks.clear()
     _lock.release()

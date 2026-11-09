@@ -285,7 +285,6 @@ Semua variabel dibaca dari file `.env` di root proyek. Nilai default ada di `app
 |----------|---------|-----------|
 | `HOST` | `0.0.0.0` | Bind address FastAPI |
 | `PORT` | `5000` | Port internal FastAPI/uvicorn (di Docker tetap 5000, Nginx meneruskan ke sini) |
-| `FLASK_ENV` | `production` | `production`, `development`, atau `testing` (legacy Flask; dipakai sebagai env mode) |
 | `DEBUG` | `False` | Mode debug FastAPI/uvicorn |
 | `NGINX_PORT` | `4455` | Port publik Nginx (HTTP). Dashboard dan firmware ESP32 mengakses lewat port ini; HTTPS di `443` |
 | `WEB_CONCURRENCY` | `2` | Jumlah worker Gunicorn (Docker). Dibaca Gunicorn dan dipakai untuk peringatan rate limit |
@@ -633,7 +632,6 @@ nexus-iot/
 │   ├── restore.py                # Restore database tertunda
 │   ├── schemas.py                # Schema Pydantic
 │   ├── utils.py                  # Helper: hash, lock, validator
-│   ├── validators.py             # Schema validasi
 │   └── workspace.py              # Scope multi-dashboard
 ├── .github/
 │   └── workflows/
@@ -1042,7 +1040,7 @@ User=nexus
 Group=nexus
 WorkingDirectory=/opt/nexus-iot
 Environment="PATH=/opt/nexus-iot/venv/bin"
-ExecStart=/opt/nexus-iot/venv/bin/gunicorn -w 4 -k gthread --threads 4 -b 127.0.0.1:5000 run:app
+ExecStart=/opt/nexus-iot/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:5000 run:app
 Restart=always
 RestartSec=5
 

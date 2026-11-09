@@ -1,9 +1,4 @@
-"""NEXUS IoT - FastAPI Pydantic v2 schemas (pengganti Marshmallow di app/validators.py).
-
-Field, batas, dan pesan error disamakan dengan validators.py agar perilaku
-endpoint sama dengan Flask. Bedanya: marshmallow ValidationError (400 +
-err.messages) menjadi pydantic ValidationError -> 400 + string ringkasan.
-"""
+"""NEXUS IoT - FastAPI Pydantic v2 schemas."""
 import math
 import re
 import typing
@@ -42,7 +37,7 @@ def validate_sensor_data(data):
 
 
 def _offline_timeout_before(value):
-    """Samakan OfflineTimeoutField marshmallow: '' -> None (mode otomatis)."""
+    """OfflineTimeoutField: '' -> None (mode otomatis)."""
     if value == '':
         return None
     return value

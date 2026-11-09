@@ -4,8 +4,8 @@
 WIFI_SSID = "GANTI_DENGAN_NAMA_WIFI"
 WIFI_PASSWORD = "GANTI_DENGAN_PASSWORD_WIFI"
 
-# URL endpoint data di server NEXUS (port publik default: 5008)
-API_URL = "http://GANTI_DENGAN_IP_SERVER:5008/api/v1/data"
+# URL endpoint data di server NEXUS (port publik default: 4455)
+API_URL = "http://GANTI_DENGAN_IP_SERVER:4455/api/v1/data"
 
 # ID device sama persis dengan yang terdaftar di dashboard
 DEVICE_ID = "GANTI_DENGAN_DEVICE_ID"

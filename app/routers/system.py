@@ -56,6 +56,11 @@ async def get_system_info(request: Request):
     wal_path = db_path + '-wal'
     if os.path.exists(wal_path):
         db_size += os.path.getsize(wal_path)
+    # get_background_status bisa sync atau async (dual) — await bila coroutine
+    import inspect as _insp
+    _bg = get_background_status(config)
+    if _insp.iscoroutine(_bg):
+        _bg = await _bg
     return JSONResponse({'success': True, 'info': {
         'version': '2.0.0',
         'device_count': device_count,
@@ -65,7 +70,7 @@ async def get_system_info(request: Request):
         'database_size_bytes': db_size,
         'database_size_mb': round(db_size / (1024 * 1024), 2),
         'data_retention_days': config.DATA_RETENTION_DAYS,
-        'background': get_background_status(config),
+        'background': _bg,
     }})
 
 

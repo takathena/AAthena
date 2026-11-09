@@ -96,7 +96,8 @@ async def receive_data(request: Request):
 
         if data['sensor_type'] != 'heartbeat':
             try:
-                await run_sync(check_and_create_alerts, data['device_id'], data['data'])
+                # check_and_create_alerts kini native async
+                await check_and_create_alerts(data['device_id'], data['data'])
             except Exception as e:
                 logger.error(f"Alert check failed: {e}", exc_info=True)
 

@@ -3,7 +3,7 @@
 Mencerminkan app/auth.py + app/workspace.py untuk FastAPI:
 - sesi dibaca dari request.session (SessionMiddleware starlette),
 - idle-timeout sama, polling API tidak memperpanjang last_activity,
-- scope dashboard dihitung tanpa Flask g/session agar bisa jalan di
+- scope dashboard dihitung tanpa g/session agar bisa jalan di
   async endpoint; DB sync dijalankan di thread via asyncio.to_thread.
 """
 import asyncio
@@ -43,7 +43,7 @@ async def run_sync(func, *args, **kwargs):
 
 
 async def safe_json(request: Request):
-    """request.get_json(silent=True) ala Flask: body invalid/kosong -> None."""
+    """Body JSON invalid/kosong -> None."""
     try:
         return await request.json()
     except Exception:
@@ -201,7 +201,7 @@ def purge_dashboard(conn, dashboard_id):
 
 
 # ==========================================
-# WORKSPACE SCOPE (tanpa Flask g/session)
+# WORKSPACE SCOPE (tanpa g/session)
 # ==========================================
 def role_allows(role, minimum):
     return bool(role) and ROLE_RANK.get(role, 0) >= ROLE_RANK[minimum]
@@ -359,7 +359,7 @@ def pick_write_dashboard(conn, scope, requested_id=None, minimum='editor'):
 
 
 def audit(conn, request: Request, user_id, username, action, detail=''):
-    """Cermin workspace.audit dengan ip/username eksplisit (tanpa Flask session)."""
+    """Cermin workspace.audit dengan ip/username eksplisit (tanpa session global)."""
     try:
         from app.database import get_wib_time
         conn.execute(

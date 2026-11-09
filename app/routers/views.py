@@ -219,7 +219,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
     config = get_config()
     if not (csrf_token or '').strip():
         return _tpl(request, 'login.html', error='Sesi tidak valid. Muat ulang halaman.')
-    # CSRF double-submit ala Flask: form token harus sama dengan cookie.
+    # CSRF double-submit: form token harus sama dengan cookie.
     if csrf_token.strip() != request.cookies.get('csrf_token', ''):
         logger.warning('CSRF validation failed (login)')
         return _tpl(request, 'login.html', error='Sesi tidak valid. Muat ulang halaman.')

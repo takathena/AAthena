@@ -74,7 +74,19 @@ def update_device_status(device_id, status, ip=None):
 
     if status == 'online':
         try:
-            clear_offline_alert(device_id)
+            # clear_offline_alert kini async (FastAPI native). Jalankan via asyncio.run
+            # bila belum ada loop berjalan (konteks sync/routers sweep).
+            import asyncio as _aio
+            _r = clear_offline_alert(device_id)
+            try:
+                loop = _aio.get_running_loop()  # type: ignore[attr-defined]
+            except RuntimeError:
+                _aio.run(_r)
+            else:
+                # ada loop berjalan -> scheduler ke thread
+                import concurrent.futures as _cf
+                with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+                    ex.submit(lambda: _aio.run(clear_offline_alert(device_id))).result(timeout=5)
         except Exception as e:
             logger.error(f"Failed to clear offline alert: {e}", exc_info=True)
 

@@ -2,14 +2,14 @@
 NEXUS IoT - Database Layer (connection)
 Schema version 19: multi-user + multi-dashboard (workspace) + analytics tabs + login_failures + audit_log.
 Logika migrasi ada di app/migrations.py; modul ini hanya koneksi + init runner.
+Native async FastAPI: get_db_context() async via aiosqlite (WAL), init_db() untuk lifespan.
 """
+import asyncio
 import os
 import sqlite3
-import threading
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-_local = threading.local()
+import aiosqlite
 
 WIB = timezone(timedelta(hours=7))
 
@@ -19,7 +19,7 @@ def get_wib_time():
     return datetime.now(WIB).replace(tzinfo=None)
 
 
-def _configure_connection(conn):
+def _configure_sync_connection(conn):
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA synchronous=NORMAL')
@@ -30,49 +30,84 @@ def _configure_connection(conn):
     return conn
 
 
+async def _configure_async_connection(conn):
+    conn.row_factory = aiosqlite.Row
+    await conn.execute('PRAGMA journal_mode=WAL')
+    await conn.execute('PRAGMA synchronous=NORMAL')
+    await conn.execute('PRAGMA foreign_keys=ON')
+    await conn.execute('PRAGMA busy_timeout=30000')
+    await conn.execute('PRAGMA temp_store=MEMORY')
+    await conn.execute('PRAGMA cache_size=-64000')
+    return conn
+
+
 def _get_db_path():
     from app.config import Config
     return Config.DB_PATH
 
 
-def get_db():
-    db = getattr(_local, 'db', None)
-    if db is None:
+class _DBContext:
+    """Dual context manager: `async with` (aiosqlite) dan `with` (sqlite3 legacy).
+
+    Jalur async adalah jalur utama FastAPI; jalur sync dipertahankan agar
+    caller lama yang masih sync (alerts, routers, tests lama) tetap jalan.
+    """
+
+    def __init__(self):
+        self._async_conn = None
+        self._sync_conn = None
+
+    def _sync_open(self):
         db_path = _get_db_path()
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        db = sqlite3.connect(
+        conn = sqlite3.connect(
             db_path,
             timeout=30.0,
             check_same_thread=False,
             isolation_level='DEFERRED',
         )
-        _configure_connection(db)
-        _local.db = db
-    return db
+        return _configure_sync_connection(conn)
+
+    async def _async_open(self):
+        db_path = _get_db_path()
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = await aiosqlite.connect(db_path, timeout=30.0, isolation_level='DEFERRED')
+        return await _configure_async_connection(conn)
+
+    def __enter__(self):
+        self._sync_conn = self._sync_open()
+        return self._sync_conn
+
+    def __exit__(self, exc_type, exc, tb):
+        if self._sync_conn is not None:
+            self._sync_conn.close()
+            self._sync_conn = None
+        return False
+
+    async def __aenter__(self):
+        self._async_conn = await self._async_open()
+        return self._async_conn
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self._async_conn is not None:
+            await self._async_conn.close()
+            self._async_conn = None
+        return False
+
+
+def get_db_context():
+    """Context manager koneksi DB. Gunakan `async with` di kode async."""
+    return _DBContext()
+
+
+def get_db():
+    """Kompatibilitas tes/FastAPI lama: return koneksi sync (untuk teardown)."""
+    return None
 
 
 def close_db(error=None):
-    db = getattr(_local, 'db', None)
-    if db is not None:
-        _local.db = None
-        db.close()
-
-
-@contextmanager
-def get_db_context():
-    db_path = _get_db_path()
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(
-        db_path,
-        timeout=30.0,
-        check_same_thread=False,
-        isolation_level='DEFERRED',
-    )
-    _configure_connection(conn)
-    try:
-        yield conn
-    finally:
-        conn.close()
+    """Kompatibilitas conftest/tests: no-op (async CM menutup per call)."""
+    return None
 
 
 SCHEMA_VERSION = 19
@@ -88,26 +123,39 @@ from app.migrations import (  # noqa: E402, F401
 )
 
 
-def init_db():
-    """Init DB dengan retry loop — aman untuk multi-worker Gunicorn."""
-    import time
+async def _init_db_async():
+    """Init DB dengan retry loop — aman untuk multi-worker."""
     from app.utils import process_lock
 
     max_wait = 60
-    start = time.time()
+    start = asyncio.get_running_loop().time()
 
     while True:
-        with process_lock('db-init', blocking=False) as got_lock:
+        async with process_lock('db-init', blocking=False) as got_lock:
             if got_lock:
-                _init_db_inner()
+                await asyncio.to_thread(_init_db_inner)
                 return
 
-        elapsed = time.time() - start
+        loop = asyncio.get_running_loop()
+        elapsed = loop.time() - start
         if elapsed > max_wait:
             raise RuntimeError(
                 f"DB init timeout after {max_wait}s — worker lain stuck?"
             )
-        time.sleep(1)
+        await asyncio.sleep(1)
+
+
+def init_db():
+    """Init DB untuk lifespan FastAPI.
+
+    - Di dalam event loop (lifespan): `await init_db()`
+    - Di luar event loop (thread sync / script): `init_db()` langsung jalan.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_init_db_async())
+    return _init_db_async()
 
 
 def _init_db_inner():
