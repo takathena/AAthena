@@ -684,7 +684,7 @@
             zoomControl: false, scrollWheelZoom: false, dragging: true,
             doubleClickZoom: false, boxZoom: false, keyboard: true, tap: false,
             attributionControl: true,
-        }).setView([-2.5489, 118.0149], 5);
+        }).setView([-7.2, 110.4], 7);
         el.closest('.bento-map-wrap')?.addEventListener('click', e => e.stopPropagation());
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapBento);
         registerMapInstance(state.mapBento);
@@ -695,13 +695,7 @@
 
     function fitBentoMap() {
         if (!state.mapBento) return;
-        const pts = state.devices
-            .filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0))
-            .map(d => [d.latitude, d.longitude]);
-        if (pts.length === 1) {
-            const [lat, lng] = pts[0];
-            state.mapBento.fitBounds(L.latLngBounds([lat - 0.05, lng - 0.05], [lat + 0.05, lng + 0.05]), { padding: [12, 12] });
-        } else if (pts.length > 1) state.mapBento.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
+        state.mapBento.setView([-7.2, 110.4], 7);
     }
 
     function refreshBento() {
