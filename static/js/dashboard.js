@@ -681,8 +681,8 @@
         }
         // Instans kedua interaktif (klik tile luar map tetap -> section map via data-goto)
         state.mapBento = L.map('mapBento', {
-            zoomControl: true, scrollWheelZoom: true, dragging: true,
-            doubleClickZoom: true, boxZoom: true, keyboard: true,
+            zoomControl: false, scrollWheelZoom: false, dragging: true,
+            doubleClickZoom: false, boxZoom: false, keyboard: true, tap: false,
             attributionControl: true,
         }).setView([-2.5489, 118.0149], 5);
         el.closest('.bento-map-wrap')?.addEventListener('click', e => e.stopPropagation());
@@ -702,12 +702,11 @@
             const [lat, lng] = pts[0];
             state.mapBento.fitBounds(L.latLngBounds([lat - 0.05, lng - 0.05], [lat + 0.05, lng + 0.05]), { padding: [12, 12] });
         } else if (pts.length > 1) state.mapBento.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
-        else state.mapBento.setView([-2.5489, 118.0149], 5);
     }
 
     function refreshBento() {
         initBentoMap().then(() => {}).catch(() => {});
-        if (state.mapBento) { loadMarkers(state.mapBento, false, 'bento'); fitBentoMap(); invalidateMap(state.mapBento); }
+        if (state.mapBento) { loadMarkers(state.mapBento, false, 'bento'); invalidateMap(state.mapBento); }
         const withLoc = state.devices.filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0));
         const sub = $('bentoMapSub');
         if (sub) sub.textContent = withLoc.length ? `${withLoc.length} dari ${state.devices.length} perangkat berkoordinat — klik untuk buka peta` : (state.devices.length ? 'Belum ada perangkat berkoordinat' : 'Belum ada perangkat');
