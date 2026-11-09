@@ -910,6 +910,8 @@ Interval: `BACKUP_INTERVAL_HOURS` jam. Jeda boot: 30 detik, lalu backup langsung
 
 `POST /api/v1/system/restore` (admin) **tidak menimpa database yang sedang berjalan**. Endpoint memverifikasi file backup, membuat `pre-restore-*.db`, lalu menyiapkan `<DB_PATH>.restore-pending` dan penanda `<DB_PATH>.restore-marker`. Restore diterapkan saat proses **start berikutnya**, sebelum koneksi database dibuka: `-wal`/`-shm` dihapus, database diganti, penanda dibuang. Hentikan semua worker lalu start ulang (`docker compose restart nexus-iot`). Jika database masih dipakai proses lain, penerapan ditunda sampai start berikutnya dan dicatat di log.
 
+> **CATATAN RESTORE (v2.0.0):** backup DB lama versi v18 (masih ada tabel `attendance`/`cardholders`) bila di-restore akan **dimigrasi otomatis ke v19** (`DROP TABLE attendance`/`cardholders`) saat aplikasi start — aman, user tidak perlu migrasi manual. Data lain (devices, sensor, alerts, dashboards, users) ikut ter-restore apa adanya.
+
 ### Status dan Heartbeat
 
 Setiap task mencatat heartbeat (tabel `user_settings`, kunci `bg_hb_*`) yang ditampilkan di `/api/v1/system/info` → `background`. Sebuah task ditandai `stale` bila heartbeat terakhirnya lebih tua dari 3× intervalnya.
@@ -998,7 +1000,7 @@ docker compose ps
 
 Akses publik di port `NGINX_PORT` (default 5008). Port Flask tidak ter-expose ke host, hanya ke network internal Docker.
 
-**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container Flask (Nginx tetap menyajikan `./static`). Perubahan kode butuh build ulang:
+**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container Flask (Nginx tetap menyajikan `./static`). Rilis v2.0.0 diterbitkan sebagai image `nexus-refactor-nexus-iot:2.0.0` (tag Docker dari `nexus-refactor-nexus-iot:latest`, sesuai git tag `v2.0.0`). Perubahan kode butuh build ulang:
 
 ```bash
 git pull

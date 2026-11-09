@@ -1,8 +1,12 @@
 # Changelog
 
-## V2.0.0
+## V2.0.0 — 2026-11-09
 
-Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route `/api/v1/*` dipertahankan), frontend lebih ringan (lazy-load Chart.js/Leaflet, gabung CSS), dan hapus fitur absensi (route `/cardholders`, `/attendance/*`, tabel `attendance`+`cardholders`, 5 chat tools, menu & section absensi). Schema naik ke v19 (`DROP TABLE attendance/cardholders`).
+Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route `/api/v1/*` dipertahankan), hapus fitur absensi v19 (route `/cardholders`, `/attendance/*`, tabel `attendance`+`cardholders`, 5 chat tools, menu & section absensi; `DROP TABLE attendance/cardholders`), frontend ringan (lazy-load Chart.js/Leaflet, gabung CSS), port publik 4455/443 via Nginx, DB fresh (database/iot.db mulai dari nol, tanpa migrasi data lama).
+
+- **Tanggal rilis:** 2026-11-09. Port publik Nginx `4455` + `443` (NAT `4455->443`, `${NGINX_PORT:-4455}:80` + `443:80`); DB fresh mulai dari schema v19.
+- **Restore DB lama:** backup v18 (masih ada `attendance`) bila di-restore dimigrasi otomatis ke v19 (`DROP attendance/cardholders`) saat start berikutnya — aman, user tidak perlu migrasi manual (lihat README § Restore Database).
+- **Rilis image:** `nexus-refactor-nexus-iot:2.0.0` (tag Docker: `docker tag nexus-refactor-nexus-iot:latest nexus-refactor-nexus-iot:2.0.0`), sesuai git tag `v2.0.0`.
 
 ## Unreleased — Refactor bertahap (fondasi)
 
