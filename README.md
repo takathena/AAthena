@@ -217,8 +217,8 @@ Alur request:
 ### Docker (Direkomendasikan)
 
 ```bash
-git clone https://github.com/takathena/nexus-iot.git
-cd nexus-iot
+git clone https://github.com/takathena/AAthena.git
+cd AAthena
 
 cp .env.example .env
 nano .env
@@ -252,8 +252,8 @@ docker compose logs -f nexus-iot
 ### Manual (Development)
 
 ```bash
-git clone https://github.com/takathena/nexus-iot.git
-cd nexus-iot
+git clone https://github.com/takathena/AAthena.git
+cd AAthena
 
 make dev
 nano .env
@@ -613,7 +613,7 @@ Filter untuk `/api/v1/alerts/all`:
 ## Struktur Proyek
 
 ```
-nexus-iot/
+AAthena/
 ├── app/                          # Package aplikasi FastAPI
 │   ├── __init__.py               # Shim versi (dari app/main.py)
 │   ├── main.py                   # App factory FastAPI: CORS, CSP/HSTS, Session, CSRF, error handlers, /health
@@ -980,8 +980,8 @@ Data dihapus oleh background task cleanup. Frekuensi penghapusan 24 jam. Timezon
 Setup minimal:
 
 ```bash
-git clone https://github.com/takathena/nexus-iot.git
-cd nexus-iot
+git clone https://github.com/takathena/AAthena.git
+cd AAthena
 
 cp .env.example .env
 nano .env
@@ -1020,7 +1020,7 @@ sudo mkdir -p /opt/nexus-iot
 sudo chown nexus:nexus /opt/nexus-iot
 
 cd /opt/nexus-iot
-sudo -u nexus git clone https://github.com/takathena/nexus-iot.git .
+sudo -u nexus git clone https://github.com/takathena/AAthena.git .
 sudo -u nexus python3 -m venv venv
 sudo -u nexus venv/bin/pip install -r requirements.txt
 sudo -u nexus cp .env.example .env
