@@ -278,7 +278,7 @@
             chart.setOption({
                 animation: false,
                 grid: { left: 36, right: 8, top: 8, bottom: 36, containLabel: false },
-                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true },
+                tooltip: { trigger: 'item', confine: true },
                 legend: { bottom: 0, textStyle: { color: legendColor, fontSize: 10, fontFamily: font }, itemWidth: 10, itemHeight: 10 },
                 xAxis: { type: 'category', data: displayLabels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: labelColor, fontSize: 10, fontFamily: font, interval: 'auto' } },
                 yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: gridColor } }, axisLabel: { color: labelColor, fontSize: 10, fontFamily: font } },

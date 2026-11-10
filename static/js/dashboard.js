@@ -639,7 +639,7 @@
             chart.setOption({
                 animation:false,
                 grid:{left:8,right:8,top:26,bottom:4,containLabel:true},
-                tooltip:{trigger:'axis',confine:true,appendToBody:true,axisPointer:{type:'shadow'}},
+                tooltip:{trigger:'item',confine:true,appendToBody:true},
                 legend:{top:0,left:0,textStyle:{color:colors.legendColor,fontSize:10,fontFamily:CHART_FONT},itemWidth:10,itemHeight:10},
                 xAxis:{type:'time',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{show:false},axisLine:{show:false},axisTick:{show:false}},
                 yAxis:{type:'value',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{lineStyle:{color:colors.gridColor}}},
@@ -2087,7 +2087,7 @@
         chart.setOption({
             animation:false, textStyle:{fontFamily:font},
             grid:{left:8,right:12,top:28,bottom:8,containLabel:true},
-            tooltip:{trigger:'axis',confine:true,appendToBody:true},
+            tooltip:{trigger:'item',confine:true,appendToBody:true},
             legend:{type:'scroll', top:0, textStyle:{color:colors.legendColor,fontSize:10}, pageIconSize:10, pageTextStyle:{color:colors.legendColor}},
             xAxis:{type:'time', splitLine:{show:false}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font, hideOverlap:true}},
             yAxis:{type:'value', splitLine:{lineStyle:{color:colors.gridColor}}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font}},

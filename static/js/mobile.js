@@ -1015,7 +1015,7 @@ function renderChart(ch, hist){
     });
   });
   if(!series.length){ chart.clear(); return; }
-  chart.setOption({...base,grid:{left:6,right:8,top:26,bottom:4,containLabel:true},tooltip:{trigger:'axis',confine:true,appendToBody:true},legend:{type:'scroll',top:0,textStyle:{color:legendC,fontSize:10}},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9,hideOverlap:true}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
+  chart.setOption({...base,grid:{left:6,right:8,top:26,bottom:4,containLabel:true},tooltip:{trigger:'item',confine:true,appendToBody:true},legend:{type:'scroll',top:0,textStyle:{color:legendC,fontSize:10}},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9,hideOverlap:true}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
 }
 
 
@@ -1425,7 +1425,7 @@ async function loadMobileTrend(){
     chart.setOption({
       animation:false,
       grid:{left:34,right:8,top:8,bottom:34},
-      tooltip:{trigger:'axis',axisPointer:{type:'shadow'},confine:true,appendToBody:true},
+      tooltip:{trigger:'item',confine:true,appendToBody:true},
       legend:{bottom:0,textStyle:{color:legendC,fontSize:10},itemWidth:10,itemHeight:10},
       xAxis:{type:'category',data:displayLabels,axisLine:{show:false},axisTick:{show:false},axisLabel:{color:labelC,fontSize:9}},
       yAxis:{type:'value',minInterval:1,splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},
