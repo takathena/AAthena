@@ -821,8 +821,8 @@ async function deleteTab(){
   else alert(d.error || 'Gagal');
 }
 
-const toChart = t => ({line_chart:'line', bar_chart:'bar', area_chart:'area', doughnut_chart:'doughnut', pie_chart:'pie', polar_area:'polarArea', radar_chart:'radar', horizontal_bar:'horizontalBar', stacked_bar:'stackedBar', stacked_area:'stackedArea', scatter_chart:'scatter', half_doughnut:'halfDoughnut', pie_dataset:'pieDataset'}[t] || 'line');
-const toWidget = t => ({line:'line_chart', bar:'bar_chart', area:'area_chart', doughnut:'doughnut_chart', pie:'pie_chart', polarArea:'polar_area', radar:'radar_chart', horizontalBar:'horizontal_bar', stackedBar:'stacked_bar', stackedArea:'stacked_area', scatter:'scatter_chart', halfDoughnut:'half_doughnut', pieDataset:'pie_dataset'}[t] || 'line_chart');
+const toChart = t => ({line_chart:'line', bar_chart:'bar', area_chart:'area', doughnut_chart:'doughnut', pie_chart:'pie', polar_area:'polarArea', radar_chart:'radar', horizontal_bar:'horizontalBar', stacked_bar:'stackedBar', stacked_area:'stackedArea', half_doughnut:'halfDoughnut'}[t] || 'line');
+const toWidget = t => ({line:'line_chart', bar:'bar_chart', area:'area_chart', doughnut:'doughnut_chart', pie:'pie_chart', polarArea:'polar_area', radar:'radar_chart', horizontalBar:'horizontal_bar', stackedBar:'stacked_bar', stackedArea:'stacked_area', halfDoughnut:'half_doughnut'}[t] || 'line_chart');
 
 async function loadCharts(){
   const c = document.getElementById('chartsList'); if(!c) return;
@@ -914,7 +914,7 @@ function renderChart(ch, hist){
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-2').trim() || (isLight?'#fff':'#141414');
   const font = CHART_FONT;
   const activeKeys = Object.entries(ch.showData || {}).filter(([k,v]) => v).map(([k]) => k);
-  const isGauge = ['doughnut','pie','polarArea','radar','halfDoughnut','pieDataset'].includes(ch.chartType);
+  const isGauge = ['doughnut','pie','polarArea','radar','halfDoughnut'].includes(ch.chartType);
   const base = { animation:false, textStyle:{fontFamily:font,color:labelC} };
   const cutoff = Date.now() - timeMinutes*60*1000;
 
@@ -937,14 +937,8 @@ function renderChart(ch, hist){
     if(ch.chartType==='doughnut'||ch.chartType==='halfDoughnut'){
       const isHalf = ch.chartType==='halfDoughnut';
       opt = {...base, tooltip:{trigger:'item'}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:isHalf?['45%','80%']:['40%','70%'],center:isHalf?['50%','72%']:['50%','45%'],startAngle:isHalf?180:90,endAngle:isHalf?360:-270,padAngle:2,itemStyle:{borderRadius:8,borderColor:bg,borderWidth:2},data,label:{show:false}}]};
-    } else if(ch.chartType==='pie'||ch.chartType==='pieDataset'){
-      const legend = {type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}};
-      if(ch.chartType==='pieDataset'){
-        const source=[['name','value']].concat(labels.map((n,i)=>[n,vals[i]]));
-        opt = {...base, tooltip:{trigger:'item'}, legend, dataset:{source}, series:[{type:'pie',radius:'65%',encode:{itemName:'name',value:'value'},label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
-      } else {
-        opt = {...base, tooltip:{trigger:'item'}, legend, series:[{type:'pie',radius:'65%',data,label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
-      }
+    } else if(ch.chartType==='pie'){
+      opt = {...base, tooltip:{trigger:'item'}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:'65%',data,label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
     } else if(ch.chartType==='polarArea'){
       opt = {...base, polar:{radius:'65%'}, angleAxis:{type:'category',data:labels,axisLabel:{color:labelC,fontSize:9}}, radiusAxis:{axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}, series:[{type:'bar',data:vals.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{}};
     } else {
@@ -990,22 +984,6 @@ function renderChart(ch, hist){
     return;
   }
 
-  // Scatter X-Y
-  if(ch.chartType==='scatter'){
-    if(activeKeys.length<2){ chart.clear(); const w=document.getElementById(ch.id); if(w&&!w.querySelector('.empty')) w.innerHTML+='<div class="empty" style="padding:12px;"><div class="empty-title">Pilih 2 jenis data (X dan Y)</div></div>'; return; }
-    const kx=activeKeys[0], ky=activeKeys[1];
-    const ix=DATA_KEYS[kx]||{label:kx,unit:''}, iy=DATA_KEYS[ky]||{label:ky,unit:''};
-    const series=[]; let ci=0;
-    ch.deviceIds.forEach(did=>{
-      const h=hist[did]||[]; if(!h.length) return; const dn=devices.find(x=>x.device_id===did)?.device_name||did; const pts=[];
-      h.forEach(item=>{ const d=parseTs(item.timestamp); if(!d||d.getTime()<cutoff) return; const o=item.data||{}; const vx=o[kx], vy=o[ky]; if(typeof vx==='number'&&typeof vy==='number') pts.push([vx,vy]); });
-      if(!pts.length) return; const color=COLORS[ci%COLORS.length]; ci++;
-      series.push({name:ch.deviceIds.length>1?dn:`${ix.label} vs ${iy.label}`,type:'scatter',data:pts.slice(-300),symbolSize:7,itemStyle:{color,opacity:0.75}});
-    });
-    if(!series.length){ chart.clear(); return; }
-    chart.setOption({...base,grid:{left:46,right:12,top:12,bottom:34},tooltip:{trigger:'item'},legend:{textStyle:{color:legendC,fontSize:10},type:'scroll'},xAxis:{type:'value',name:`${ix.label}`,nameLocation:'middle',nameGap:22,nameTextStyle:{color:labelC,fontSize:9},axisLabel:{color:labelC,fontSize:9},splitLine:{lineStyle:{color:gridC}}},yAxis:{type:'value',name:`${iy.label}`,nameTextStyle:{color:labelC,fontSize:9},axisLabel:{color:labelC,fontSize:9},splitLine:{lineStyle:{color:gridC}}},series},{notMerge:true,lazyUpdate:true});
-    return;
-  }
 
   // Time-series
   const series=[]; let ci=0;

@@ -1939,7 +1939,7 @@
         const colors = getChartColors();
         const deviceIds = config.deviceIds || [];
         const activeKeys = Object.entries(config.showData || {}).filter(([_, v]) => v).map(([k]) => k);
-        const isGauge = ['doughnut', 'pie', 'polarArea', 'radar', 'halfDoughnut', 'pieDataset'].includes(config.chartType);
+        const isGauge = ['doughnut', 'pie', 'polarArea', 'radar', 'halfDoughnut'].includes(config.chartType);
         const font = CHART_FONT;
         const chart = ensureEChart(plotEl);
         if(!chart) return;
@@ -1982,20 +1982,8 @@
                         data, label:{show:false}, emphasis:{itemStyle:{shadowBlur:8}}
                     }]
                 };
-            } else if (config.chartType === 'pie' || config.chartType === 'pieDataset') {
-                const legend = { type:'scroll', orient:'vertical', right:4, top:'center', textStyle:{color:colors.legendColor,fontSize:10} };
-                if (config.chartType === 'pieDataset') {
-                    const source = [['name','value']].concat(gaugeLabels.map((n,i)=>[n,gaugeValues[i]]));
-                    opt = {
-                        animation:false, textStyle:{fontFamily:font},
-                        tooltip:{trigger:'item'},
-                        legend,
-                        dataset:{ source },
-                        series:[{ type:'pie', radius:'65%', center:['35%','50%'], encode:{itemName:'name', value:'value'}, label:{show:false}, emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1} }]
-                    };
-                } else {
-                    opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item'}, legend, series:[{type:'pie',radius:'65%',center:['35%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1}}] };
-                }
+            } else if (config.chartType === 'pie') {
+                opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item'}, legend:{ type:'scroll', orient:'vertical', right:4, top:'center', textStyle:{color:colors.legendColor,fontSize:10} }, series:[{type:'pie',radius:'65%',center:['35%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1}}] };
             } else if (config.chartType === 'polarArea') {
                 opt = { animation:false, textStyle:{fontFamily:font}, polar:{radius:'65%'}, angleAxis:{type:'category',data:gaugeLabels,axisLabel:{color:colors.labelColor,fontSize:9}}, radiusAxis:{axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}}, series:[{type:'bar',data:gaugeValues.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{} };
             } else { // radar (unchanged)
@@ -2068,42 +2056,6 @@
             return;
         }
 
-        // Scatter X–Y distribution (2 sensor keys)
-        if (config.chartType === 'scatter') {
-            if (activeKeys.length < 2) { showChartEmpty(config.id, 'Pilih 2 jenis data (X dan Y) untuk scatter'); return; }
-            const kx = activeKeys[0], ky = activeKeys[1];
-            const ix = DATA_KEYS[kx] || {label:kx,unit:''}, iy = DATA_KEYS[ky] || {label:ky,unit:''};
-            const series = [];
-            let ci = 0;
-            deviceIds.forEach(did => {
-                const hist = historyByDevice[did] || [];
-                if (!hist.length) return;
-                const dname = state.devices.find(d => d.device_id === did)?.device_name || did;
-                const pts = [];
-                hist.forEach(item => {
-                    const ts = item.timestamp; if (tsSet && !tsSet.has(ts)){} // use range filter
-                    const d = parseDate(ts); if(!d || d.getTime() < cutoff) return;
-                    const obj = item.data || {};
-                    const vx = obj[kx], vy = obj[ky];
-                    if (typeof vx === 'number' && typeof vy === 'number') pts.push([vx, vy]);
-                });
-                if (!pts.length) return;
-                const color = CHART_COLORS[ci % CHART_COLORS.length]; ci++;
-                series.push({ name: deviceIds.length>1?dname:`${ix.label} vs ${iy.label}`, type:'scatter', data: pts.slice(-400), symbolSize: 8, itemStyle:{color, opacity:0.75}, emphasis:{focus:'series'} });
-            });
-            if (!series.length) { showChartEmpty(config.id, 'Tidak ada pasangan data X–Y yang cocok'); return; }
-            chart.setOption({
-                animation:false, textStyle:{fontFamily:font},
-                grid:{left:50,right:16,top:16,bottom:36},
-                tooltip:{trigger:'item', formatter:(p)=>`${p.seriesName}<br/>${ix.label}: ${p.value[0]} ${ix.unit||''}<br/>${iy.label}: ${p.value[1]} ${iy.unit||''}`},
-                legend:{textStyle:{color:colors.legendColor,fontSize:10},type:'scroll'},
-                xAxis:{type:'value',name:`${ix.label}${ix.unit?' ('+ix.unit+')':''}`,nameLocation:'middle',nameGap:24,nameTextStyle:{color:colors.labelColor},axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
-                yAxis:{type:'value',name:`${iy.label}${iy.unit?' ('+iy.unit+')':''}`,nameTextStyle:{color:colors.labelColor},axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
-                series,
-            }, {notMerge:true,lazyUpdate:true});
-            config.chartInstance = plotEl;
-            return;
-        }
 
         // Time-series: line (smoothed), area (gradient stacked), stackedArea (gradient stacked), stackedBar (unchanged)
         const series = [];
