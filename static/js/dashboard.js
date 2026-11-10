@@ -632,14 +632,14 @@
                     const c = byTs[ts][key];
                     return [isNaN(ms)?null:ms, c ? +(c.sum/c.n).toFixed(2) : null];
                 }).filter(p => p[0]!=null);
-                return { name: info.label, type:'line', data, showSymbol:false, smooth:true, sampling:'lttb', connectNulls:true, lineStyle:{width:2.5,color}, itemStyle:{color}, areaStyle:{color:color+'22'}, emphasis:{focus:'series'} };
+                return { name: info.label, type:'bar', stack:'bento', data, barMaxWidth:18, itemStyle:{color}, emphasis:{focus:'series'} };
             });
             const chart = ensureEChart(plotEl);
             if(!chart) return;
             chart.setOption({
                 animation:false,
                 grid:{left:34,right:8,top:24,bottom:24},
-                tooltip:{trigger:'axis',confine:true},
+                tooltip:{trigger:'axis',confine:true, axisPointer:{type:'shadow'}},
                 legend:{top:0,left:0,textStyle:{color:colors.legendColor,fontSize:10,fontFamily:CHART_FONT},itemWidth:10,itemHeight:10},
                 xAxis:{type:'time',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{show:false},axisLine:{show:false},axisTick:{show:false}},
                 yAxis:{type:'value',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{lineStyle:{color:colors.gridColor}}},
