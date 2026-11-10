@@ -56,7 +56,7 @@ Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn mul
 ### Monitoring dan Visualisasi
 
 - Dashboard real-time dengan auto-refresh 30 detik, kartu metrik, dan activity feed
-- Peta interaktif berbasis Leaflet dengan marker cluster, filter status, dan pencarian
+- Peta interaktif berbasis Leaflet dengan filter status dan pencarian
 - Editor lokasi device drag-and-drop langsung di peta
 - Analitik multi-chart: line, bar, area, doughnut, pie, polar area, radar, horizontal bar, stacked bar, dan stacked area
 - Layout chart bebas: drag dari header, resize dari sudut kanan bawah, resize tinggi kanvas dari handle bawah
@@ -125,7 +125,6 @@ Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn mul
 | Event Signals | blinker | 1.9.0 |
 | Chart Library | Chart.js | 4.4.0 |
 | Peta | Leaflet | 1.9.4 |
-| Marker Cluster | Leaflet.markercluster | 1.5.3 |
 | Drag / Resize | interact.js | 1.10.27 |
 | Icons | Font Awesome Free | 6.5.1 |
 | Font | Geist / Geist Mono | Google Fonts |
@@ -491,16 +490,12 @@ curl -X POST http://localhost:4455/api/v1/data   # via Nginx; dev langsung ke Fa
 
 | Key | Label | Unit | Rentang Default (healthy) |
 |-----|-------|------|---------------------------|
-| `temperature` | Suhu | °C | 6 - 28 |
+| `temperature` | Suhu | °C | 6 - 28 (bisa di-override env) |
 | `humidity` | Kelembaban | % | 20 - 90 |
 | `gas_level` | Level Gas | ppm | 0 - 70 |
-| `moisture` | Kelembaban Tanah | % | 40 - 70 |
-| `lux` | Cahaya | lux | 100 - 800 |
-| `co2` | CO2 | ppm | 300 - 1000 |
-| `smoke` | Asap | ppm | 0 - 200 |
-| `voc` | VOC | ppb | 0 - 250 |
-| `air_quality` | Kualitas Udara | AQI | 0 - 100 |
-| `motion` | Gerakan | - | 0 - 0 |
+| `smoke` | Asap | ppm | 0 - 50 |
+
+Sensor lain dengan key valid tetap bisa dikirim/disimpan, tapi tanpa metadata/preset UI khusus.
 
 ---
 

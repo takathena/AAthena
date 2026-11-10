@@ -10,156 +10,154 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/device-detail.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/device-detail_desktop.css') }}">
 </head>
 <body>
-<a class="skip-link" id="skipLink" href="#main-content" style="position:absolute;left:-9999px;top:0;background:#fff;color:#000;padding:8px 14px;z-index:9999;border-radius:0 0 8px 0">Lewati ke konten utama</a>
+<a class="skip-link" href="#main-content" style="position:absolute;left:-9999px;top:0;background:#fff;color:#000;padding:8px 14px;z-index:9999;border-radius:0 0 8px 0">Lewati ke konten utama</a>
 
-<header class="hdr">
-  <button class="hdr-back" id="btnBack">
-    <i class="fa-solid fa-chevron-left"></i>
-    <span>Kembali</span>
-  </button>
-  <div class="hdr-actions">
-    <button class="hdr-btn" data-click="toggleTheme" aria-label="Toggle Theme">
+<header class="dd-topbar">
+  <div class="dd-topbar-left">
+    <button class="dd-back" id="btnBack" title="Kembali">
+      <i class="fa-solid fa-chevron-left"></i>
+      <span>Kembali</span>
+    </button>
+    <div class="dd-crumb">
+      <span class="dd-crumb-muted">Perangkat</span>
+      <i class="fa-solid fa-chevron-right"></i>
+      <span id="deviceIdDisplay" class="dd-crumb-id">{{ device_id }}</span>
+    </div>
+  </div>
+  <div class="dd-topbar-right">
+    <button class="dd-icon-btn" data-click="toggleTheme" aria-label="Toggle Theme">
       <i class="fa-solid fa-moon" id="themeIcon"></i>
     </button>
-    <div class="hdr-export-wrap">
-      <button class="hdr-btn" id="btnExport" aria-label="Export Data" title="Export Data">
+    <div class="dd-export-wrap">
+      <button class="dd-icon-btn" id="btnExport" aria-label="Export Data" title="Export Data">
         <i class="fa-solid fa-download"></i>
       </button>
       <div class="hdr-export-menu" id="exportMenu">
-        <button class="hdr-export-item" data-format="csv" data-hours="24">
-          <i class="fa-solid fa-file-csv" style="color:var(--accent-ok);"></i>
-          <span>CSV · 24 jam</span>
-        </button>
-        <button class="hdr-export-item" data-format="csv" data-hours="168">
-          <i class="fa-solid fa-file-csv" style="color:var(--accent-ok);"></i>
-          <span>CSV · 7 hari</span>
-        </button>
-        <button class="hdr-export-item" data-format="json" data-hours="24">
-          <i class="fa-solid fa-file-code" style="color:var(--accent-warn);"></i>
-          <span>JSON · 24 jam</span>
-        </button>
-        <button class="hdr-export-item" data-format="json" data-hours="168">
-          <i class="fa-solid fa-file-code" style="color:var(--accent-warn);"></i>
-          <span>JSON · 7 hari</span>
-        </button>
+        <button class="hdr-export-item" data-format="csv" data-hours="24"><i class="fa-solid fa-file-csv" style="color:var(--accent-ok);"></i><span>CSV · 24 jam</span></button>
+        <button class="hdr-export-item" data-format="csv" data-hours="168"><i class="fa-solid fa-file-csv" style="color:var(--accent-ok);"></i><span>CSV · 7 hari</span></button>
+        <button class="hdr-export-item" data-format="json" data-hours="24"><i class="fa-solid fa-file-code" style="color:var(--accent-warn);"></i><span>JSON · 24 jam</span></button>
+        <button class="hdr-export-item" data-format="json" data-hours="168"><i class="fa-solid fa-file-code" style="color:var(--accent-warn);"></i><span>JSON · 7 hari</span></button>
       </div>
     </div>
   </div>
 </header>
 
-<main id="main-content" tabindex="-1">
-
-  <div class="device-hero">
-    <div class="device-icon"><i class="fa-solid fa-microchip"></i></div>
-    <div class="device-title">
-      <h1 id="deviceName">Memuat...</h1>
-      <div class="device-id" id="deviceIdDisplay">{{ device_id }}</div>
-    </div>
-  </div>
-
-  <div class="status-bar" id="statusBar">
-    <span class="status-pulse offline" id="statusPulse"></span>
-    <div class="status-info">
-      <div class="status-label" id="statusLabel">Memuat...</div>
-      <div class="status-sub" id="statusSub">—</div>
-    </div>
-    <span class="live-badge" id="liveBadge" style="display:none;">Live</span>
-  </div>
-
-  <div class="group" id="alertGroup">
-    <div class="group-header">
-      <div class="group-title"><i class="fa-solid fa-bell"></i> Alert Aktif</div>
-      <span class="group-meta" id="alertCount"></span>
-    </div>
-    <div class="group-body" id="alertBody">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
-
-  <div class="group" id="chartGroup">
-    <div class="group-header">
-      <div class="group-title"><i class="fa-solid fa-chart-line"></i> Grafik History</div>
-      <div class="chart-range-picker" id="chartRangePicker">
-        <button class="chart-range-btn" data-hours="1">1j</button>
-        <button class="chart-range-btn" data-hours="3">3j</button>
-        <button class="chart-range-btn" data-hours="6">6j</button>
-        <button class="chart-range-btn active" data-hours="24">24j</button>
-        <button class="chart-range-btn" data-hours="168">7h</button>
+<main id="main-content" class="dd-main" tabindex="-1">
+  <section class="dd-hero-card dd-card">
+    <div class="dd-hero-left">
+      <div class="device-icon dd-hero-icon"><i class="fa-solid fa-microchip"></i></div>
+      <div class="device-title">
+        <h1 id="deviceName">Memuat...</h1>
+        <div class="device-id dd-hero-id">{{ device_id }}</div>
       </div>
     </div>
-    <div class="group-body" id="chartBody">
-      <div class="chart-canvas-wrap">
-        <canvas id="historyChartCanvas"></canvas>
+    <div class="dd-hero-right">
+      <div class="status-bar dd-status-pill" id="statusBar">
+        <span class="status-pulse offline" id="statusPulse"></span>
+        <div class="status-info">
+          <div class="status-label" id="statusLabel">Memuat...</div>
+          <div class="status-sub" id="statusSub">—</div>
+        </div>
+        <span class="live-badge" id="liveBadge" style="display:none;">Live</span>
       </div>
-      <div class="chart-legend" id="chartLegend"></div>
     </div>
-  </div>
+  </section>
 
-  <div class="group">
-    <div class="group-header">
-      <div class="group-title"><i class="fa-solid fa-circle-info"></i> Informasi</div>
-    </div>
-    <div class="group-body" id="infoBody">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
+  <div class="dd-grid">
+    <section class="dd-card dd-alerts group" id="alertGroup">
+      <div class="group-header">
+        <div class="group-title"><i class="fa-solid fa-bell"></i> Alert Aktif</div>
+        <span class="group-meta" id="alertCount"></span>
+      </div>
+      <div class="group-body" id="alertBody">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </section>
 
-  <div class="group">
-    <div class="group-header">
-      <div class="group-title"><i class="fa-solid fa-wave-square"></i> Data Sensor</div>
-      <span class="group-meta" id="sensorMeta"></span>
-    </div>
-    <div class="group-body" id="sensorBody">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
+    <section class="dd-card dd-chart group" id="chartGroup">
+      <div class="group-header">
+        <div class="group-title"><i class="fa-solid fa-chart-line"></i> Grafik History</div>
+        <div class="chart-range-picker" id="chartRangePicker">
+          <button class="chart-range-btn" data-hours="1">1j</button>
+          <button class="chart-range-btn" data-hours="3">3j</button>
+          <button class="chart-range-btn" data-hours="6">6j</button>
+          <button class="chart-range-btn active" data-hours="24">24j</button>
+          <button class="chart-range-btn" data-hours="168">7h</button>
+        </div>
+      </div>
+      <div class="group-body dd-chart-body" id="chartBody">
+        <div class="chart-canvas-wrap dd-chart-canvas">
+          <canvas id="historyChartCanvas"></canvas>
+        </div>
+        <div class="chart-legend" id="chartLegend"></div>
+      </div>
+    </section>
 
-  <div class="group" id="statusHistoryGroup">
-    <div class="group-header">
-      <div class="group-title"><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Status</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="group-meta" id="statusHistoryMeta"></span>
-        <button class="group-action" id="statusHistoryRefreshBtn" title="Refresh" aria-label="Refresh">
-          <i class="fa-solid fa-rotate"></i>
+    <section class="dd-card dd-info group">
+      <div class="group-header">
+        <div class="group-title"><i class="fa-solid fa-circle-info"></i> Informasi</div>
+      </div>
+      <div class="group-body" id="infoBody">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </section>
+
+    <section class="dd-card dd-sensor group">
+      <div class="group-header">
+        <div class="group-title"><i class="fa-solid fa-wave-square"></i> Data Sensor</div>
+        <span class="group-meta" id="sensorMeta"></span>
+      </div>
+      <div class="group-body" id="sensorBody">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </section>
+
+    <section class="dd-card dd-history group" id="statusHistoryGroup">
+      <div class="group-header">
+        <div class="group-title"><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Status</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="group-meta" id="statusHistoryMeta"></span>
+          <button class="group-action" id="statusHistoryRefreshBtn" title="Refresh" aria-label="Refresh">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </div>
+      </div>
+      <div class="group-body" id="statusHistoryBody">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </section>
+
+    <section class="dd-card dd-settings group">
+      <div class="group-header">
+        <div class="group-title"><i class="fa-solid fa-sliders"></i> Pengaturan</div>
+      </div>
+      <div class="group-body" style="padding-top:0;">
+        <button type="button" class="action-row" data-click="regenKey" aria-label="Regenerate API Key" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+          <span class="action-row-left">
+            <i class="icon fa-solid fa-key"></i>
+            <span class="action-row-text">
+              <span class="action-row-title" style="display:block">Regenerate API Key</span>
+              <span class="action-row-sub" style="display:block">Buat key baru, key lama tidak akan berfungsi</span>
+            </span>
+          </span>
+          <i class="fa-solid fa-chevron-right action-row-chevron"></i>
+        </button>
+        <button type="button" class="action-row danger" data-click="openDelete" aria-label="Hapus Perangkat" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
+          <span class="action-row-left">
+            <i class="icon fa-solid fa-trash"></i>
+            <span class="action-row-text">
+              <span class="action-row-title" style="display:block">Hapus Perangkat</span>
+              <span class="action-row-sub" style="display:block">Hapus permanen beserta data sensor</span>
+            </span>
+          </span>
+          <i class="fa-solid fa-chevron-right action-row-chevron"></i>
         </button>
       </div>
-    </div>
-    <div class="group-body" id="statusHistoryBody">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
+    </section>
   </div>
-
-  <div class="group">
-    <div class="group-header">
-      <div class="group-title"><i class="fa-solid fa-sliders"></i> Pengaturan</div>
-    </div>
-    <div class="group-body" style="padding-top:0;">
-      <button type="button" class="action-row" data-click="regenKey" aria-label="Regenerate API Key" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
-        <span class="action-row-left">
-          <i class="icon fa-solid fa-key"></i>
-          <span class="action-row-text">
-            <span class="action-row-title" style="display:block">Regenerate API Key</span>
-            <span class="action-row-sub" style="display:block">Buat key baru, key lama tidak akan berfungsi</span>
-          </span>
-        </span>
-        <i class="fa-solid fa-chevron-right action-row-chevron"></i>
-      </button>
-      <button type="button" class="action-row danger" data-click="openDelete" aria-label="Hapus Perangkat" style="width:100%;font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left">
-        <span class="action-row-left">
-          <i class="icon fa-solid fa-trash"></i>
-          <span class="action-row-text">
-            <span class="action-row-title" style="display:block">Hapus Perangkat</span>
-            <span class="action-row-sub" style="display:block">Hapus permanen beserta data sensor</span>
-          </span>
-        </span>
-        <i class="fa-solid fa-chevron-right action-row-chevron"></i>
-      </button>
-    </div>
-  </div>
-
 </main>
 
 <div class="modal" id="m-key">
@@ -199,7 +197,6 @@
   </div>
 </div>
 
-<!-- Chart.js dimuat lazy via lazy-load.js (AAGuardLazy.loadChartLibs), bukan eager di sini -->
 <script src="{{ url_for('static', filename='js/lazy-load.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ui.js') }}"></script>

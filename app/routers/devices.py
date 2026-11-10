@@ -344,9 +344,6 @@ async def add_device(request: Request):
     interval_manual = 1 if explicit_interval else 0
     firmware_version = (data.get('firmware_version') or '').strip()
     offline_timeout = data.get('offline_timeout')
-    device_type = (data.get('device_type') or '').strip()
-    if offline_timeout is None and 'rfid' in device_type.lower():
-        offline_timeout = 86400
     if (offline_timeout is not None and expected_interval is not None
             and offline_timeout < expected_interval):
         return JSONResponse({'success': False, 'error': (
@@ -886,9 +883,6 @@ async def bulk_import_devices(request: Request):
                     api_key = generate_api_key()
                     api_key_hash = hash_api_key(api_key)
                     offline_timeout = data.get('offline_timeout')
-                    device_type = (data.get('device_type') or '').strip()
-                    if offline_timeout is None and 'rfid' in device_type.lower():
-                        offline_timeout = 86400
                     await conn.execute('''
                         INSERT INTO devices
                         (device_id, device_name, device_type, location, description,

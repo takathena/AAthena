@@ -1,7 +1,7 @@
 # Workspace update (schema v17)
 
 ## Model
-- Dashboard = ruang kerja: memiliki perangkat, kartu RFID, anggota, dan bot Telegram sendiri.
+- Dashboard = ruang kerja: memiliki perangkat, anggota, dan bot Telegram sendiri.
 - Peran: owner (pemilik), editor, viewer. Admin diperlakukan sebagai owner di semua dashboard.
 - Migrasi v17 memindahkan semua perangkat/kartu lama ke dashboard default admin pertama. Idempotent.
 - Dashboard baru kosong total (tanpa perangkat, tab, widget).

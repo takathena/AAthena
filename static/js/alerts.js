@@ -122,18 +122,14 @@
     function alertTypeLabel(type) {
         const map = {
             temperature: 'Suhu', humidity: 'Kelembaban', gas_level: 'Gas',
-            offline: 'Offline', smoke: 'Asap', motion: 'Gerakan',
-            co2: 'CO2', moisture: 'K. Tanah', lux: 'Cahaya',
-            voc: 'VOC', air_quality: 'Kualitas Udara',
+            offline: 'Offline', smoke: 'Asap',
         };
         return map[type] || String(type).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
     const SENSOR_UNITS = {
         temperature: '°C', humidity: '%', gas_level: 'ppm',
-        smoke: 'ppm', moisture: '%', lux: 'lux',
-        co2: 'ppm', voc: 'ppb', air_quality: 'AQI',
-        motion: '', rfid: '',
+        smoke: 'ppm',
     };
 
     function formatValue(alertType, value) {

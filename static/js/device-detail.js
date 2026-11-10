@@ -14,16 +14,10 @@ skipLink?.addEventListener('blur', () => { skipLink.style.left = '-9999px'; });
 const SENSOR_META = {
   temperature: {icon:'fa-temperature-half', color:'#ef6a6a', unit:'°C', range:[0,50]},
   humidity:    {icon:'fa-droplet',          color:'#5b9eff', unit:'%',  range:[0,100]},
-  moisture:    {icon:'fa-water',            color:'#38bdf8', unit:'%',  range:[0,100]},
-  lux:         {icon:'fa-sun',              color:'#f0b547', unit:'lux',range:[0,1000]},
-  co2:         {icon:'fa-cloud',            color:'#3ecf8e', unit:'ppm',range:[0,2000]},
-  voc:         {icon:'fa-wind',             color:'#b078f0', unit:'ppb',range:[0,500]},
-  gas_level:   {icon:'fa-fire',             color:'#f59e0b', unit:'ppm',range:[0,100]},
-  air_quality: {icon:'fa-lungs',            color:'#5b9eff', unit:'AQI',range:[0,500]},
   smoke:       {icon:'fa-smog',             color:'#a78bfa', unit:'ppm',range:[0,1000]},
-  motion:      {icon:'fa-person-running',   color:'#22d3ee', unit:'',   range:[0,1]},
-  rfid:        {icon:'fa-id-card',          color:'#a3e635', unit:'',   range:[0,1]},
+  gas_level:   {icon:'fa-fire',             color:'#f59e0b', unit:'ppm',range:[0,100]},
 };
+
 const getSensor = k => SENSOR_META[k] || {icon:'fa-microchip', color:'#adb5c2', unit:'', range:[0,100]};
 const gaugePct = (k,v) => {
   const [a,b] = getSensor(k).range;
@@ -110,11 +104,13 @@ function updateThemeIcon(){
 /* ---------- Back ---------- */
 (function setupBack(){
   const btn = document.getElementById('btnBack');
-  let back = '/mobile';
+  const isDesktop = !!document.querySelector('.dd-main');
+  let back = isDesktop ? '/' : '/mobile';
   try{
     const stored = sessionStorage.getItem('aaguard_back_url');
     if(stored && stored.startsWith('/')) back = stored;
   }catch(e){}
+  if (isDesktop && (back === '/mobile' || back === '/')) back = '/#devices';
   btn.onclick = () => {
     try{ sessionStorage.removeItem('aaguard_back_url'); }catch(e){}
     window.location.href = back;
@@ -693,7 +689,8 @@ async function confirmDelete(){
       closeModal('m-del');
       try{ sessionStorage.removeItem('aaguard_back_url'); }catch(e){}
       toast('Perangkat dihapus');
-      setTimeout(() => window.location.href = '/mobile', 500);
+      const isDesktop = !!document.querySelector('.dd-main');
+      setTimeout(() => window.location.href = isDesktop ? '/#devices' : '/mobile', 500);
     } else {
       alert('Gagal: ' + (d.error || ''));
       btn.disabled = false;

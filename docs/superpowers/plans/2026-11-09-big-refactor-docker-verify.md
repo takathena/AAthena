@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor besar AAguard IoT tanpa mengubah fitur/kegunaan (API, web, alert, RFID, multi-user, background, backup/restore, chat), lalu deploy via Docker Compose dan verifikasi situs berjalan semestinya.
+**Goal:** Refactor besar AAguard IoT tanpa mengubah fitur/kegunaan (API, web, alert, multi-user, background, backup/restore, chat), lalu deploy via Docker Compose dan verifikasi situs berjalan semestinya.
 
 **Architecture:** Pecah monolit `api.py` (2984 baris, 59 route) dan `dashboards.py` (955 baris) menjadi package per-domain dengan layer services tipis, pertahankan kontrak HTTP/JSON + schema persis, lalu validasi lewat pytest + smoke Docker (health → login → dashboard → ingest → CRUD → background).
 
@@ -20,7 +20,7 @@
 
 ## Review Focus
 
-- **Payload device jelek / berlebih:** JSON rusak, `data` bukan dict datar, NaN/Infinity, string >64, >32 key, RFID UID tak valid (`0x...`), > `DATA_MAX_BYTES` (8192) — harus 400/413 tanpa menyimpan yatim.
+- **Payload device jelek / berlebih:** JSON rusak, `data` bukan dict datar, NaN/Infinity, string >64, >32 key UID tak valid (`0x...`), > `DATA_MAX_BYTES` (8192) — harus 400/413 tanpa menyimpan yatim.
 - **Auth & akses lintas user:** tanpa session/CSRF, non-admin ubah/hapus device/kartu, user A baca dashboard user B, logout GET vs POST, throttle login per username+IP & per-IP — harus 401/403/404 dan tidak bocor error/secret.
 - **Alert state machine & ack:** healthy→warning→danger→warning→healthy + hysteresis per-sensor, ack meng-skip retrigger bila severity sama/ringan tapi retrigger bila memburuk, offline timeout = 2× interval (10–86400 dtk, median 5 sampel) — harus tidak flip-flop / tidak spam notifikasi.
 - **Efek samping DB & background:** `database is locked`, multi-worker Gunicorn + file lock `db-init`/`aaguard-background`, cleanup 24 jam + VACUUM >1000 baris, backup `iot_*.db` (min keep 3, jangan hapus `pre-restore-*`), restore tertunda diterapkan saat start —
@@ -366,7 +366,7 @@ curl -sf http://localhost:5008/ready
 | 2 | `/login` | 200, form CSRF ada |
 | 3 | Login `IOT_USERNAME/IOT_PASSWORD` dari `.env` | 302 → `/`, cookie HttpOnly SameSite=Lax |
 | 4 | `/` (dashboard) | 200, device list rilis, auto-refresh tanpa 401 |
-| 5 | `POST /api/v1/data` (device) | 200, alert dievaluasi, RFID dedup 30 dtk |
+| 5 | `POST /api/v1/data` (device) | 200, alert dievaluasi dedup 30 dtk |
 | 6 | CRUD device + regenerate key | 201/200, key plain hanya sekali |
 | 7 | `/alerts`, ack + bulk-ack, `/attendance` report/export CSV | 200, CSV tanpa formula-injection |
 | 8 | `POST /api/v1/system/backup` → list → download | file `iot_*.db`, `pre-restore-*` tidak terhapus otomatis |

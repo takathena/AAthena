@@ -35,7 +35,7 @@ def test_heartbeat_and_empty_data_accepted(anon_client, dev):
 
 def test_bool_and_short_string_accepted(anon_client, dev):
     key, did = dev
-    assert post_data(anon_client, did, key, {'motion': True, 'note': 'x' * 64}).status_code == 200
+    assert post_data(anon_client, did, key, {'smoke': 10, 'note': 'x' * 64}).status_code == 200
 
 
 @pytest.mark.parametrize('data', [

@@ -115,19 +115,19 @@ def test_device_custom_rule_still_triggers_for_its_sensor(admin_client, make_dev
 
 def test_get_device_alert_rules_merges_and_skips_invalid(app, make_device):
     custom = {'temperature': {'bogus': 1},
-              'lux': {'healthy': {'min': 1, 'max': 2}, 'warning': {'min': 0, 'max': 3},
-                      'danger': {'min': 0, 'max': 4}}}
+              'smoke': {'healthy': {'min': 0, 'max': 10}, 'warning': {'min': 0, 'max': 20},
+                        'danger': {'min': 0, 'max': 30}}}
     make_device('c-3', alert_rules_json=json.dumps(custom))
     with get_db_context() as conn:
         rules = get_device_alert_rules(conn, 'c-3')
     assert rules['temperature']['healthy']['max'] == 28    # custom invalid diabaikan
-    assert rules['lux']['healthy']['max'] == 2             # custom valid menimpa
+    assert rules['smoke']['healthy']['max'] == 10          # custom valid menimpa
     assert 'humidity' in rules and 'gas_level' in rules    # sensor global tetap ada
 
 
 def test_device_rules_endpoint_shows_inherited_sensors(admin_client, make_device):
-    custom = {'lux': {'healthy': {'min': 1, 'max': 2}, 'warning': {'min': 0, 'max': 3},
-                      'danger': {'min': 0, 'max': 4}}}
+    custom = {'smoke': {'healthy': {'min': 0, 'max': 10}, 'warning': {'min': 0, 'max': 20},
+                       'danger': {'min': 0, 'max': 30}}}
     make_device('c-4', alert_rules_json=json.dumps(custom))
     body = admin_client.get('/api/v1/devices/c-4/alert-rules').get_json()
     assert body['is_custom'] is True

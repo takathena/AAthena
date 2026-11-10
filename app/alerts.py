@@ -44,13 +44,6 @@ SENSOR_LABELS = {
     'humidity': ('Kelembaban', '%'),
     'gas_level': ('Level Gas', 'ppm'),
     'smoke': ('Asap', 'ppm'),
-    'moisture': ('Kelembaban Tanah', '%'),
-    'lux': ('Cahaya', 'lux'),
-    'co2': ('CO2', 'ppm'),
-    'voc': ('VOC', 'ppb'),
-    'air_quality': ('Kualitas Udara', 'AQI'),
-    'motion': ('Gerakan', ''),
-    'rfid': ('RFID', ''),
 }
 
 
@@ -443,7 +436,7 @@ async def check_and_create_alerts(device_id, sensor_data):
         alert_rules = await get_device_alert_rules(conn, device_id)
 
         for key, value in sensor_data.items():
-            if key in ('uid', 'card_id', 'tag', 'rfid'):
+            if key in ('uid', 'card_id', 'tag'):
                 continue
             if key not in alert_rules:
                 continue

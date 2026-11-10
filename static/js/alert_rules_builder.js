@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    window.SENSOR_PRESETS = {
+        window.SENSOR_PRESETS = {
         temperature: {
             label: 'Suhu', unit: '°C',
             defaults: {
@@ -30,31 +30,16 @@
                 danger:  { min: 0, max: 100 },
             }
         },
-        co2: {
-            label: 'CO2', unit: 'ppm',
+        smoke: {
+            label: 'Asap', unit: 'ppm',
             defaults: {
-                healthy: { min: 300, max: 1000 },
-                warning: { min: 300, max: 1500 },
-                danger:  { min: 300, max: 5000 },
-            }
-        },
-        moisture: {
-            label: 'Kelembaban Tanah', unit: '%',
-            defaults: {
-                healthy: { min: 40, max: 70 },
-                warning: { min: 30, max: 80 },
-                danger:  { min: 20, max: 90 },
-            }
-        },
-        lux: {
-            label: 'Cahaya', unit: 'lux',
-            defaults: {
-                healthy: { min: 100, max: 800 },
-                warning: { min: 50, max: 1000 },
-                danger:  { min: 0, max: 2000 },
+                healthy: { min: 0, max: 50 },
+                warning: { min: 0, max: 70 },
+                danger:  { min: 0, max: 100 },
             }
         },
     };
+
 
     const SEVERITY_LABELS = { healthy: 'Normal', warning: 'Peringatan', danger: 'Bahaya' };
 

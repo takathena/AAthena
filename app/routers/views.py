@@ -148,7 +148,10 @@ async def mobile_dashboard(request: Request):
 @router.get('/device/{device_id}', response_class=HTMLResponse)
 async def device_detail(device_id: str, request: Request):
     get_current_user_html(request)
-    return _tpl(request, 'device_detail.html', device_id=device_id)
+    ua = (request.headers.get('user-agent') or '').lower()
+    is_mobile = any(k in ua for k in ('mobile', 'android', 'iphone', 'ipad', 'ipod'))
+    tpl = 'device_detail_mobile.html' if is_mobile else 'device_detail.html'
+    return _tpl(request, tpl, device_id=device_id)
 
 
 # ==========================================

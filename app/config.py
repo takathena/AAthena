@@ -78,47 +78,11 @@ def _build_alert_rules():
             'danger':  {'min': 0, 'max': 100},
             '_hysteresis': 2.0,
         },
-        'moisture': {
-            'healthy': {'min': 40, 'max': 70},
-            'warning': {'min': 30, 'max': 80},
-            'danger':  {'min': 20, 'max': 90},
-            '_hysteresis': 1.0,
-        },
-        'lux': {
-            'healthy': {'min': 100, 'max': 800},
-            'warning': {'min': 50, 'max': 1000},
-            'danger':  {'min': 0, 'max': 2000},
-            '_hysteresis': 50.0,
-        },
-        'co2': {
-            'healthy': {'min': 300, 'max': 1000},
-            'warning': {'min': 300, 'max': 1500},
-            'danger':  {'min': 300, 'max': 5000},
-            '_hysteresis': 50.0,
-        },
         'smoke': {
-            'healthy': {'min': 0, 'max': 200},
-            'warning': {'min': 0, 'max': 500},
-            'danger':  {'min': 0, 'max': 1000},
-            '_hysteresis': 20.0,
-        },
-        'motion': {
-            'healthy': {'min': 0, 'max': 0},
-            'warning': {'min': 0, 'max': 1},
-            'danger':  {'min': 0, 'max': 1},
-            '_hysteresis': 0.0,
-        },
-        'voc': {
-            'healthy': {'min': 0, 'max': 250},
-            'warning': {'min': 0, 'max': 500},
-            'danger':  {'min': 0, 'max': 1000},
-            '_hysteresis': 20.0,
-        },
-        'air_quality': {
-            'healthy': {'min': 0, 'max': 100},
-            'warning': {'min': 0, 'max': 200},
-            'danger':  {'min': 0, 'max': 500},
-            '_hysteresis': 10.0,
+            'healthy': {'min': 0, 'max': 50},
+            'warning': {'min': 0, 'max': 70},
+            'danger':  {'min': 0, 'max': 100},
+            '_hysteresis': 5.0,
         },
     }
 

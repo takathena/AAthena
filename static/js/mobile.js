@@ -76,32 +76,20 @@ const DATA_KEYS = {
   humidity:{label:'Kelembaban',unit:'%',color:'#3b82f6'},
   gas_level:{label:'Gas',unit:'ppm',color:'#ef4444'},
   smoke:{label:'Asap',unit:'ppm',color:'#8b5cf6'},
-  motion:{label:'Gerakan',unit:'',color:'#14b8a6'},
-  rfid:{label:'RFID',unit:'',color:'#22c55e'},
-  moisture:{label:'K. Tanah',unit:'%',color:'#06b6d4'},
-  lux:{label:'Cahaya',unit:'lux',color:'#f59e0b'},
-  co2:{label:'CO2',unit:'ppm',color:'#22c55e'},
-  voc:{label:'VOC',unit:'ppb',color:'#a855f7'},
-  air_quality:{label:'Kualitas Udara',unit:'AQI',color:'#3b82f6'},
 };
 
 const PRESETS = {
   temperature:{label:'Suhu',defaults:{healthy:{min:20,max:26},warning:{min:15,max:30},danger:{min:10,max:35}}},
   humidity:{label:'Kelembaban',defaults:{healthy:{min:40,max:70},warning:{min:30,max:80},danger:{min:20,max:90}}},
   gas_level:{label:'Level Gas',defaults:{healthy:{min:0,max:70},warning:{min:0,max:85},danger:{min:0,max:100}}},
-  co2:{label:'CO2',defaults:{healthy:{min:300,max:1000},warning:{min:300,max:1500},danger:{min:300,max:5000}}},
-  moisture:{label:'K. Tanah',defaults:{healthy:{min:40,max:70},warning:{min:30,max:80},danger:{min:20,max:90}}},
-  lux:{label:'Cahaya',defaults:{healthy:{min:100,max:800},warning:{min:50,max:1000},danger:{min:0,max:2000}}},
+  smoke:{label:'Asap',defaults:{healthy:{min:0,max:50},warning:{min:0,max:70},danger:{min:0,max:100}}},
 };
 
 const SENSOR_LABELS = {
-  temperature:'Suhu',humidity:'Kelembaban',gas_level:'Gas',moisture:'K. Tanah',
-  lux:'Cahaya',co2:'CO2',smoke:'Asap',voc:'VOC',air_quality:'Kualitas Udara',
-  motion:'Gerakan',rfid:'RFID',
+  temperature:'Suhu',humidity:'Kelembaban',gas_level:'Gas',smoke:'Asap',
 };
 const SENSOR_UNITS = {
-  temperature:'°C',humidity:'%',gas_level:'ppm',moisture:'%',
-  lux:'lux',co2:'ppm',smoke:'ppm',voc:'ppb',air_quality:'AQI',motion:'',rfid:'',
+  temperature:'°C',humidity:'%',gas_level:'ppm',smoke:'ppm',
 };
 
 const COLORS = ['#f97316','#22c55e','#ef4444','#8b5cf6','#3b82f6','#14b8a6','#f59e0b','#ec4899'];
@@ -141,7 +129,7 @@ const deviceStatus = d => {
   return d.status || 'offline';
 };
 const alertTypeLabel = type => {
-  const map = {temperature:'Suhu',humidity:'Kelembaban',gas_level:'Gas',offline:'Offline',smoke:'Asap',motion:'Gerakan',co2:'CO2',moisture:'K. Tanah',lux:'Cahaya',voc:'VOC',air_quality:'Kualitas Udara'};
+  const map = {temperature:'Suhu',humidity:'Kelembaban',gas_level:'Gas',offline:'Offline',smoke:'Asap'};
   return map[type] || String(type||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
 };
 const formatVal = (type, value) => {
@@ -2428,7 +2416,6 @@ function fillBulkSample(){
   document.getElementById('bulkJson').value = JSON.stringify([
     { device_id: "ESP32-001", device_name: "Sensor Suhu Server", device_type: "ESP32", location: "Ruang Server" },
     { device_id: "ESP32-002", device_name: "Sensor Gudang", device_type: "ESP32", location: "Gudang A" },
-    { device_id: "RFID-01", device_name: "Reader Pintu Depan", device_type: "RFID Reader", location: "Pintu Utama" }
   ], null, 2);
   parseBulkJson();
 }

@@ -18,8 +18,7 @@ def _clean_timestamp(ts):
 def _alert_label(alert_type, severity):
     type_labels = {
         'temperature': 'Suhu', 'humidity': 'Kelembaban', 'gas_level': 'Level Gas',
-        'offline': 'Perangkat Offline', 'smoke': 'Asap', 'motion': 'Gerakan',
-        'co2': 'CO2', 'moisture': 'Kelembaban Tanah', 'lux': 'Cahaya',
+        'offline': 'Perangkat Offline', 'smoke': 'Asap',
     }
     base = type_labels.get(alert_type, alert_type.replace('_', ' ').title())
     sev_labels = {'danger': 'Bahaya', 'warning': 'Peringatan', 'info': 'Info', 'healthy': 'Normal'}

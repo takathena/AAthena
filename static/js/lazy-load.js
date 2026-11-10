@@ -10,9 +10,6 @@
     var CDN = {
         leafletCss: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
         leafletJs: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-        clusterCss: 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css',
-        clusterDefaultCss: 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css',
-        clusterJs: 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
         chartJs: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
         interactJs: 'https://cdn.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js',
     };
@@ -65,8 +62,8 @@
     }
 
     function loadMapLibs() {
-        return Promise.all([loadCSS(CDN.leafletCss), loadCSS(CDN.clusterCss), loadCSS(CDN.clusterDefaultCss)])
-            .then(function () { return loadSequential([CDN.leafletJs, CDN.clusterJs]); });
+        return loadCSS(CDN.leafletCss)
+            .then(function () { return loadScript(CDN.leafletJs); });
     }
 
     function loadChartLibs() {

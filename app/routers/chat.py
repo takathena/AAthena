@@ -250,8 +250,6 @@ def tool_generate_bulk_template():
         ['ESP32-001', 'Sensor Suhu Server', 'ESP32', 'Ruang Server',
          'Monitoring suhu', 'v1.0.0', '900', 'danger'],
         ['ESP32-002', 'Sensor Gudang', 'ESP32', 'Gudang A', '', '', '900', 'warning'],
-        ['RFID-01', 'Reader Pintu Depan', 'RFID Reader', 'Pintu Utama',
-         'Akses kartu', '', '86400', 'danger'],
     ]
     file_meta = _make_csv_file('aaguard_bulk_import_template.csv', rows, header)
     return {

@@ -17,7 +17,6 @@
         mapFull: null,
         mapBento: null,
         bentoChart: null,
-        markerCluster: null,
         marker: null,
         selectedLat: null,
         selectedLng: null,
@@ -60,17 +59,10 @@
     const MIN_H = 160;
 
     const DATA_KEYS = {
-        temperature: { label: 'Suhu',           unit: '°C',  color: '#f97316' },
-        humidity:    { label: 'Kelembaban',     unit: '%',   color: '#3b82f6' },
-        gas_level:   { label: 'Gas',            unit: 'ppm', color: '#ef4444' },
-        smoke:       { label: 'Asap',           unit: 'ppm', color: '#8b5cf6' },
-        motion:      { label: 'Gerakan',        unit: '',    color: '#14b8a6' },
-        rfid:        { label: 'RFID',           unit: '',    color: '#22c55e' },
-        moisture:    { label: 'K. Tanah',       unit: '%',   color: '#06b6d4' },
-        lux:         { label: 'Cahaya',         unit: 'lux', color: '#f59e0b' },
-        co2:         { label: 'CO2',            unit: 'ppm', color: '#22c55e' },
-        voc:         { label: 'VOC',            unit: 'ppb', color: '#a855f7' },
-        air_quality: { label: 'Kualitas Udara', unit: 'AQI', color: '#3b82f6' },
+        temperature: { label: 'Suhu',       unit: '°C',  color: '#f97316' },
+        humidity:    { label: 'Kelembaban', unit: '%',   color: '#3b82f6' },
+        gas_level:   { label: 'Gas',        unit: 'ppm', color: '#ef4444' },
+        smoke:       { label: 'Asap',       unit: 'ppm', color: '#8b5cf6' },
     };
 
     const STORAGE_KEYS = {
@@ -206,6 +198,43 @@
         setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 200);
     }
 
+    const MAP_VIEW_KEY = 'aaguard:map-view';
+    function loadMapViews() {
+        try { return JSON.parse(localStorage.getItem(MAP_VIEW_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function saveMapView(key, map) {
+        if (!key || !map) return;
+        try {
+            const c = map.getCenter();
+            const z = map.getZoom();
+            if (!c || typeof z !== 'number') return;
+            const views = loadMapViews();
+            views[key] = { lat: +c.lat.toFixed(6), lng: +c.lng.toFixed(6), zoom: z };
+            localStorage.setItem(MAP_VIEW_KEY, JSON.stringify(views));
+        } catch (e) {}
+    }
+    function restoreMapView(key, map, fallbackCenter, fallbackZoom) {
+        if (!map) return;
+        const view = loadMapViews()[key];
+        if (view && Number.isFinite(view.lat) && Number.isFinite(view.lng) && Number.isFinite(view.zoom)) {
+            map.setView([view.lat, view.lng], view.zoom);
+            return;
+        }
+        if (fallbackCenter) map.setView(fallbackCenter, fallbackZoom);
+    }
+    function bindMapViewPersistence(key, map) {
+        if (!key || !map || map.__viewPersistBound) return;
+        map.__viewPersistBound = true;
+        let t = null;
+        const save = () => {
+            clearTimeout(t);
+            t = setTimeout(() => saveMapView(key, map), 150);
+        };
+        map.on('moveend', save);
+        map.on('zoomend', save);
+        window.addEventListener('resize', () => invalidateMap(map));
+    }
+
     function getSectionFromHash() {
         const hash = (window.location.hash || '').replace('#', '').trim();
         const base = hash.split('/')[0];
@@ -275,7 +304,7 @@
                 if (!state.mapFull) initFullMap();
                 // Leaflet lazy: markers/invalidate ditangani initFullMap setelah map siap (atau fallback offline)
                 if (state.mapFull) {
-                    loadMarkers(state.mapFull, true);
+                    loadMarkers(state.mapFull, 'main');
                     renderMapDeviceList();
                     invalidateMap(state.mapFull);
                     updateMapSelectedBanner();
@@ -367,7 +396,7 @@
         setText('alertBadge', alerts);
         const onboarding = $('onboardingCard');
         if (onboarding) onboarding.hidden = (summary.total_devices || 0) > 0;
-        if (state.mapFull) loadMarkers(state.mapFull, true);
+        if (state.mapFull) loadMarkers(state.mapFull, 'main');
         refreshBento();
         updateFilterCounts();
         renderFilteredDevices();
@@ -484,16 +513,14 @@
         }
         state.mapFull = L.map('mapFull').setView([-2.5489, 118.0149], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapFull);
-        if (typeof L.markerClusterGroup === 'function') {
-            state.markerCluster = L.markerClusterGroup();
-            state.mapFull.addLayer(state.markerCluster);
-        }
         state.mapFull.on('click', (e) => {
             if (!state.selectedMapDeviceId) { showToast('Pilih device di list dulu', 'warning'); return; }
             placeMarkerAt(e.latlng.lat, e.latlng.lng);
         });
         registerMapInstance(state.mapFull);
-        loadMarkers(state.mapFull, true);
+        restoreMapView('full', state.mapFull, [-2.5489, 118.0149], 5);
+        bindMapViewPersistence('full', state.mapFull);
+        loadMarkers(state.mapFull, 'main');
         renderMapDeviceList();
         invalidateMap(state.mapFull);
         updateMapSelectedBanner();
@@ -517,24 +544,29 @@
             zoomControl: true, scrollWheelZoom: true, dragging: true,
             doubleClickZoom: true, boxZoom: true, keyboard: true, tap: false,
             attributionControl: true,
-        }).setView([-7.2, 110.4], 7);
+        }).setView([-7.0, 109.5], 7);
         el.closest('.bento-map-wrap')?.addEventListener('click', e => e.stopPropagation());
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapBento);
         registerMapInstance(state.mapBento);
-        loadMarkers(state.mapBento, false, 'bento');
-        fitBentoMap();
+        restoreMapView('bento', state.mapBento, [-7.0, 109.5], 7);
+        bindMapViewPersistence('bento', state.mapBento);
+        loadMarkers(state.mapBento, 'bento');
         invalidateMap(state.mapBento);
     }
 
     function fitBentoMap() {
         if (!state.mapBento) return;
-        // Semua perangkat di Jawa -> view kunci Jawa, jangan fitBounds (zoom liar di container kecil)
+        const saved = loadMapViews().bento;
+        if (saved && Number.isFinite(saved.lat) && Number.isFinite(saved.lng) && Number.isFinite(saved.zoom)) {
+            state.mapBento.setView([saved.lat, saved.lng], saved.zoom);
+            return;
+        }
         state.mapBento.setView([-7.0, 109.5], 7);
     }
 
     function refreshBento() {
         initBentoMap().then(() => {}).catch(() => {});
-        if (state.mapBento) { loadMarkers(state.mapBento, false, 'bento'); fitBentoMap(); invalidateMap(state.mapBento); }
+        if (state.mapBento) { loadMarkers(state.mapBento, 'bento'); invalidateMap(state.mapBento); }
         const withLoc = state.devices.filter(d => d.latitude != null && d.longitude != null && !(d.latitude === 0 && d.longitude === 0));
         const sub = $('bentoMapSub');
         if (sub) sub.textContent = withLoc.length ? `${withLoc.length} dari ${state.devices.length} perangkat berkoordinat — klik untuk buka peta` : (state.devices.length ? 'Belum ada perangkat berkoordinat' : 'Belum ada perangkat');
@@ -606,7 +638,7 @@
             // Pilih 3 sensor key teratas (prioritas umum, lalu count terbanyak)
             const keyCounts = {};
             usedTs.forEach(ts => Object.keys(byTs[ts]).forEach(k => { keyCounts[k] = (keyCounts[k] || 0) + 1; }));
-            const PRIORITY = ['temperature', 'humidity', 'co2', 'lux', 'moisture', 'gas_level', 'smoke', 'voc', 'air_quality'];
+            const PRIORITY = ['temperature', 'humidity', 'gas_level', 'smoke'];
             const keys = PRIORITY.concat(Object.keys(keyCounts).sort((a, b) => (keyCounts[b] || 0) - (keyCounts[a] || 0)))
                 .filter((k, i, arr) => arr.indexOf(k) === i && (keyCounts[k] || 0) >= Math.max(2, usedTs.length * 0.3))
                 .slice(0, 3);
@@ -724,23 +756,20 @@
         return { color: safeColor(color), label };
     }
 
-    function loadMarkers(map, useCluster = false, key = null) {
+    function loadMarkers(map, key = 'main') {
         if (!map || typeof L === 'undefined') return;
         if (state.marker && !state.mapHasUnsavedChange) { map.removeLayer(state.marker); state.marker = null; }
+        const mapKey = key || 'main';
         const validIds = new Set();
         state.devices.forEach(d => {
             if (d.latitude == null || d.longitude == null) return;
             if (d.latitude === 0 && d.longitude === 0) return;
             validIds.add(d.device_id);
         });
-        const mapKey = key || (useCluster ? 'cluster' : 'main');
         for (const [deviceId, entry] of state.markerMap.entries()) {
             if (entry.mapKey !== mapKey) continue;
             if (!validIds.has(deviceId)) {
-                try {
-                    if (useCluster && state.markerCluster) state.markerCluster.removeLayer(entry.marker);
-                    else map.removeLayer(entry.marker);
-                } catch (e) {}
+                try { map.removeLayer(entry.marker); } catch (e) {}
                 state.markerMap.delete(deviceId);
             }
         }
@@ -772,8 +801,7 @@
                 });
             });
             marker.on('click', () => selectMapDevice(d.device_id, { zoom: false, placeMarker: false }));
-            if (useCluster && state.markerCluster) state.markerCluster.addLayer(marker);
-            else marker.addTo(map);
+            marker.addTo(map);
             state.markerMap.set(d.device_id, { marker, mapKey });
         });
     }
@@ -1122,7 +1150,7 @@
 
         const typeEl = $('editDeviceType');
         if (typeEl) {
-            const types = ['ESP32', 'ESP8266', 'Arduino', 'Raspberry Pi', 'RFID Reader', 'Other'];
+            const types = ['ESP32', 'ESP8266', 'Arduino', 'Raspberry Pi', 'Other'];
             const current = device.device_type || 'ESP32';
             typeEl.value = types.includes(current) ? current : 'Other';
         }
@@ -3065,14 +3093,10 @@
     let globalRulesCache = null;
 
     const SENSOR_LABELS = {
-        temperature: 'Suhu', humidity: 'Kelembaban', gas_level: 'Level Gas',
-        moisture: 'Kelembaban Tanah', lux: 'Cahaya', co2: 'CO2', smoke: 'Asap',
-        voc: 'VOC', air_quality: 'Kualitas Udara', motion: 'Gerakan', rfid: 'RFID',
+        temperature: 'Suhu', humidity: 'Kelembaban', gas_level: 'Level Gas', smoke: 'Asap',
     };
     const SENSOR_UNITS = {
-        temperature: '°C', humidity: '%', gas_level: 'ppm', moisture: '%',
-        lux: 'lux', co2: 'ppm', smoke: 'ppm', voc: 'ppb', air_quality: 'AQI',
-        motion: '', rfid: '',
+        temperature: '°C', humidity: '%', gas_level: 'ppm', smoke: 'ppm',
     };
 
     async function openGlobalRulesModal() {
@@ -3527,7 +3551,6 @@
         txt.value = JSON.stringify([
             { device_id: "ESP32-001", device_name: "Sensor Suhu Server", device_type: "ESP32", location: "Ruang Server", description: "Monitoring suhu ruang server" },
             { device_id: "ESP32-002", device_name: "Sensor Gudang", device_type: "ESP32", location: "Gudang A", description: "" },
-            { device_id: "RFID-01", device_name: "Reader Pintu Depan", device_type: "RFID Reader", location: "Pintu Utama", description: "" }
         ], null, 2);
         parseBulkJson();
     }
@@ -3535,8 +3558,7 @@
     function downloadBulkTemplate() {
         const csv = 'device_id,device_name,device_type,location,description,firmware_version\n' +
                     'ESP32-001,Sensor Suhu Server,ESP32,Ruang Server,Monitoring suhu,\n' +
-                    'ESP32-002,Sensor Gudang,ESP32,Gudang A,,\n' +
-                    'RFID-01,Reader Pintu Depan,RFID Reader,Pintu Utama,,\n';
+                    'ESP32-002,Sensor Gudang,ESP32,Gudang A,,\n';
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

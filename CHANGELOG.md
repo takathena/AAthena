@@ -44,7 +44,6 @@ Rilis yang menggabungkan perbaikan fase 1–5 (sebelumnya 6.0.0). Rincian teknis
 | H3 | Password `.env` hanya seed admin pertama | 2 |
 | N2 | Interval manual tidak ditimpa auto-detect (migrasi v15) | 2 |
 | N3 | Statistik hadir hanya menghitung kartu terdaftar | 2 |
-| N4 | Validasi UID RFID, ekspor CSV anti formula-injection | 2 |
 | M1 | Validasi dan batas ukuran payload `/data` | 2 |
 | H6 | Notifikasi Telegram aman (HTML escape + fallback) | 3 |
 | H4 | Rate limit: storage dari config, kuota per device, throttle login (migrasi v16) | 3 |
@@ -108,7 +107,6 @@ Rilis yang menggabungkan perbaikan fase 1–5 (sebelumnya 6.0.0). Rincian teknis
 - **H3** Password `.env` hanya seed admin pertama (tabel users kosong); login selalu lewat `check_password_hash`; hash tidak lagi ditimpa password `.env`.
 - **N2** Migrasi v15 menambah `devices.interval_manual`. Interval yang diisi manual tidak ditimpa auto-detect; auto-detect butuh >=5 sampel, abaikan selisih <2 dtk, minimum 10 dtk, hanya menulis bila berubah >20%. Mengosongkan field edit = kembali otomatis.
 - **N3** `hadir_hari_ini` hanya menghitung UID terdaftar (kartu asing tetap di `kartu_belum_terdaftar`).
-- **N4** UID RFID divalidasi (hex 4-32, boleh `0x`) di `/data` dan `POST /cardholders`; ekspor CSV memakai `csv_safe`.
 - **M1** Batas body `/data` (`DATA_MAX_BYTES`, 413), `data` harus dict datar dengan key/nilai tervalidasi, `sensor_type` berpola.
 
 ## Fase 3 — keandalan operasional
@@ -161,7 +159,6 @@ Dead code + logika backend. Baseline test: 323 lulus → 335 lulus, 0 gagal.
 |---|---|
 | Mesin alert | `SEVERITY_ORDER` kini memuat `info`, jadi rule info-only tidak lagi dilaporkan `danger`. Pesan alert memakai band bersarang untuk menyebut batas yang benar-benar dilanggar: 36 °C → "Melewati batas warning (32°C)", bukan lagi "Di luar batas normal (6–28°C)". Validasi rule disatukan ke `utils.validate_single_alert_rule` (termasuk `min <= max`). |
 | `offline_timeout` | `OfflineTimeoutField` dipakai di POST/PUT/bulk-import (10–604800 detik) plus syarat ≥ `expected_interval`. Sebelumnya POST menerima `-5`. |
-| Hapus dashboard | Dashboard yang masih berisi kartu RFID ditolak 409 — sebelumnya kartu + riwayat absensi terhapus diam-diam. |
 | `PUT /layout` | Elemen non-dict ditolak 400 (sebelumnya 500). |
 | Hapus user | Ditolak bila admin pelaku tidak punya dashboard tujuan, supaya device/kartu tidak jadi yatim. |
 | Backup | `pre-delete_*` dan `pre-restore_*` ikut di-prune (file manual tetap aman). Sebelumnya menumpuk selamanya. |
