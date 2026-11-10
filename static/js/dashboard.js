@@ -2026,15 +2026,16 @@
                 });
             });
             if (catInfo.length === 0) { showChartEmpty(config.id, 'Tidak ada data sensor yang cocok'); return; }
+            const isH = config.chartType === 'horizontalBar';
             const pairs = catInfo.sort((a,b)=>b.value-a.value).slice(0,10);
             const names = pairs.map(p=>p.name), values = pairs.map(p=>p.value), cols = pairs.map(p=>p.color);
-            const data = values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:[6,6,0,0]}}));
+            const data = values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:isH?[0,6,6,0]:[6,6,0,0]}}));
             chart.setOption({
                 animation: true, animationDuration: 400, animationDurationUpdate: 700, animationEasingUpdate: 'cubicOut',
-                grid:{left:46,right:12,top:20,bottom:40,containLabel:true},
-                xAxis:{type:'category',data:names,axisLabel:{color:colors.labelColor,fontSize:10,interval:0,rotate:names.length>4?20:0},axisLine:{show:false},axisTick:{show:false}},
-                yAxis:{type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
-                series:[{type:'bar',data,barMaxWidth:28,label:{show:true,position:'top',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
+                grid:{left:isH?10:46,right:isH?30:12,top:isH?12:20,bottom:isH?12:40,containLabel:true},
+                xAxis: isH ? {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}} : {type:'category',data:names,axisLabel:{color:colors.labelColor,fontSize:10,interval:0,rotate:names.length>4?20:0},axisLine:{show:false},axisTick:{show:false}},
+                yAxis: isH ? {type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false}} : {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
+                series:[{type:'bar',data,barMaxWidth:28,label:{show:true,position:isH?'right':'top',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
                 tooltip:{trigger:'item'}
             }, {notMerge:true,lazyUpdate:false});
             config.chartInstance = plotEl;
