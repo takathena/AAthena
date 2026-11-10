@@ -2073,7 +2073,7 @@
                     const grad = { type:'linear', x:0,y:0,x2:0,y2:1, colorStops:[{offset:0,color:color+'55'},{offset:1,color:color+'05'}] };
                     series.push({
                         name: label, type:'line', data,
-                        showSymbol:false, smooth:true, sampling:'lttb', connectNulls:true,
+                        showSymbol:false, smooth:true, sampling:'lttb', connectNulls:true, triggerLineEvent:true,
                         lineStyle:{width:2,color}, itemStyle:{color},
                         areaStyle: isAreaType ? { color: grad } : undefined,
                         stack: (isAreaType && isStacked) ? 'a' : undefined,
