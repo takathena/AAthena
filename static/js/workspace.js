@@ -1,5 +1,5 @@
 /* ============================================================
-   NEXUS — Workspace UI
+   AAguard — Workspace UI
    - Bagikan dashboard (anggota viewer/editor)
    - Telegram per dashboard
    - Kelola Data (hapus per rentang waktu, kecilkan file) — admin

@@ -1,5 +1,5 @@
 # ==========================================
-# NEXUS IoT - Makefile
+# AAguard IoT - Makefile
 # ==========================================
 
 COMPOSE_PROD := docker compose -f docker-compose.yml
@@ -20,7 +20,7 @@ PORT        := $(shell grep '^PORT' .env 2>/dev/null | cut -d= -f2 | tr -d ' ' |
 NGINX_PORT  := $(shell grep '^NGINX_PORT' .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo 4455)
 
 help:
-	@echo "$(GREEN)NEXUS IoT - Available Commands$(NC)"
+	@echo "$(GREEN)AAguard IoT - Available Commands$(NC)"
 	@echo ""
 	@echo "  $(YELLOW)Development:$(NC)"
 	@echo "    make dev            Setup virtualenv & install dependencies"
@@ -157,4 +157,4 @@ docker-logs:
 	docker compose logs -f
 
 docker-shell:
-	docker compose exec nexus-iot bash
+	docker compose exec aaguard-iot bash

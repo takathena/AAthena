@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}NEXUS — Command Center{% endblock %}
+{% block title %}AAguard — Command Center{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
@@ -59,7 +59,7 @@
                 <line x1="14.1" y1="13.1" x2="18.4" y2="15.6" opacity="0.55"/>
             </svg>
         </a>
-        <span class="title">NEXUS</span>
+        <span class="title">AAguard</span>
 
         <button class="sidebar-toggle-btn sidebar-toggle-in-header" type="button"
                 title="Sembunyikan Sidebar" aria-label="Sembunyikan Sidebar">
@@ -99,9 +99,9 @@
         </a>
         {% if chat_enabled %}
         <div class="nav-section">Asisten</div>
-        <a class="nav-item" href="#" id="chatToggleBtn" title="Buka NEXUS AI" aria-label="Buka NEXUS AI">
+        <a class="nav-item" href="#" id="chatToggleBtn" title="Buka AAguard AI" aria-label="Buka AAguard AI">
             <span class="icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
-            <span class="label">NEXUS AI</span>
+            <span class="label">AAguard AI</span>
             <span class="badge chat-online-badge" id="chatOnlineBadge" title="AI Online" style="display:none;">
                 <i class="fa-solid fa-circle" style="font-size:6px;"></i>
             </span>
@@ -109,11 +109,11 @@
         {% else %}
         <div class="nav-section">Asisten</div>
         <div class="nav-item nx-disabled" id="chatDisabledBtn" role="link" aria-disabled="true"
-           aria-label="NEXUS AI belum aktif"
-           data-hint="NEXUS AI belum aktif. Set LLM_API_KEY di .env lalu restart container."
-           title="NEXUS AI belum aktif — set LLM_API_KEY di .env lalu restart">
+           aria-label="AAguard AI belum aktif"
+           data-hint="AAguard AI belum aktif. Set LLM_API_KEY di .env lalu restart container."
+           title="AAguard AI belum aktif — set LLM_API_KEY di .env lalu restart">
             <span class="icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
-            <span class="label">NEXUS AI</span>
+            <span class="label">AAguard AI</span>
             <span class="nx-chip-sm">Belum aktif</span>
         </div>
         {% endif %}

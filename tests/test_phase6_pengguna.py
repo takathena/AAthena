@@ -71,8 +71,8 @@ def test_users_js_uses_existing_api_and_no_browser_storage():
 def test_users_js_listens_to_settings_tab_event():
     js = _read('static', 'js', 'users.js')
     settings = _read('static', 'js', 'settings.js')
-    assert "'nexus:settings-tab'" in js
-    assert "'nexus:settings-tab'" in settings
+    assert "'aaguard:settings-tab'" in js
+    assert "'aaguard:settings-tab'" in settings
 
 
 def test_dashboard_loads_users_js_after_settings_js():

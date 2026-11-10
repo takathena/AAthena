@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI alert endpoints (dari app/api.py)."""
+"""AAguard IoT - FastAPI alert endpoints (dari app/api.py)."""
 import logging
 from datetime import timedelta
 
@@ -11,7 +11,7 @@ from app.deps import (get_current_user, resolve_scope as _rs,
                       scope_error_response as _se, device_in_sql)
 from app.deps import limiter, safe_json
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['alerts'])
 
 

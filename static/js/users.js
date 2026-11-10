@@ -1,5 +1,5 @@
 /* ==========================================================
-   NEXUS — Kelola Pengguna di Pengaturan › Pengguna
+   AAguard — Kelola Pengguna di Pengaturan › Pengguna
    - Daftar langsung tampil saat tab dibuka
    - Tambah/edit lewat laci kanan: X dan Simpan saja
    - Hapus lewat dialog Batal | Hapus (tanpa X)
@@ -157,20 +157,20 @@
     fillForm(u || null);
     setDirty(false);
     $('userFormSave').hidden = !!u;
-    global.NexusUI && NexusUI.openDrawer($('userDrawer'));
+    global.AAGuardUI && AAGuardUI.openDrawer($('userDrawer'));
 
     setTimeout(() => { const f = u ? $('userFormDisplayName') : $('userFormUsername'); if (f) f.focus(); }, 120);
   }
 
   function closeForm(force) {
     if (!force && state.dirty) {
-      global.NexusUI && NexusUI.openDialog($('userDiscardDialog'));
+      global.AAGuardUI && AAGuardUI.openDialog($('userDiscardDialog'));
       return;
     }
     state.editing = null;
     state.editUser = null;
     setDirty(false);
-    global.NexusUI && NexusUI.closeDrawer($('userDrawer'));
+    global.AAGuardUI && AAGuardUI.closeDrawer($('userDrawer'));
   }
 
   function showFormError(msg) {
@@ -233,14 +233,14 @@
     $('userDeleteText').textContent =
       'Pengguna "' + (u.display_name || u.username) + '" (@' + u.username + ') akan dihapus. '
       + 'Dashboard milik pengguna ini akan dipindahkan ke admin.';
-    global.NexusUI && NexusUI.openDialog($('userDeleteDialog'));
+    global.AAGuardUI && AAGuardUI.openDialog($('userDeleteDialog'));
   }
 
   async function confirmDelete() {
     if (!pendingDelete) return;
     const u = pendingDelete;
     const res = await global.API.call(API_BASE + '/' + u.id, { method: 'DELETE' });
-    global.NexusUI && NexusUI.closeDialog($('userDeleteDialog'));
+    global.AAGuardUI && AAGuardUI.closeDialog($('userDeleteDialog'));
     pendingDelete = null;
     if (res.success) { toast('Pengguna dihapus', 'success'); await load(); }
     else toast(res.error || 'Gagal menghapus pengguna', 'error');
@@ -285,18 +285,18 @@
       if (drawer && drawer.classList.contains('nx-open') && state.dirty) {
         e.stopImmediatePropagation();
         e.preventDefault();
-        global.NexusUI && NexusUI.openDialog($('userDiscardDialog'));
+        global.AAGuardUI && AAGuardUI.openDialog($('userDiscardDialog'));
       }
     }, true);
 
     const discardOk = $('userDiscardConfirm');
     if (discardOk) discardOk.addEventListener('click', () => {
-      global.NexusUI && NexusUI.closeDialog($('userDiscardDialog'));
+      global.AAGuardUI && AAGuardUI.closeDialog($('userDiscardDialog'));
       closeForm(true);
     });
     const discardCancel = $('userDiscardCancel');
     if (discardCancel) discardCancel.addEventListener('click', () => {
-      global.NexusUI && NexusUI.closeDialog($('userDiscardDialog'));
+      global.AAGuardUI && AAGuardUI.closeDialog($('userDiscardDialog'));
     });
 
     const delOk = $('userDeleteConfirm');
@@ -304,11 +304,11 @@
     const delCancel = $('userDeleteCancel');
     if (delCancel) delCancel.addEventListener('click', () => {
       pendingDelete = null;
-      global.NexusUI && NexusUI.closeDialog($('userDeleteDialog'));
+      global.AAGuardUI && AAGuardUI.closeDialog($('userDeleteDialog'));
     });
 
     // Muat daftar saat tab Pengguna dibuka.
-    document.addEventListener('nexus:settings-tab', (e) => {
+    document.addEventListener('aaguard:settings-tab', (e) => {
       if (e.detail && e.detail.tab === 'pengguna') load();
     });
   }
@@ -320,10 +320,10 @@
   // legacy). Membuka tab Pengaturan > Pengguna, lalu drawer form.
   function open(u) {
     if (location.hash !== '#settings/pengguna') location.hash = '#settings/pengguna';
-    document.dispatchEvent(new CustomEvent('nexus:settings-tab', { detail: { tab: 'pengguna' } }));
+    document.dispatchEvent(new CustomEvent('aaguard:settings-tab', { detail: { tab: 'pengguna' } }));
     load();
     if (u !== undefined) openForm(u || null);
   }
 
-  global.NexusUsers = { load: load, open: open, openForm: openForm };
+  global.AAGuardUsers = { load: load, open: open, openForm: openForm };
 })(window);

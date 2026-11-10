@@ -6,7 +6,7 @@ Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route 
 
 - **Tanggal rilis:** 2026-11-09. Port publik Nginx `4455` + `443` (NAT `4455->443`, `${NGINX_PORT:-4455}:80` + `443:80`); DB fresh mulai dari schema v19.
 - **Restore DB lama:** backup v18 (masih ada `attendance`) bila di-restore dimigrasi otomatis ke v19 (`DROP attendance/cardholders`) saat start berikutnya — aman, user tidak perlu migrasi manual (lihat README § Restore Database).
-- **Rilis image:** `nexus-refactor-nexus-iot:2.0.0` (tag Docker: `docker tag nexus-refactor-nexus-iot:latest nexus-refactor-nexus-iot:2.0.0`), sesuai git tag `v2.0.0`.
+- **Rilis image:** `aaguard-iot:2.0.0` (tag Docker: `docker tag aaguard-iot:latest aaguard-iot:2.0.0`), sesuai git tag `v2.0.0`.
 - **Flask dihapus:** `app/api.py`, `app/auth.py`, `app/chat.py`, `app/dashboards.py`, `app/views.py`, `app/extensions.py`, `app/ratelimit.py` dihapus; `app/__init__.py` jadi shim versi (versi tunggal di `app/main.py`); `app/database.py` tanpa Flask `g` (thread-local); `app/permissions.py` + `app/workspace.py` tanpa Flask session; auth/scope/throttle pindah ke `app/deps.py` + `app/routers/*` (FastAPI + Uvicorn, production Gunicorn + UvicornWorker). `ruff check app run.py` hijau. README disinkronkan (badge FastAPI/Uvicorn + Gunicorn 23.0.0, port publik 4455/443, tanpa baris absensi).
 
 ## Unreleased — Refactor bertahap (fondasi)
@@ -133,9 +133,9 @@ Dari hasil audit kode + verifikasi di staging (2026-10-19).
 
 | Area | Perbaikan |
 |---|---|
-| Manage user | Modal legacy dihapus. `settings_section.html` dan `modals.html` sama-sama merender 7 `id` form yang sama, sehingga `getElementById()` menulis ke drawer Pengaturan dan Command Palette → "Kelola user" selalu gagal. Sekarang satu-satunya pintu masuk `NexusUsers.open()`. |
+| Manage user | Modal legacy dihapus. `settings_section.html` dan `modals.html` sama-sama merender 7 `id` form yang sama, sehingga `getElementById()` menulis ke drawer Pengaturan dan Command Palette → "Kelola user" selalu gagal. Sekarang satu-satunya pintu masuk `AAGuardUsers.open()`. |
 | Notifikasi | `POST /api/v1/notifications/test` melaporkan `success: true` walau tidak ada channel aktif (`all([])` atas generator kosong). Kini menyaring kunci `_` lebih dulu dan membalas 503 bila memang belum siap. |
-| NEXUS AI | Menu, panel, dan `chat.js` hilang total saat `LLM_API_KEY` kosong. Menu kini tetap terlihat dengan status "belum aktif" + penjelasan cara mengaktifkannya. |
+| AAguard AI | Menu, panel, dan `chat.js` hilang total saat `LLM_API_KEY` kosong. Menu kini tetap terlihat dengan status "belum aktif" + penjelasan cara mengaktifkannya. |
 | Mobile | `historyChartMobile is not defined` setiap ganti tema. |
 | Markup | `</nav>` ganda di `dashboard.html`. |
 | Test | 5 test failure → 0. `PYTHON_DOTENV_DISABLED=1` di `conftest.py` membuat test hermetik terhadap `.env` sungguhan; `importlib.reload(app.extensions)` kini memulihkan singleton `limiter` sehingga tidak merusak test lain. |

@@ -1,5 +1,5 @@
 /* ============================================================
-   NEXUS — Mobile (Sure Style v8)
+   AAguard — Mobile (Sure Style v8)
    Layout + theme konsisten, dropdown no border
    ============================================================ */
 :root{
@@ -2011,7 +2011,7 @@ body.modal-open .chat-fab-mobile {
    MERGED: fixes.css + unified.css (toast fixes) — do not re-add as separate files
    ========================================================== */
 /* ==========================================================
-   NEXUS — Fixes (Sure Style v7)
+   AAguard — Fixes (Sure Style v7)
    - Segmented control + border + gap
    - UNIFIED SIZING: semua button & dropdown 36px
    ========================================================== */

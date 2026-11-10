@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Database Layer (connection)
+AAguard IoT - Database Layer (connection)
 Schema version 19: multi-user + multi-dashboard (workspace) + analytics tabs + login_failures + audit_log.
 Logika migrasi ada di app/migrations.py; modul ini hanya koneksi + init runner.
 Native async FastAPI: get_db_context() async via aiosqlite (WAL), init_db() untuk lifespan.

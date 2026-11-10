@@ -104,7 +104,7 @@ def test_token_never_logged_on_request_error(monkeypatch):
             records.append(record.getMessage())
 
     handler = _H()
-    log = logging.getLogger('nexus')
+    log = logging.getLogger('aaguard')
     log.addHandler(handler)
     old_level = log.level
     log.setLevel(logging.DEBUG)

@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI dependencies (auth, scope workspace, throttle).
+"""AAguard IoT - FastAPI dependencies (auth, scope workspace, throttle).
 
 Mencerminkan app/auth.py + app/workspace.py untuk FastAPI:
 - sesi dibaca dari request.session (SessionMiddleware starlette),

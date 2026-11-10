@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Database Migrations
+AAguard IoT - Database Migrations
 Schema version 18: multi-user + multi-dashboard (workspace) + analytics tabs + login_failures + audit_log.
 Dipisahkan dari app/database.py (connection layer) agar file koneksi tetap kecil.
 """

@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - Alert Rules Builder
+   AAguard IoT - Alert Rules Builder
    ========================================== */
 
 (function() {

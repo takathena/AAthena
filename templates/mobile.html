@@ -6,7 +6,7 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="dashboard-id" content="{{ dashboard_id }}">
-<title>NEXUS</title>
+<title>AAguard</title>
 <!-- Leaflet + Chart.js dimuat lazy via lazy-load.js saat section map/graph dibuka -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,7 +25,7 @@
     <i class="fa-solid fa-bars"></i>
   </button>
 
-  <button class="hdr-logo" data-click="go" data-arg="dashboard" data-prevent="1" aria-label="NEXUS">
+  <button class="hdr-logo" data-click="go" data-arg="dashboard" data-prevent="1" aria-label="AAguard">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 2.5l8.5 4.9v9.2L12 21.5 3.5 16.6V7.4z"/>
       <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>
@@ -1253,7 +1253,7 @@
 
 {% if chat_enabled %}
 <!-- FAB Chat Mobile -->
-<button class="chat-fab-mobile" data-click="NexusChat.toggle" aria-label="Buka Chatbot" title="NEXUS AI">
+<button class="chat-fab-mobile" data-click="AAGuardChat.toggle" aria-label="Buka Chatbot" title="AAguard AI">
   <i class="fa-solid fa-wand-magic-sparkles"></i>
 </button>
 

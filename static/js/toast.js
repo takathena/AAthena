@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - Toast Notification (v2)
+   AAguard IoT - Toast Notification (v2)
    Fitur:
      - Stacking: pesan & tipe sama → di-merge jadi 1 toast
      - Badge counter: ×2, ×3, dst

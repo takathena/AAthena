@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT — Global Error Boundary v2
+   AAguard IoT — Global Error Boundary v2
    Filter: cross-origin "Script error." noise
    ========================================== */
 

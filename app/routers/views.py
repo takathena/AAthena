@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI web views + login/logout (dari app/views.py + app/auth.py)."""
+"""AAguard IoT - FastAPI web views + login/logout (dari app/views.py + app/auth.py)."""
 import logging
 import os
 import time
@@ -11,7 +11,7 @@ from app.config import get_config
 from app.deps import (check_login_throttle, clear_login_failures, client_ip,
                       get_current_user_html, limiter, record_login_failure)
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(tags=['views'])
 
 templates = Jinja2Templates(directory=os.path.join(

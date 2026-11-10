@@ -77,7 +77,7 @@ def test_dashboard_template_loads_components_and_ui():
 
 def test_dashboard_js_calls_apply_needs_after_role_known():
     js = _read('static', 'js', 'dashboard.js')
-    assert 'NexusUI.applyNeeds' in js
+    assert 'AAGuardUI.applyNeeds' in js
 
 
 # ---------- Logika data-needs (Node.js) ----------
@@ -90,7 +90,7 @@ global.window = {};
 global.document = { addEventListener() {}, querySelectorAll() { return []; } };
 eval(fs.readFileSync(process.argv[1], 'utf8'));
 const cases = JSON.parse(process.argv[2]);
-const out = cases.map(c => window.NexusUI._allowed(c.spec, c.ctx));
+const out = cases.map(c => window.AAGuardUI._allowed(c.spec, c.ctx));
 console.log(JSON.stringify(out));
 """
 

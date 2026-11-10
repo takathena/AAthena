@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI Pydantic v2 schemas."""
+"""AAguard IoT - FastAPI Pydantic v2 schemas."""
 import math
 import re
 import typing

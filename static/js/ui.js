@@ -1,5 +1,5 @@
 /* ==========================================================
-   NEXUS — Helper UI bersama (Fase 0 redesain)
+   AAguard — Helper UI bersama (Fase 0 redesain)
    - applyNeeds(): sembunyikan kontrol sesuai peran/izin (data-needs)
    - Dialog, Drawer, Menu: buka/tutup dengan satu cara
    Tanpa penyimpanan browser. Backend tetap sumber kebenaran (403).
@@ -121,7 +121,7 @@
     if (then && typeof global[then] === 'function') global[then]();
   });
 
-  global.NexusUI = {
+  global.AAGuardUI = {
     applyNeeds: applyNeeds,
     _allowed: allowed,
     openDialog: openDialog,

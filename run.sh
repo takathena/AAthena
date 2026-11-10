@@ -1,5 +1,5 @@
 #!/bin/bash
-# NEXUS IoT - Quick Run Script
+# AAguard IoT - Quick Run Script
 
 set -e
 
@@ -21,7 +21,7 @@ fi
 source venv/bin/activate
 
 PORT=$(grep '^PORT' .env | cut -d= -f2 | tr -d ' ' || echo 5000)
-echo -e "${GREEN}Starting NEXUS IoT...${NC}"
+echo -e "${GREEN}Starting AAguard IoT...${NC}"
 echo -e "${YELLOW}   Akses: http://localhost:${PORT}${NC}"
 echo ""
 

@@ -1,11 +1,11 @@
 /* ==========================================
-   NEXUS IoT - Theme Manager
+   AAguard IoT - Theme Manager
    ========================================== */
 
 (function() {
     'use strict';
 
-    const THEME_KEY = 'nexus-theme';
+    const THEME_KEY = 'aaguard-theme';
     const THEMES = { DARK: 'dark', LIGHT: 'light' };
 
     const ThemeManager = {

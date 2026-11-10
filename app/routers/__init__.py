@@ -1,1 +1,1 @@
-"""NEXUS IoT - FastAPI routers package."""
+"""AAguard IoT - FastAPI routers package."""

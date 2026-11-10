@@ -1,5 +1,5 @@
 # ==========================================
-# NEXUS IoT — Git Ignore
+# AAguard IoT — Git Ignore
 # ==========================================
 
 # Kredensial (JANGAN pernah di-commit)
@@ -56,4 +56,6 @@ Thumbs.db
 
 # Locks (runtime)
 *.lock
-nexus-*.lock
+aaguard-*.lock
+# Deepwork state
+.slim/deepwork/

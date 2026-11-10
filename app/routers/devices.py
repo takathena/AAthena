@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI device/dashboard endpoints (dari app/api.py)."""
+"""AAguard IoT - FastAPI device/dashboard endpoints (dari app/api.py)."""
 import csv
 import io
 import json
@@ -18,7 +18,7 @@ from app.deps import (get_current_user, load_device as _dl,
 from app.deps import limiter
 from app.deps import safe_json
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['devices'])
 
 

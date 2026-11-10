@@ -1,5 +1,5 @@
 /* ==========================================================
-   NEXUS — Komponen dasar (Fase 0 redesain)
+   AAguard — Komponen dasar (Fase 0 redesain)
    - Hanya memakai token yang sudah ada (--surface, --hairline, dst.)
    - Tanpa deklarasi penimpaan paksa baru
    - Lima jenis tombol: primer, sekunder, teks, bahaya, ikon
@@ -210,7 +210,7 @@
 .nx-empty__title { color: var(--text); font-size: 14px; font-weight: 600; }
 
 /* ---------- Kontrol izin ---------- */
-/* Dipakai oleh NexusUI.applyNeeds() di ui.js. Backend tetap sumber kebenaran. */
+/* Dipakai oleh AAGuardUI.applyNeeds() di ui.js. Backend tetap sumber kebenaran. */
 .nx-hidden { display: none !important; }
 
 /* ---------- Fitur ada tapi belum dikonfigurasi ---------- */

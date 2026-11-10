@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Configuration
+AAguard IoT - Configuration
 """
 import os
 from datetime import timedelta
@@ -46,7 +46,7 @@ def _parse_cors_origins():
     origins = [o.strip() for o in raw.split(',') if o.strip()]
     if '*' in origins:
         import logging
-        logging.getLogger('nexus').warning(
+        logging.getLogger('aaguard').warning(
             "[SECURITY] CORS_ORIGINS='*' ditolak. Menggunakan localhost."
         )
         return ['http://localhost:5000']
@@ -228,7 +228,7 @@ class Config:
     LOGIN_LOCKOUT_SECONDS = _env_int('LOGIN_LOCKOUT_SECONDS', 900)
 
     LOG_LEVEL = _env_str('LOG_LEVEL', 'INFO')
-    LOG_FILE = os.getenv('LOG_FILE') or os.path.join(BASE_DIR, 'logs', 'nexus.log')
+    LOG_FILE = os.getenv('LOG_FILE') or os.path.join(BASE_DIR, 'logs', 'aaguard.log')
     LOG_MAX_BYTES = _env_int('LOG_MAX_BYTES', 10485760)
     LOG_BACKUP_COUNT = _env_int('LOG_BACKUP_COUNT', 5)
 

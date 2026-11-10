@@ -1,5 +1,5 @@
 /* ==========================================================
-   NEXUS — Halaman Pengaturan (Fase 1)
+   AAguard — Halaman Pengaturan (Fase 1)
    - Tab di #settings/<tab>; tab yang tidak diizinkan disembunyikan
    - Tombol di halaman ini memicu tombol lama (data-proxy) agar
      handler yang sudah ada tetap dipakai.
@@ -32,7 +32,7 @@
       p.hidden = !active;
     });
 
-    document.dispatchEvent(new CustomEvent('nexus:settings-tab', { detail: { tab: tab } }));
+    document.dispatchEvent(new CustomEvent('aaguard:settings-tab', { detail: { tab: tab } }));
   }
 
   function setHashTab(tab) {
@@ -57,8 +57,8 @@
 
     // Sembunyikan tab dan panel admin sejak awal (sebelum daftar dashboard dimuat).
     const meta = document.querySelector('meta[name="is-admin"]');
-    if (window.NexusUI) {
-      NexusUI.applyNeeds({ isAdmin: !!meta && meta.content === '1', dashboardRole: null }, el);
+    if (window.AAGuardUI) {
+      AAGuardUI.applyNeeds({ isAdmin: !!meta && meta.content === '1', dashboardRole: null }, el);
     }
 
     el.addEventListener('click', function (e) {
@@ -83,5 +83,5 @@
     init();
   }
 
-  global.NexusSettings = { show: show, TABS: TABS };
+  global.AAGuardSettings = { show: show, TABS: TABS };
 })(window);

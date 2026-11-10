@@ -1,5 +1,5 @@
 /* ============================================================
-   NEXUS — Date Range Picker (vanilla)
+   AAguard — Date Range Picker (vanilla)
    ============================================================ */
 (function () {
     'use strict';
@@ -406,6 +406,6 @@
         }
     }
 
-    window.NexusDateRangePicker = { DateRangePicker };
+    window.AAGuardDateRangePicker = { DateRangePicker };
     console.log('[DateRangePicker] Ready');
 })();

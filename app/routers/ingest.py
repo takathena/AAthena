@@ -1,4 +1,4 @@
-"""NEXUS IoT - Device-facing endpoint (dari app/api.py receive_data)."""
+"""AAguard IoT - Device-facing endpoint (dari app/api.py receive_data)."""
 import json
 import logging
 
@@ -10,7 +10,7 @@ from app.config import get_config
 from app.deps import limiter
 from app.schemas import SensorData
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['ingest'])
 
 

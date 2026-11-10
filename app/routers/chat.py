@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI AI Chat via OpenAI-compatible endpoint (dari app/chat.py).
+"""AAguard IoT - FastAPI AI Chat via OpenAI-compatible endpoint (dari app/chat.py).
 
 POST /api/v1/chat: JSON default, SSE bila diminta
 (Accept: text/event-stream / ?stream=1).
@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.deps import get_current_user, limiter, safe_json, client_ip  # noqa: F401
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['chat'])
 
 LLM_BASE_URL = os.getenv('LLM_BASE_URL', 'http://localhost:8000/v1')
@@ -253,7 +253,7 @@ def tool_generate_bulk_template():
         ['RFID-01', 'Reader Pintu Depan', 'RFID Reader', 'Pintu Utama',
          'Akses kartu', '', '86400', 'danger'],
     ]
-    file_meta = _make_csv_file('nexus_bulk_import_template.csv', rows, header)
+    file_meta = _make_csv_file('aaguard_bulk_import_template.csv', rows, header)
     return {
         'file': file_meta,
         'info': 'Template bulk import (3 baris contoh). Isi sesuai device Anda, lalu upload ke Perangkat → Bulk Import.',
@@ -284,7 +284,7 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {}, "required": []}}},
 ]
 
-SYSTEM_PROMPT = """Kamu adalah NEXUS AI, asisten IoT monitoring.
+SYSTEM_PROMPT = """Kamu adalah AAguard AI, asisten IoT monitoring.
 Jawab SINGKAT, RAMAH, dalam Bahasa Indonesia.
 
 ATURAN:

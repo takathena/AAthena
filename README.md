@@ -1,4 +1,4 @@
-# NEXUS IoT Platform
+# AAguard IoT Platform
 
 Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan Raspberry Pi. Menyediakan dashboard web, peta interaktif, analitik multi-chart yang bisa di-drag, sistem alert berjenjang dengan notifikasi Telegram, dan asisten AI yang terhubung langsung ke database.
 
@@ -30,7 +30,7 @@ Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan R
 10. [Struktur Proyek](#struktur-proyek)
 11. [Sistem Alert](#sistem-alert)
 12. [Multi-User dan Dashboard](#multi-user-dan-dashboard)
-13. [NEXUS AI Chat](#nexus-ai-chat)
+13. [AAguard AI Chat](#aaguard-ai-chat)
 14. [Background Tasks](#background-tasks)
 15. [Database dan Migrations](#database-dan-migrations)
 16. [Deployment Produksi](#deployment-produksi)
@@ -45,7 +45,7 @@ Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan R
 
 ## Ringkasan
 
-NEXUS adalah aplikasi server tunggal yang menerima data sensor dari perangkat IoT melalui HTTP POST, menyimpannya di SQLite (mode WAL), lalu menyajikannya lewat dashboard web dan API JSON. Sistem mendukung banyak pengguna, banyak dashboard per pengguna, banyak tab analitik per dashboard, dan layout chart yang dapat diatur bebas oleh pengguna (drag dan resize).
+AAguard adalah aplikasi server tunggal yang menerima data sensor dari perangkat IoT melalui HTTP POST, menyimpannya di SQLite (mode WAL), lalu menyajikannya lewat dashboard web dan API JSON. Sistem mendukung banyak pengguna, banyak dashboard per pengguna, banyak tab analitik per dashboard, dan layout chart yang dapat diatur bebas oleh pengguna (drag dan resize).
 
 Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn multi-worker dengan UvicornWorker), Nginx sebagai reverse proxy, Docker Compose, rate limiting, CSRF protection, hashing API key, background task terkoordinasi via file lock, auto-backup database, dan retensi data per kategori.
 
@@ -83,7 +83,7 @@ Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn mul
 - Composite unique constraint pada (user_id, slug)
 - Auto-create dashboard saat login pertama
 
-### NEXUS AI
+### AAguard AI
 
 - Chat panel terintegrasi yang bisa minimize
 - Mendukung endpoint OpenAI-compatible (OpenRouter, Ollama, vLLM, Hermes)
@@ -217,8 +217,8 @@ Alur request:
 ### Docker (Direkomendasikan)
 
 ```bash
-git clone https://github.com/takathena/nexus-iot.git
-cd nexus-iot
+git clone https://github.com/takathena/AAthena.git
+cd AAthena
 
 cp .env.example .env
 nano .env
@@ -246,14 +246,14 @@ Cek status container:
 
 ```bash
 docker compose ps
-docker compose logs -f nexus-iot
+docker compose logs -f aaguard-iot
 ```
 
 ### Manual (Development)
 
 ```bash
-git clone https://github.com/takathena/nexus-iot.git
-cd nexus-iot
+git clone https://github.com/takathena/AAthena.git
+cd AAthena
 
 make dev
 nano .env
@@ -377,7 +377,7 @@ Catatan: `memory://` tidak shared antar worker Gunicorn; aplikasi mencatat perin
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
 | `LOG_LEVEL` | `INFO` | Level log |
-| `LOG_FILE` | `logs/nexus.log` | Path file log |
+| `LOG_FILE` | `logs/aaguard.log` | Path file log |
 | `LOG_MAX_BYTES` | `10485760` | Ukuran maksimum per file log |
 | `LOG_BACKUP_COUNT` | `5` | Jumlah file log yang disimpan |
 
@@ -407,7 +407,7 @@ Hanya suhu yang bisa di-override via env. Sensor lain pakai default dari `app/co
 
 Jika `NOTIFY_ENABLED=True` maka `TELEGRAM_ENABLED` harus `True` dan token serta chat ID wajib diisi, kalau tidak aplikasi akan gagal start.
 
-### NEXUS AI Chat
+### AAguard AI Chat
 
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
@@ -420,9 +420,9 @@ Jika `NOTIFY_ENABLED=True` maka `TELEGRAM_ENABLED` harus `True` dan token serta 
 
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
-| `NEXUS_LOCK_DIR` | `/tmp` | Direktori lock file untuk koordinasi background task |
+| `AAGUARD_LOCK_DIR` | `/tmp` | Direktori lock file untuk koordinasi background task |
 
-Pada deployment multi-container, `NEXUS_LOCK_DIR` harus menunjuk ke volume yang di-share antar-worker, atau cukup satu container yang menjalankan background task (default).
+Pada deployment multi-container, `AAGUARD_LOCK_DIR` harus menunjuk ke volume yang di-share antar-worker, atau cukup satu container yang menjalankan background task (default).
 
 ---
 
@@ -613,7 +613,7 @@ Filter untuk `/api/v1/alerts/all`:
 ## Struktur Proyek
 
 ```
-nexus-iot/
+AAthena/
 ├── app/                          # Package aplikasi FastAPI
 │   ├── __init__.py               # Shim versi (dari app/main.py)
 │   ├── main.py                   # App factory FastAPI: CORS, CSP/HSTS, Session, CSRF, error handlers, /health
@@ -642,7 +642,7 @@ nexus-iot/
 ├── nginx/
 │   ├── nginx.conf                # Konfigurasi utama Nginx
 │   └── conf.d/
-│       └── nexus.conf            # Konfigurasi site
+│       └── aaguard.conf            # Konfigurasi site
 ├── static/
 │   ├── css/
 │   │   ├── app.css               # Layout desktop
@@ -800,7 +800,7 @@ Tabel `dashboards` menggunakan composite unique constraint `(user_id, slug)`. In
 
 ### Widget Layout
 
-Posisi dan ukuran widget disimpan di kolom `grid_x`, `grid_y`, `grid_w`, `grid_h`. Frontend menyimpan layout tambahan (lebar dan tinggi aktual dalam pixel) di `localStorage` dengan kunci `nexus-chart-layout-<tab_id>`.
+Posisi dan ukuran widget disimpan di kolom `grid_x`, `grid_y`, `grid_w`, `grid_h`. Frontend menyimpan layout tambahan (lebar dan tinggi aktual dalam pixel) di `localStorage` dengan kunci `aaguard-chart-layout-<tab_id>`.
 
 ### Migrasi Data Legacy
 
@@ -808,7 +808,7 @@ Ketika pengguna login dan dashboard dengan `user_id IS NULL` masih ada, dashboar
 
 ---
 
-## NEXUS AI Chat
+## AAguard AI Chat
 
 Chat panel terintegrasi yang memanggil LLM melalui API OpenAI-compatible. Mendukung function calling: LLM dapat memanggil tool untuk query database, lalu merangkum hasilnya dalam bahasa natural.
 
@@ -909,7 +909,7 @@ Interval: `BACKUP_INTERVAL_HOURS` jam. Jeda boot: 30 detik, lalu backup langsung
 
 ### Restore Database
 
-`POST /api/v1/system/restore` (admin) **tidak menimpa database yang sedang berjalan**. Endpoint memverifikasi file backup, membuat `pre-restore-*.db`, lalu menyiapkan `<DB_PATH>.restore-pending` dan penanda `<DB_PATH>.restore-marker`. Restore diterapkan saat proses **start berikutnya**, sebelum koneksi database dibuka: `-wal`/`-shm` dihapus, database diganti, penanda dibuang. Hentikan semua worker lalu start ulang (`docker compose restart nexus-iot`). Jika database masih dipakai proses lain, penerapan ditunda sampai start berikutnya dan dicatat di log.
+`POST /api/v1/system/restore` (admin) **tidak menimpa database yang sedang berjalan**. Endpoint memverifikasi file backup, membuat `pre-restore-*.db`, lalu menyiapkan `<DB_PATH>.restore-pending` dan penanda `<DB_PATH>.restore-marker`. Restore diterapkan saat proses **start berikutnya**, sebelum koneksi database dibuka: `-wal`/`-shm` dihapus, database diganti, penanda dibuang. Hentikan semua worker lalu start ulang (`docker compose restart aaguard-iot`). Jika database masih dipakai proses lain, penerapan ditunda sampai start berikutnya dan dicatat di log.
 
 ### Status dan Heartbeat
 
@@ -917,7 +917,7 @@ Setiap task mencatat heartbeat (tabel `user_settings`, kunci `bg_hb_*`) yang dit
 
 ### Lock File
 
-Lock file disimpan di `NEXUS_LOCK_DIR` (default `/tmp`). Nama file: `nexus-background.lock`. Untuk deployment multi-container, direktori ini harus di-share antar-container, atau cukup satu container yang menjalankan background task.
+Lock file disimpan di `AAGUARD_LOCK_DIR` (default `/tmp`). Nama file: `aaguard-background.lock`. Untuk deployment multi-container, direktori ini harus di-share antar-container, atau cukup satu container yang menjalankan background task.
 
 Worker yang tidak mendapat lock **tidak berhenti**: ia mencoba lagi tiap 30 detik, sehingga bila pemegang lock mati atau di-recycle (`--max-requests`), worker lain mengambil alih.
 
@@ -980,8 +980,8 @@ Data dihapus oleh background task cleanup. Frekuensi penghapusan 24 jam. Timezon
 Setup minimal:
 
 ```bash
-git clone https://github.com/takathena/nexus-iot.git
-cd nexus-iot
+git clone https://github.com/takathena/AAthena.git
+cd AAthena
 
 cp .env.example .env
 nano .env
@@ -999,7 +999,7 @@ docker compose ps
 
 Akses publik di port `NGINX_PORT` (default 4455) dan `443` (HTTPS). Port internal FastAPI/uvicorn (5000) tidak ter-expose ke host, hanya ke network internal Docker.
 
-**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container FastAPI (Nginx tetap menyajikan `./static`). Rilis v2.0.0 diterbitkan sebagai image `nexus-refactor-nexus-iot:2.0.0` (tag Docker dari `nexus-refactor-nexus-iot:latest`, sesuai git tag `v2.0.0`). Perubahan kode butuh build ulang:
+**Kode ada di dalam image.** `docker-compose.yml` tidak lagi me-mount `./app`, `./templates`, `./static` ke container FastAPI (Nginx tetap menyajikan `./static`). Rilis v2.0.0 diterbitkan sebagai image `aaguard-iot:2.0.0` (tag Docker dari `aaguard-iot:latest`, sesuai git tag `v2.0.0`). Perubahan kode butuh build ulang:
 
 ```bash
 git pull
@@ -1015,32 +1015,32 @@ Gunicorn berjalan dengan `--timeout 60 --graceful-timeout 30 --max-requests 1000
 Tanpa Docker:
 
 ```bash
-sudo useradd -r -s /bin/false nexus
-sudo mkdir -p /opt/nexus-iot
-sudo chown nexus:nexus /opt/nexus-iot
+sudo useradd -r -s /bin/false aaguard
+sudo mkdir -p /opt/aaguard-iot
+sudo chown aaguard:aaguard /opt/aaguard-iot
 
-cd /opt/nexus-iot
-sudo -u nexus git clone https://github.com/takathena/nexus-iot.git .
-sudo -u nexus python3 -m venv venv
-sudo -u nexus venv/bin/pip install -r requirements.txt
-sudo -u nexus cp .env.example .env
+cd /opt/aaguard-iot
+sudo -u aaguard git clone https://github.com/takathena/AAthena.git .
+sudo -u aaguard python3 -m venv venv
+sudo -u aaguard venv/bin/pip install -r requirements.txt
+sudo -u aaguard cp .env.example .env
 sudo nano .env
 ```
 
-Buat service file `/etc/systemd/system/nexus-iot.service`:
+Buat service file `/etc/systemd/system/aaguard-iot.service`:
 
 ```ini
 [Unit]
-Description=NEXUS IoT Platform
+Description=AAguard IoT Platform
 After=network.target
 
 [Service]
 Type=simple
-User=nexus
-Group=nexus
-WorkingDirectory=/opt/nexus-iot
-Environment="PATH=/opt/nexus-iot/venv/bin"
-ExecStart=/opt/nexus-iot/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:5000 run:app
+User=aaguard
+Group=aaguard
+WorkingDirectory=/opt/aaguard-iot
+Environment="PATH=/opt/aaguard-iot/venv/bin"
+ExecStart=/opt/aaguard-iot/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:5000 run:app
 Restart=always
 RestartSec=5
 
@@ -1052,9 +1052,9 @@ Aktifkan:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable nexus-iot
-sudo systemctl start nexus-iot
-sudo systemctl status nexus-iot
+sudo systemctl enable aaguard-iot
+sudo systemctl start aaguard-iot
+sudo systemctl status aaguard-iot
 ```
 
 ### Nginx Reverse Proxy
@@ -1067,7 +1067,7 @@ server {
     server_name iot.example.com;
 
     location /static/ {
-        alias /opt/nexus-iot/static/;
+        alias /opt/aaguard-iot/static/;
         expires 30d;
         add_header Cache-Control "public, immutable";
         access_log off;
@@ -1243,7 +1243,7 @@ Solusi: set `SECRET_KEY` permanen di `.env` dengan `secrets.token_hex(32)`.
 
 Gejala: container exit dengan error tulis ke `database` atau `logs`.
 
-Penyebab: host directory di-mount sebagai root, container berjalan sebagai user nexus (UID 1000).
+Penyebab: host directory di-mount sebagai root, container berjalan sebagai user aaguard (UID 1000).
 
 Solusi:
 
@@ -1260,7 +1260,7 @@ Gejala: `docker compose ps` menampilkan status unhealthy.
 Solusi:
 
 ```bash
-docker compose logs nexus-iot | tail -50
+docker compose logs aaguard-iot | tail -50
 curl -v http://localhost:4455/health
 ```
 
@@ -1296,7 +1296,7 @@ Penyebab umum:
 3. Rate limit terlampaui. Cek log untuk `429 Too Many Requests`.
 4. Payload bukan JSON valid. Cek log untuk `Invalid JSON`.
 
-Solusi: cek log dengan `docker compose logs -f nexus-iot` atau `tail -f logs/nexus.log`.
+Solusi: cek log dengan `docker compose logs -f aaguard-iot` atau `tail -f logs/aaguard.log`.
 
 ### Alert tidak muncul
 
@@ -1359,7 +1359,7 @@ ls -lh database/
 sqlite3 database/iot.db "SELECT COUNT(*) FROM sensor_data;"
 
 # Trigger manual cleanup dengan restart container
-docker compose restart nexus-iot
+docker compose restart aaguard-iot
 ```
 
 ---
@@ -1445,4 +1445,4 @@ Saat menaikkan versi: ubah `__version__`, badge di README, dan tambahkan judul `
 
 MIT License. Lihat file [LICENSE](LICENSE) untuk teks lengkap.
 
-Copyright (c) 2026 NEXUS IoT Platform
+Copyright (c) 2026 AAguard IoT Platform

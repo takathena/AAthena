@@ -1,5 +1,5 @@
 /* ============================================================
-   NEXUS Device Detail — v5
+   AAguard Device Detail — v5
    Batch 7 integrated
    ============================================================ */
 const CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
@@ -112,11 +112,11 @@ function updateThemeIcon(){
   const btn = document.getElementById('btnBack');
   let back = '/mobile';
   try{
-    const stored = sessionStorage.getItem('nexus_back_url');
+    const stored = sessionStorage.getItem('aaguard_back_url');
     if(stored && stored.startsWith('/')) back = stored;
   }catch(e){}
   btn.onclick = () => {
-    try{ sessionStorage.removeItem('nexus_back_url'); }catch(e){}
+    try{ sessionStorage.removeItem('aaguard_back_url'); }catch(e){}
     window.location.href = back;
   };
 })();
@@ -351,7 +351,7 @@ async function loadHistoryChart(){
 
   // Chart.js lazy-load: muat dulu bila belum siap; fallback rapi bila offline
   if(typeof Chart === 'undefined'){
-    try{ if(window.NexusLazy) await window.NexusLazy.loadChartLibs(); }
+    try{ if(window.AAGuardLazy) await window.AAGuardLazy.loadChartLibs(); }
     catch(e){ showChartFallback('Chart.js gagal dimuat. Cek koneksi internet/CDN.'); return; }
     if(typeof Chart === 'undefined'){ showChartFallback('Chart.js gagal dimuat. Cek koneksi internet/CDN.'); return; }
   }
@@ -691,7 +691,7 @@ async function confirmDelete(){
     const d = await r.json();
     if(d.success){
       closeModal('m-del');
-      try{ sessionStorage.removeItem('nexus_back_url'); }catch(e){}
+      try{ sessionStorage.removeItem('aaguard_back_url'); }catch(e){}
       toast('Perangkat dihapus');
       setTimeout(() => window.location.href = '/mobile', 500);
     } else {

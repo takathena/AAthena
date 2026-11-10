@@ -1,4 +1,4 @@
-"""NEXUS IoT package.
+"""AAguard IoT package.
 
 FastAPI app lives in app/main.py. This lazy shim re-exports __version__
 without importing the FastAPI app on every `import app.*` (avoids circular

@@ -1,4 +1,4 @@
-"""Fixture bersama untuk tes NEXUS IoT (FastAPI).
+"""Fixture bersama untuk tes AAguard IoT (FastAPI).
 
 Env harus di-set SEBELUM `app` diimpor, karena app/config.py membaca
 env saat import.
@@ -8,14 +8,14 @@ import re
 import sys
 import tempfile
 
-_TMP = tempfile.mkdtemp(prefix='nexus-tests-')
+_TMP = tempfile.mkdtemp(prefix='aaguard-tests-')
 os.environ['FLASK_ENV'] = 'testing'
 os.environ['SECRET_KEY'] = 'test-secret-key-for-testing-only-32chars-minimum'
 os.environ['IOT_USERNAME'] = 'admin'
 os.environ['IOT_PASSWORD'] = 'AdminPass-12345'
 os.environ['DB_PATH'] = os.path.join(_TMP, 'boot.db')
-os.environ['LOG_FILE'] = os.path.join(_TMP, 'nexus.log')
-os.environ['NEXUS_LOCK_DIR'] = _TMP
+os.environ['LOG_FILE'] = os.path.join(_TMP, 'aaguard.log')
+os.environ['AAGUARD_LOCK_DIR'] = _TMP
 os.environ['BACKUP_DIR'] = os.path.join(_TMP, 'backup')
 
 # app/config.py memanggil load_dotenv() saat import. Tanpa ini, file .env

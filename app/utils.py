@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Utilities
+AAguard IoT - Utilities
 """
 import json
 import os
@@ -10,7 +10,7 @@ import hmac
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 WIB = timezone(timedelta(hours=7))
 
@@ -95,13 +95,13 @@ class process_lock:
         self._acquired = False
 
     def _open(self):
-        lock_dir = os.environ.get('NEXUS_LOCK_DIR', '/tmp')
+        lock_dir = os.environ.get('AAGUARD_LOCK_DIR', '/tmp')
         try:
             os.makedirs(lock_dir, exist_ok=True)
         except Exception:
             lock_dir = '/tmp'
 
-        lock_path = os.path.join(lock_dir, f'nexus-{self.name}.lock')
+        lock_path = os.path.join(lock_dir, f'aaguard-{self.name}.lock')
         try:
             self._lock_file = open(lock_path, 'w')
         except OSError as e:

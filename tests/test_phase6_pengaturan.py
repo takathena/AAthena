@@ -95,7 +95,7 @@ def test_admin_tabs_are_gated():
 def test_dashboard_js_knows_settings_section():
     js = _read('static', 'js', 'dashboard.js')
     assert "'settings'" in js
-    assert 'NexusSettings.show' in js
+    assert 'AAGuardSettings.show' in js
     assert "'.sidebar .nav-item[data-section]'" in js
 
 

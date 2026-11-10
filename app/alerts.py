@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Alert System (FastAPI async murni)
+AAguard IoT - Alert System (FastAPI async murni)
 
 State machine: healthy → warning → danger → warning → healthy
 
@@ -31,7 +31,7 @@ from app.database import get_wib_time
 from app.notifier import notify_alert_event
 from app import workspace as ws
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 SEVERITY_ORDER = ['healthy', 'info', 'warning', 'danger']
 DEFAULT_HYSTERESIS = 0.5

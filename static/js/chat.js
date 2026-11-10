@@ -1,11 +1,11 @@
 /* ============================================================
-   NEXUS AI CHAT — v4 (Composer + Shortcuts + Files)
+   AAguard AI CHAT — v4 (Composer + Shortcuts + Files)
    ============================================================ */
 (function() {
     'use strict';
 
-    const STORAGE_KEY = 'nexus-chat-open';
-    const AI_NAME = 'NEXUS AI';
+    const STORAGE_KEY = 'aaguard-chat-open';
+    const AI_NAME = 'AAguard AI';
 
     const SHORTCUTS = [
         { icon: 'fa-microchip',           label: 'Status semua perangkat',            q: 'Bagaimana status semua perangkat?' },
@@ -187,7 +187,7 @@
         }
     }
 
-    window.__nexusChatDownload = _downloadFile;
+    window.__aaguardChatDownload = _downloadFile;
 
     // ============================================================
     // INIT
@@ -233,7 +233,7 @@
         checkHealth();
         state.healthTimer = setInterval(checkHealth, 30000);
 
-        console.log('[NexusChat] Initialized v4 (composer + shortcuts)');
+        console.log('[AAGuardChat] Initialized v4 (composer + shortcuts)');
     }
 
     function buildShortcutsMenu() {
@@ -650,7 +650,7 @@
         location.reload();
     }
 
-    window.NexusChat = { toggle, open, close, send, clear };
+    window.AAGuardChat = { toggle, open, close, send, clear };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

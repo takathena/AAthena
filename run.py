@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Entry Point (FastAPI v2.0)
+AAguard IoT - Entry Point (FastAPI v2.0)
 Usage:
    Development: python run.py
    Production:  gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:5000 run:app
@@ -12,7 +12,7 @@ from app.config import get_config
 from app.main import app  # FastAPI app (dari app/main.py:create_app)
 
 config = get_config()
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 
 def _signal_handler(signum, frame):
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         pass
 
     logger.info("=" * 60)
-    logger.info("NEXUS IoT starting (FastAPI v2.0)...")
+    logger.info("AAguard IoT starting (FastAPI v2.0)...")
     logger.info(f"   Host    : {config.HOST}")
     logger.info(f"   Port    : {config.PORT}")
     logger.info(f"   Debug   : {config.DEBUG}")

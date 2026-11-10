@@ -1,5 +1,5 @@
 /* ============================================================
-   NEXUS Mobile v8.0 — Batch 1-9 synced with desktop
+   AAguard Mobile v8.0 — Batch 1-9 synced with desktop
    ============================================================ */
 const getCsrf = () => (document.querySelector('meta[name="csrf-token"]')||{}).content||'';
 const csrf = () => getCsrf();
@@ -39,7 +39,7 @@ async function api(url, opts = {}){
   if(dashScope && String(url).startsWith('/api/v1/') && !h['X-Dashboard-Id']) h['X-Dashboard-Id'] = dashScope;
   const res = await fetch(url, { ...opts, method:m, headers:h, credentials:'same-origin' });
   if(res.status === 401){
-    try{ sessionStorage.removeItem('nexus_back_url'); sessionStorage.removeItem('nexus-last-section'); }catch(_){}
+    try{ sessionStorage.removeItem('aaguard_back_url'); sessionStorage.removeItem('aaguard-last-section'); }catch(_){}
     if(!(window.location.pathname||'').startsWith('/login')) window.location.href = '/login';
   }
   return res;
@@ -265,8 +265,8 @@ function go(name, opts = {}){
   closeDrawer();
 
   if(name === 'dashboard'){ loadDashboard(); loadActivity(); }
-  else if(name === 'map') setTimeout(() => { if(window.NexusLazy) window.NexusLazy.loadMapLibs().then(()=> initMap()).catch(()=> initMap()); else initMap(); }, 100);
-  else if(name === 'analytics') { const loadAnalytics = ()=> loadTabs().then(() => { if(currentTabId) loadCharts(); }); if(window.NexusLazy) window.NexusLazy.loadChartLibs().then(loadAnalytics).catch(()=>{ const cl=document.getElementById('chartsList'); if(cl) cl.innerHTML='<div class="empty" style="padding:30px;"><div class="empty-title">Chart.js gagal dimuat. Cek koneksi lalu buka lagi Analitik.</div></div>'; }); else loadAnalytics(); }
+  else if(name === 'map') setTimeout(() => { if(window.AAGuardLazy) window.AAGuardLazy.loadMapLibs().then(()=> initMap()).catch(()=> initMap()); else initMap(); }, 100);
+  else if(name === 'analytics') { const loadAnalytics = ()=> loadTabs().then(() => { if(currentTabId) loadCharts(); }); if(window.AAGuardLazy) window.AAGuardLazy.loadChartLibs().then(loadAnalytics).catch(()=>{ const cl=document.getElementById('chartsList'); if(cl) cl.innerHTML='<div class="empty" style="padding:30px;"><div class="empty-title">Chart.js gagal dimuat. Cek koneksi lalu buka lagi Analitik.</div></div>'; }); else loadAnalytics(); }
   else if(name === 'devices') renderDevicesFull();
   else if(name === 'alerts') loadAlerts();
 
@@ -280,9 +280,9 @@ async function doLogout(){
     if(window.showToast) window.showToast('Gagal logout. Periksa koneksi lalu coba lagi.', 'error');
   }
 }
-function logout(){ confirmModal('Logout', 'Yakin ingin keluar dari NEXUS?', () => { doLogout(); }); }
+function logout(){ confirmModal('Logout', 'Yakin ingin keluar dari AAguard?', () => { doLogout(); }); }
 function openDevice(id){
-  try{ sessionStorage.setItem('nexus_back_url', '/mobile'); }catch(e){}
+  try{ sessionStorage.setItem('aaguard_back_url', '/mobile'); }catch(e){}
   window.location.href = '/device/' + encodeURIComponent(id);
 }
 
@@ -496,8 +496,8 @@ function initMap(force){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
   map.on('click', e => { if(selDeviceId) placeMarker(e.latlng.lat, e.latlng.lng); });
   mapReady = true;
-  if(!window.__nexusMaps) window.__nexusMaps = [];
-  if(!window.__nexusMaps.includes(map)) window.__nexusMaps.push(map);
+  if(!window.__aaguardMaps) window.__aaguardMaps = [];
+  if(!window.__aaguardMaps.includes(map)) window.__aaguardMaps.push(map);
   invalidateMap();
   loadMapMarkers(); renderMapList();
 }
@@ -1435,7 +1435,7 @@ async function loadMobileTrend(){
   if(!canvas) return;
   // Chart.js lazy: muat dulu bila belum siap; fallback bila offline
   if(typeof Chart === 'undefined'){
-    if(window.NexusLazy){ try{ await window.NexusLazy.loadChartLibs(); }catch(e){ if(empty){ empty.style.display='flex'; empty.textContent='Chart.js gagal dimuat. Cek koneksi internet/CDN.'; } return; } }
+    if(window.AAGuardLazy){ try{ await window.AAGuardLazy.loadChartLibs(); }catch(e){ if(empty){ empty.style.display='flex'; empty.textContent='Chart.js gagal dimuat. Cek koneksi internet/CDN.'; } return; } }
     if(typeof Chart === 'undefined'){ if(empty){ empty.style.display='flex'; empty.textContent='Chart.js gagal dimuat. Cek koneksi internet/CDN.'; } return; }
   }
 
@@ -1937,7 +1937,7 @@ function switchDashboard(id){
   currentDashboardName = db.name;
   currentDashboardIcon = db.icon || 'fa-layer-group';
   // Save to localStorage for persistence
-  try { localStorage.setItem('nexus-mobile-dashboard', String(id)); } catch(e) {}
+  try { localStorage.setItem('aaguard-mobile-dashboard', String(id)); } catch(e) {}
   toast(`Dashboard: ${db.name}`);
   setTimeout(() => window.location.reload(), 400);
 }
@@ -2452,7 +2452,7 @@ function downloadBulkTemplate(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'nexus-bulk-template.csv';
+  a.download = 'aaguard-bulk-template.csv';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -2832,7 +2832,7 @@ if(!window.showToast){
     const d = await r.json();
     if(d.success){
       dashboardsList = d.dashboards || [];
-      const saved = localStorage.getItem('nexus-mobile-dashboard');
+      const saved = localStorage.getItem('aaguard-mobile-dashboard');
       const target = saved ? dashboardsList.find(x => x.id === parseInt(saved, 10)) : null;
       const def = target || dashboardsList.find(x => x.is_default) || dashboardsList[0];
       if(def){

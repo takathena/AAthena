@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Restore database yang aman.
+AAguard IoT - Restore database yang aman.
 
 Endpoint restore TIDAK menimpa DB yang sedang hidup. Ia hanya menyiapkan:
     <DB_PATH>.restore-pending   salinan backup yang sudah diverifikasi
@@ -17,7 +17,7 @@ import time
 
 from app.utils import process_lock
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 PENDING_SUFFIX = '.restore-pending'
 MARKER_SUFFIX = '.restore-marker'

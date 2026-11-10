@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI user endpoints (dari app/api.py USER MANAGEMENT)."""
+"""AAguard IoT - FastAPI user endpoints (dari app/api.py USER MANAGEMENT)."""
 import logging
 
 from fastapi import APIRouter, Request
@@ -9,7 +9,7 @@ from app.api_common import _clean_timestamp, _validate_username
 from app.config import get_config
 from app.deps import audit, get_current_user, limiter, require_admin, safe_json
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['users'])
 
 

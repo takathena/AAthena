@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI system endpoints (dari app/api.py)."""
+"""AAguard IoT - FastAPI system endpoints (dari app/api.py)."""
 import json
 import logging
 import os
@@ -15,7 +15,7 @@ from app.deps import (audit, get_current_user, limiter, require_admin,
                       scope_error_response as _se, device_in_sql,
                       dashboard_in_sql as _dash_in_sql)
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['system'])
 
 

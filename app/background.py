@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Background Tasks (native async FastAPI)
+AAguard IoT - Background Tasks (native async FastAPI)
 Hanya satu worker yang menjalankan background tasks (file lock). Worker lain terus
 mencoba mengambil alih secara berkala bila pemegang lock mati. Setiap task mencatat
 heartbeat di tabel user_settings supaya status terlihat dari /system/info.
@@ -20,7 +20,7 @@ from app.database import get_db_context, get_wib_time
 from app.utils import parse_datetime
 from app.alerts import create_offline_alert, clear_offline_alert
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 shutdown_event = None  # asyncio.Event, dibuat di start_background_tasks
 _bg_tasks = []
@@ -62,8 +62,8 @@ async def _delete_chunks(conn, sql, params, chunk=CLEANUP_CHUNK):
 class BackgroundLock:
     """Exclusive file lock non-blocking. Dua instance pada path yang sama saling eksklusif."""
 
-    def __init__(self, lock_dir=None, name='nexus-background.lock'):
-        self.lock_dir = lock_dir or os.environ.get('NEXUS_LOCK_DIR', '/tmp')
+    def __init__(self, lock_dir=None, name='aaguard-background.lock'):
+        self.lock_dir = lock_dir or os.environ.get('AAGUARD_LOCK_DIR', '/tmp')
         self.name = name
         self._file = None
 

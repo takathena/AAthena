@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI application factory (v2.0 core).
+"""AAguard IoT - FastAPI application factory (v2.0 core).
 
 FastAPI jalan via `uvicorn app.main:app` / `run:app` (gunicorn+uvicorn).
 Fitur: CORS, CSP/HSTS, SessionMiddleware starlette,
@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_config
 
 __version__ = '2.0.0'
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 CSRF_EXEMPT_PREFIX = '/api/v1/data'
 CSRF_EXEMPT_PATHS = {'/login'}  # login divalidasi via form csrf_token di views.
@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
 
 def create_app(config_override=None):
     config = get_config()
-    app = FastAPI(title='NEXUS IoT', version=__version__, lifespan=lifespan)
+    app = FastAPI(title='AAguard IoT', version=__version__, lifespan=lifespan)
 
     from app.deps import limiter
     app.state.limiter = limiter
@@ -147,7 +147,7 @@ def create_app(config_override=None):
     )
     app.add_middleware(_SecurityHeadersMiddleware)
     app.add_middleware(_CsrfMiddleware)
-    secret = config.SECRET_KEY or 'nexus-dev-fallback-change-me-32chars'
+    secret = config.SECRET_KEY or 'aaguard-dev-fallback-change-me-32chars'
     lifetime = int(config.PERMANENT_SESSION_LIFETIME.total_seconds())
     app.add_middleware(
         SessionMiddleware,

@@ -2,12 +2,12 @@
 
 ## Ditambahkan
 - static/css/components.css: tombol (primer, sekunder/ghost, bahaya, ikon), badge, chip, tabs, menu ⋯, dialog konfirmasi, drawer, empty state, kelas .nx-hidden. Memakai token yang sudah ada.
-- static/js/ui.js: NexusUI.applyNeeds() untuk atribut data-needs, serta helper dialog, drawer, dan menu. Tanpa penyimpanan browser.
+- static/js/ui.js: AAGuardUI.applyNeeds() untuk atribut data-needs, serta helper dialog, drawer, dan menu. Tanpa penyimpanan browser.
 - tests/test_phase6_fondasi.py: tes struktur CSS/JS/template dan logika applyNeeds (Node.js).
 
 ## Diubah
 - templates/dashboard.html: memuat components.css dan ui.js (sebelum dashboard.js).
-- static/js/dashboard.js: memanggil NexusUI.applyNeeds() setelah peran dashboard aktif diketahui. Logika is-viewer lama tetap ada.
+- static/js/dashboard.js: memanggil AAGuardUI.applyNeeds() setelah peran dashboard aktif diketahui. Logika is-viewer lama tetap ada.
 
 ## Belum (sisa Fase 0)
 - Memecah dashboard.js (4.200 baris) menjadi modul per halaman.
@@ -52,7 +52,7 @@
 ## Ditambahkan
 - static/js/users.js: daftar pengguna langsung tampil di Pengaturan › Pengguna; tambah dan edit lewat laci kanan (X + Simpan saja); hapus lewat dialog Batal | Hapus tanpa X; konfirmasi "Buang perubahan?" bila ada isian belum tersimpan; Escape di laci yang berubah juga meminta konfirmasi.
 - Pencarian pengguna dan menu ⋯ per baris (Edit, Hapus). Hapus tidak tersedia untuk akun sendiri.
-- Event `nexus:settings-tab` dari settings.js agar daftar dimuat saat tab dibuka.
+- Event `aaguard:settings-tab` dari settings.js agar daftar dimuat saat tab dibuka.
 - Peran: User dan Admin (is_admin yang sudah ada).
 
 ## Belum (menunggu Paket A di review)

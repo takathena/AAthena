@@ -73,7 +73,7 @@ def test_health_failure_does_not_leak_error(anon_client, monkeypatch):
     import app.database as dbmod
 
     def boom():
-        raise RuntimeError('SECRET-PATH /var/lib/nexus/iot.db')
+        raise RuntimeError('SECRET-PATH /var/lib/aaguard/iot.db')
     monkeypatch.setattr(dbmod, 'get_db_context', boom)
     resp = anon_client.get('/health')
     assert resp.status_code == 503

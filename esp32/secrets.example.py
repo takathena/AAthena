@@ -4,7 +4,7 @@
 WIFI_SSID = "GANTI_DENGAN_NAMA_WIFI"
 WIFI_PASSWORD = "GANTI_DENGAN_PASSWORD_WIFI"
 
-# URL endpoint data di server NEXUS (port publik default: 4455)
+# URL endpoint data di server AAguard (port publik default: 4455)
 API_URL = "http://GANTI_DENGAN_IP_SERVER:4455/api/v1/data"
 
 # ID device sama persis dengan yang terdaftar di dashboard

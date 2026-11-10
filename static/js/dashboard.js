@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - Dashboard Logic (v8.0)
+   AAguard IoT - Dashboard Logic (v8.0)
    Batch 1-7 + Metric cards integrated
    ========================================== */
 
@@ -74,29 +74,29 @@
     };
 
     const STORAGE_KEYS = {
-        THEME: 'nexus-theme',
-        GLOBAL_TIME: 'nexus-global-time',
-        LAST_SECTION: 'nexus-last-section',
-        BACK_URL: 'nexus_back_url',
-        CURRENT_TAB: 'nexus-current-tab',
-        CHART_LAYOUT_PREFIX: 'nexus-chart-layout-',
-        CANVAS_HEIGHT: 'nexus-chart-canvas-height',
+        THEME: 'aaguard-theme',
+        GLOBAL_TIME: 'aaguard-global-time',
+        LAST_SECTION: 'aaguard-last-section',
+        BACK_URL: 'aaguard_back_url',
+        CURRENT_TAB: 'aaguard-current-tab',
+        CHART_LAYOUT_PREFIX: 'aaguard-chart-layout-',
+        CANVAS_HEIGHT: 'aaguard-chart-canvas-height',
     };
 
     const DASHBOARD_SECTIONS = ['dashboard', 'map', 'graph', 'devices', 'alerts', 'settings'];
 
     function refreshPermissionGates() {
-        if (!window.NexusUI) return;
+        if (!window.AAGuardUI) return;
         const curDash = (state.dashboardsList || []).find(d => d.id === state.currentDashboardId);
-        NexusUI.applyNeeds({
+        AAGuardUI.applyNeeds({
             isAdmin: userState.currentIsAdmin === true,
             dashboardRole: curDash ? curDash.role : null,
             permissions: userState.permissions || [],
         });
 
         // Sinkronkan context ke command palette (agar 'needs' difilter sesuai peran)
-        if (window.NexusCommandPalette && typeof window.NexusCommandPalette.updateContext === 'function') {
-            window.NexusCommandPalette.updateContext({
+        if (window.AAGuardCommandPalette && typeof window.AAGuardCommandPalette.updateContext === 'function') {
+            window.AAGuardCommandPalette.updateContext({
                 isAdmin: userState.currentIsAdmin === true,
                 dashboardRole: curDash ? curDash.role : null,
                 permissions: userState.permissions || [],
@@ -203,8 +203,8 @@
     function closeModal(id) { const el = $(id); if (el) el.classList.remove('active'); unlockBodyScrollIfNoModal(); }
 
     function registerMapInstance(map) {
-        if (!window.__nexusMaps) window.__nexusMaps = [];
-        if (!window.__nexusMaps.includes(map)) window.__nexusMaps.push(map);
+        if (!window.__aaguardMaps) window.__aaguardMaps = [];
+        if (!window.__aaguardMaps.includes(map)) window.__aaguardMaps.push(map);
     }
 
     // Leaflet must re-measure after display/layout settles (banner toggle, resize, sidebar)
@@ -279,7 +279,7 @@
             }
         }
 
-        if (section === 'settings' && window.NexusSettings) { NexusSettings.show(getSettingsTabFromHash()); }
+        if (section === 'settings' && window.AAGuardSettings) { AAGuardSettings.show(getSettingsTabFromHash()); }
         if (section === 'map') {
             setTimeout(() => {
                 if (!state.mapFull) initFullMap();
@@ -308,8 +308,8 @@
                     }, 200);
                 };
                 // Chart.js/interact.js lazy-load saat graph dibuka; fallback pesan bila offline
-                if (window.NexusLazy && typeof window.NexusLazy.loadChartLibs === 'function') {
-                    window.NexusLazy.loadChartLibs().then(runGraph).catch(() => {
+                if (window.AAGuardLazy && typeof window.AAGuardLazy.loadChartLibs === 'function') {
+                    window.AAGuardLazy.loadChartLibs().then(runGraph).catch(() => {
                         const grid = $('chartsGrid');
                         if (grid) grid.innerHTML = '<div class="chart-empty" style="padding:30px;text-align:center;">Gagal memuat Chart.js (offline?). Cek koneksi lalu buka lagi section Analitik.</div>';
                     });
@@ -318,11 +318,11 @@
                 }
             }, 100);
         }
-        if (section === 'alerts' && window.NexusAlerts && typeof window.NexusAlerts.load === 'function') {
-            if (window.NexusAlerts.setSearch) {
-                window.NexusAlerts.setSearch(state.alertSearchTerm || '');
+        if (section === 'alerts' && window.AAGuardAlerts && typeof window.AAGuardAlerts.load === 'function') {
+            if (window.AAGuardAlerts.setSearch) {
+                window.AAGuardAlerts.setSearch(state.alertSearchTerm || '');
             }
-            window.NexusAlerts.load();
+            window.AAGuardAlerts.load();
         }
 
         try { sessionStorage.setItem(STORAGE_KEYS.LAST_SECTION, section); } catch (e) {}
@@ -357,7 +357,7 @@
         const offline = summary.offline_devices || 0;
         const alerts = summary.active_alerts || 0;
         const applyMetrics = () => {
-            const M = window.NexusMetrics;
+            const M = window.AAGuardMetrics;
             if (!M) return;
             M.setValue('totalDevices', total);
             M.setValue('onlineDevices', online);
@@ -366,10 +366,10 @@
             // Sparkline real dari /api/v1/metrics/devices-history
             loadDashboardMetricsHistory();
         };
-        if (window.NexusMetrics) applyMetrics();
+        if (window.AAGuardMetrics) applyMetrics();
         // metrics.css/js lazy saat section dibuka
-        else if (window.NexusLazy && typeof window.NexusLazy.loadMetrics === 'function') {
-            window.NexusLazy.loadMetrics().then(applyMetrics).catch(() => {});
+        else if (window.AAGuardLazy && typeof window.AAGuardLazy.loadMetrics === 'function') {
+            window.AAGuardLazy.loadMetrics().then(applyMetrics).catch(() => {});
         }
 
         const setText = (id, val) => { const el = $(id); if (el) el.textContent = val; };
@@ -388,7 +388,7 @@
     }
 
     async function loadDashboardMetricsHistory() {
-        const M = window.NexusMetrics;
+        const M = window.AAGuardMetrics;
         if (!M) return;
 
         const res = await API.call('/api/v1/metrics/devices-history?hours=24');
@@ -653,7 +653,7 @@
         if (typeof L === 'undefined') {
             el.innerHTML = '<div class="map-fallback" style="padding:30px;text-align:center;">Memuat peta...</div>';
             try {
-                if (window.NexusLazy) await window.NexusLazy.loadMapLibs();
+                if (window.AAGuardLazy) await window.AAGuardLazy.loadMapLibs();
             } catch (e) { /* ditangani di bawah */ }
             if (typeof L === 'undefined') {
                 el.innerHTML = '<div class="map-fallback" style="padding:30px;text-align:center;">Gagal memuat peta (offline?). Cek koneksi lalu buka lagi section Peta.</div>';
@@ -685,7 +685,7 @@
         if (state.mapBento) return;
         const el = $('mapBento'); if (!el) return;
         if (typeof L === 'undefined') {
-            try { if (window.NexusLazy) await window.NexusLazy.loadMapLibs(); } catch (e) {}
+            try { if (window.AAGuardLazy) await window.AAGuardLazy.loadMapLibs(); } catch (e) {}
             if (typeof L === 'undefined') {
                 el.innerHTML = '<div class="bento-map-empty">Peta gagal dimuat (offline?). Buka section Peta.</div>';
                 return;
@@ -753,7 +753,7 @@
         if (!canvas) return;
         if (state.devices.length === 0) { if (sub) sub.textContent = 'Belum ada perangkat'; return; }
         if (typeof Chart === 'undefined') {
-            try { if (window.NexusLazy) await window.NexusLazy.loadChartLibs(); } catch (e) {}
+            try { if (window.AAGuardLazy) await window.AAGuardLazy.loadChartLibs(); } catch (e) {}
             if (typeof Chart === 'undefined') { if (sub) sub.textContent = 'Chart.js gagal dimuat (offline?)'; return; }
         }
         // Gabungan history semua perangkat (cap 15 agar tidak banjir request)
@@ -945,8 +945,8 @@
                 el.querySelectorAll('[data-action="map-select"],[data-action="map-view"]').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const id = btn.dataset.deviceId;
-                        if (btn.dataset.action === 'map-select') window.__nexusMapSelect(id);
-                        else window.__nexusMapView(id);
+                        if (btn.dataset.action === 'map-select') window.__aaguardMapSelect(id);
+                        else window.__aaguardMapView(id);
                     });
                 });
             });
@@ -1049,8 +1049,8 @@
         updateMapSelectedBanner();
     }
 
-    window.__nexusMapSelect = function(id) { if (state.mapFull) state.mapFull.closePopup(); selectMapDevice(id, { zoom: false, placeMarker: true }); };
-    window.__nexusMapView = function(id) { viewDevice(id); };
+    window.__aaguardMapSelect = function(id) { if (state.mapFull) state.mapFull.closePopup(); selectMapDevice(id, { zoom: false, placeMarker: true }); };
+    window.__aaguardMapView = function(id) { viewDevice(id); };
 
     // ==========================================
     // DEVICE FILTERS
@@ -2517,12 +2517,12 @@
         state.currentDashboardRole = curDash ? curDash.role : null;
         document.body.classList.toggle('is-viewer',
             !isAdminMeta() && !!curDash && curDash.role === 'viewer');
-        if (window.NexusUI) {
-            NexusUI.applyNeeds({ isAdmin: isAdminMeta(), dashboardRole: curDash ? curDash.role : null,
+        if (window.AAGuardUI) {
+            AAGuardUI.applyNeeds({ isAdmin: isAdminMeta(), dashboardRole: curDash ? curDash.role : null,
                                  permissions: userState.permissions || [] });
         }
-        if (window.NexusCommandPalette && typeof window.NexusCommandPalette.updateContext === 'function') {
-            window.NexusCommandPalette.updateContext({
+        if (window.AAGuardCommandPalette && typeof window.AAGuardCommandPalette.updateContext === 'function') {
+            window.AAGuardCommandPalette.updateContext({
                 isAdmin: isAdminMeta(),
                 dashboardRole: curDash ? curDash.role : null,
                 permissions: userState.permissions || [],
@@ -2882,9 +2882,9 @@
                 const usersBtn = $('manageUsersBtn');
                 if (usersBtn) usersBtn.style.display = userState.currentIsAdmin ? '' : 'none';
                 // Tombol legacy ini tak terlihat (ada di #legacyActions). Satu-satunya
-                // jalan ke kelola pengguna: command palette -> NexusUsers.open().
+                // jalan ke kelola pengguna: command palette -> AAGuardUsers.open().
                 if (usersBtn) usersBtn.addEventListener('click', () => {
-                    if (window.NexusUsers) window.NexusUsers.open();
+                    if (window.AAGuardUsers) window.AAGuardUsers.open();
                     else window.showToast('Modul pengguna belum siap', 'error');
                 });
 
@@ -3720,7 +3720,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'nexus-bulk-import-template.csv';
+        a.download = 'aaguard-bulk-import-template.csv';
         a.click();
         URL.revokeObjectURL(url);
     }
@@ -4231,8 +4231,8 @@
                     applyGraphSearch();
                 } else if (state.currentSection === 'alerts') {
                     state.alertSearchTerm = value;
-                    if (window.NexusAlerts && window.NexusAlerts.setSearch) {
-                        window.NexusAlerts.setSearch(value);
+                    if (window.AAGuardAlerts && window.AAGuardAlerts.setSearch) {
+                        window.AAGuardAlerts.setSearch(value);
                     }
                 } else {
                     state.deviceSearchTerm = value;
@@ -4287,7 +4287,7 @@
         window.addEventListener('hashchange', () => {
             const s = getSectionFromHash();
             if (state.currentSection !== s) showSection(s, true);
-            else if (s === 'settings' && window.NexusSettings) NexusSettings.show(getSettingsTabFromHash());
+            else if (s === 'settings' && window.AAGuardSettings) AAGuardSettings.show(getSettingsTabFromHash());
         });
     }
 
@@ -4328,14 +4328,14 @@
 
         window.addEventListener('sidebar-toggle', () => {
             setTimeout(() => {
-                if (window.__nexusMaps) window.__nexusMaps.forEach(m => { try { m.invalidateSize(); } catch (e) {} });
+                if (window.__aaguardMaps) window.__aaguardMaps.forEach(m => { try { m.invalidateSize(); } catch (e) {} });
             }, 400);
         });
 
         window.addEventListener('resize', () => {
-            clearTimeout(window.__nexusResizeTO);
-            window.__nexusResizeTO = setTimeout(() => {
-                if (window.__nexusMaps) window.__nexusMaps.forEach(m => { try { m.invalidateSize(); } catch (e) {} });
+            clearTimeout(window.__aaguardResizeTO);
+            window.__aaguardResizeTO = setTimeout(() => {
+                if (window.__aaguardMaps) window.__aaguardMaps.forEach(m => { try { m.invalidateSize(); } catch (e) {} });
                 clampChartsToCanvas();
                 resolveCollisions();
                 applyAllGeom();

@@ -2,7 +2,7 @@
 # `docker compose up` memuat file ini otomatis. Untuk PRODUKSI jalankan tanpa override:
 #   docker compose -f docker-compose.yml up -d --build      (atau: make docker-up)
 services:
-  nexus-iot:
+  aaguard-iot:
     volumes:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro

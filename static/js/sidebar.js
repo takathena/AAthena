@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - Sidebar Toggle v4
+   AAguard IoT - Sidebar Toggle v4
    - Toggle via class .sidebar-toggle-btn (bisa multiple)
    - Logo = link ke #dashboard (bukan toggle)
    - DESKTOP (>992px): collapsed (icon-only 72px) ↔ expanded (240px)
@@ -9,7 +9,7 @@
 (function() {
     'use strict';
 
-    const STORAGE_KEY = 'nexus-sidebar-collapsed';
+    const STORAGE_KEY = 'aaguard-sidebar-collapsed';
     const MOBILE_BREAKPOINT = 992;
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
 
@@ -21,8 +21,8 @@
 
     function invalidateMaps() {
         setTimeout(() => {
-            if (window.__nexusMaps) {
-                window.__nexusMaps.forEach(m => {
+            if (window.__aaguardMaps) {
+                window.__aaguardMaps.forEach(m => {
                     try { m.invalidateSize(); } catch (e) {}
                 });
             }
@@ -172,7 +172,7 @@
 
     // Expose public API
     window.toggleSidebar = toggleSidebar;
-    window.NexusSidebar = {
+    window.AAGuardSidebar = {
         toggle: toggleSidebar,
         setDesktopCollapsed,
         setMobileExpanded,

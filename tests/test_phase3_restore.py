@@ -39,7 +39,7 @@ def _integrity(path):
 
 @pytest.fixture
 def paths(tmp_path, monkeypatch):
-    monkeypatch.setenv('NEXUS_LOCK_DIR', str(tmp_path / 'locks'))
+    monkeypatch.setenv('AAGUARD_LOCK_DIR', str(tmp_path / 'locks'))
     return str(tmp_path / 'live.db'), str(tmp_path / 'backup.db')
 
 

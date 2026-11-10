@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - Alert Center (v9)
+   AAguard IoT - Alert Center (v9)
    + Alert Trend Chart (stacked bar per jam)
    + Alert History Viewer (modal audit trail)
    + Date Range Picker
@@ -28,7 +28,7 @@
     };
 
     const STORAGE_KEYS = {
-        BACK_URL: 'nexus_back_url',
+        BACK_URL: 'aaguard_back_url',
     };
 
     const _seenAlertIds = new Set();
@@ -986,8 +986,8 @@
         // Date range picker untuk alert (css/js lazy saat section dibuka)
         const drpEl = document.getElementById('alertDateRange');
         const makeAlertDRP = () => {
-            if (!drpEl || !window.NexusDateRangePicker) return;
-            state.alertDRP = new window.NexusDateRangePicker.DateRangePicker(drpEl, {
+            if (!drpEl || !window.AAGuardDateRangePicker) return;
+            state.alertDRP = new window.AAGuardDateRangePicker.DateRangePicker(drpEl, {
                 placeholder: 'Filter tanggal...',
                 onChange: (start, end) => {
                     state.dateStart = start || '';
@@ -996,9 +996,9 @@
                 }
             });
         };
-        if (window.NexusDateRangePicker) makeAlertDRP();
-        else if (window.NexusLazy && typeof window.NexusLazy.loadDateRange === 'function') {
-            window.NexusLazy.loadDateRange().then(makeAlertDRP).catch(() => {});
+        if (window.AAGuardDateRangePicker) makeAlertDRP();
+        else if (window.AAGuardLazy && typeof window.AAGuardLazy.loadDateRange === 'function') {
+            window.AAGuardLazy.loadDateRange().then(makeAlertDRP).catch(() => {});
         }
 
         const refreshBtn = $('refreshAlertsBtn');
@@ -1086,7 +1086,7 @@
         }
     });
 
-    window.NexusAlerts = {
+    window.AAGuardAlerts = {
         init,
         load: loadAlerts,
         loadStats,

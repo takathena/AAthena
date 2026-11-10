@@ -1,4 +1,4 @@
-"""NEXUS IoT - FastAPI dashboards/widgets/tabs (dari app/dashboards.py)."""
+"""AAguard IoT - FastAPI dashboards/widgets/tabs (dari app/dashboards.py)."""
 import json
 import logging
 import re
@@ -11,7 +11,7 @@ from app.deps import (audit, get_current_user, get_dashboard_role, limiter,
                       role_allows, safe_json)
 from app.utils import safe_json_loads
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 router = APIRouter(prefix='/api/v1', tags=['dashboards'])
 
 SLUG_RE = re.compile(r'^[a-z0-9\-]+$')

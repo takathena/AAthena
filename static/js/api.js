@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - API Helper (v3 FIXED)
+   AAguard IoT - API Helper (v3 FIXED)
    Fix:
      - 401 clear session + redirect
      - Global flatten error object → string
@@ -120,8 +120,8 @@
 
     function clearClientSession() {
         try {
-            sessionStorage.removeItem('nexus_back_url');
-            sessionStorage.removeItem('nexus-last-section');
+            sessionStorage.removeItem('aaguard_back_url');
+            sessionStorage.removeItem('aaguard-last-section');
         } catch (e) {}
     }
 

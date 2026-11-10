@@ -1,5 +1,5 @@
 /* ==========================================================
-   NEXUS — Metric Cards helper
+   AAguard — Metric Cards helper
    ========================================================== */
 (function () {
     'use strict';
@@ -157,12 +157,12 @@
         bindMenus(document);
     }
 
-    window.NexusMetrics = {
+    window.AAGuardMetrics = {
         renderSparkline: renderSparkline,
         setValue: setValue,
         setTrend: setTrend,
         buildSparkline: buildSparkline,
     };
 
-    console.log('[NexusMetrics] Ready');
+    console.log('[AAGuardMetrics] Ready');
 })();

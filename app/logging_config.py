@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Logging Configuration
+AAguard IoT - Logging Configuration
 """
 import os
 import logging
@@ -41,6 +41,6 @@ def setup_logging(config):
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
 
-    logger = logging.getLogger('nexus')
+    logger = logging.getLogger('aaguard')
     logger.info("Logging initialized")
     return logger

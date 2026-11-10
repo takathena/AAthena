@@ -1,5 +1,5 @@
 /* ==========================================
-   NEXUS IoT - Dashboard Store v3 (Multi-Dashboard)
+   AAguard IoT - Dashboard Store v3 (Multi-Dashboard)
    + list, create, update, delete, set-default
    ========================================== */
 

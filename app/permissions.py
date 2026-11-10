@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Peran user dan izin granular (Paket A).
+AAguard IoT - Peran user dan izin granular (Paket A).
 
 Sumber kebenaran tetap di backend. UI hanya menyembunyikan kontrol.
 

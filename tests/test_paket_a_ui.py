@@ -53,7 +53,7 @@ const fs = require('fs');
 global.window = {};
 global.document = { addEventListener() {}, querySelectorAll() { return []; } };
 eval(fs.readFileSync(process.argv[1], 'utf8'));
-const A = window.NexusUI._allowed;
+const A = window.AAGuardUI._allowed;
 const cases = [
   ['perm:foo.view', {isAdmin:false, permissions:['foo.view']}],
   ['perm:foo.view', {isAdmin:false, permissions:[]}],

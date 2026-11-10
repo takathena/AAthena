@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Throttle percobaan login gagal.
+AAguard IoT - Throttle percobaan login gagal.
 
 Disimpan di tabel `login_failures` (SQLite) supaya konsisten antar worker Gunicorn.
 Dua kunci dihitung terpisah:

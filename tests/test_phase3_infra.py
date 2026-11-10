@@ -11,7 +11,7 @@ def _read(*parts):
 
 
 def test_nginx_chat_location_has_long_read_timeout():
-    conf = _read('nginx', 'conf.d', 'nexus.conf')
+    conf = _read('nginx', 'conf.d', 'aaguard.conf')
     m = re.search(r'location\s+/api/v1/chat\s*\{(.*?)\n    \}', conf, re.S)
     assert m, 'harus ada location /api/v1/chat'
     secs = int(re.search(r'proxy_read_timeout\s+(\d+)s', m.group(1)).group(1))
@@ -19,7 +19,7 @@ def test_nginx_chat_location_has_long_read_timeout():
 
 
 def test_nginx_connection_header_uses_map_not_constant_upgrade():
-    conf = _read('nginx', 'conf.d', 'nexus.conf')
+    conf = _read('nginx', 'conf.d', 'aaguard.conf')
     assert re.search(r'map\s+\$http_upgrade\s+\$connection_upgrade', conf)
     assert 'Connection "upgrade"' not in conf
     assert 'proxy_set_header Connection $connection_upgrade' in conf
@@ -47,7 +47,7 @@ def test_public_port_is_consistent_5008():
 
 def test_prod_compose_does_not_mount_application_code():
     compose = _read('docker-compose.yml')
-    app_block = compose.split('nginx:')[0]                 # layanan nexus-iot
+    app_block = compose.split('nginx:')[0]                 # layanan aaguard-iot
     for mount in ('./app:', './templates:', './run.py:'):
         assert mount not in app_block
     assert './static:/app/static' not in app_block

@@ -1,5 +1,5 @@
 """
-NEXUS IoT - API Common Helpers
+AAguard IoT - API Common Helpers
 Dipisahkan dari app/api.py agar helper yang dipakai banyak route (timestamp,
 auth device, status, label alert, auto-interval, user, purge) punya rumah sendiri.
 Khususnya test yang mengimpor helper lewat app.api tetap jalan karena app/api.py
@@ -12,7 +12,7 @@ from app.database import get_db_context, get_wib_time
 from app.utils import verify_api_key
 from app.alerts import clear_offline_alert
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 # ============================================================
 # Helper

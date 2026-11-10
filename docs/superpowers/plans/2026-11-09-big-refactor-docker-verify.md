@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor besar NEXUS IoT tanpa mengubah fitur/kegunaan (API, web, alert, RFID, multi-user, background, backup/restore, chat), lalu deploy via Docker Compose dan verifikasi situs berjalan semestinya.
+**Goal:** Refactor besar AAguard IoT tanpa mengubah fitur/kegunaan (API, web, alert, RFID, multi-user, background, backup/restore, chat), lalu deploy via Docker Compose dan verifikasi situs berjalan semestinya.
 
 **Architecture:** Pecah monolit `api.py` (2984 baris, 59 route) dan `dashboards.py` (955 baris) menjadi package per-domain dengan layer services tipis, pertahankan kontrak HTTP/JSON + schema persis, lalu validasi lewat pytest + smoke Docker (health → login → dashboard → ingest → CRUD → background).
 
@@ -15,7 +15,7 @@
 - Python 3.11; Flask 3.1.3; SQLite WAL; schema tetap v18 (`app/database.SCHEMA_VERSION==18`); `run.py` (`run:app`) dan Gunicorn `run:app` tetap entry point.
 - Kontrak tidak berubah: semua path `/api/v1/*`, status code, bentuk JSON `{success, error?, ...}`, auth session + CSRF, rate limit, API key SHA-256, CSP/HSTS, dan semua nama env di `.env.example` (PORT 5000 internal, NGINX_PORT 5008 publik).
 - DB_PATH default `database/iot.db`, WAL, `busy_timeout=30000`; migrasi hanya append (jangan edit v1..v18), tambah v19 bila perlu.
-- Docker: `docker-compose.yml` (nexus-iot + nginx), Dockerfile multi-stage non-root UID 1000, volume `database/`, `logs/`, `backup/`, `.env` ro.
+- Docker: `docker-compose.yml` (aaguard-iot + nginx), Dockerfile multi-stage non-root UID 1000, volume `database/`, `logs/`, `backup/`, `.env` ro.
 - `ruff check app run.py` harus hijau; `pytest -q` hijau sebelum deploy Docker.
 
 ## Review Focus
@@ -23,7 +23,7 @@
 - **Payload device jelek / berlebih:** JSON rusak, `data` bukan dict datar, NaN/Infinity, string >64, >32 key, RFID UID tak valid (`0x...`), > `DATA_MAX_BYTES` (8192) — harus 400/413 tanpa menyimpan yatim.
 - **Auth & akses lintas user:** tanpa session/CSRF, non-admin ubah/hapus device/kartu, user A baca dashboard user B, logout GET vs POST, throttle login per username+IP & per-IP — harus 401/403/404 dan tidak bocor error/secret.
 - **Alert state machine & ack:** healthy→warning→danger→warning→healthy + hysteresis per-sensor, ack meng-skip retrigger bila severity sama/ringan tapi retrigger bila memburuk, offline timeout = 2× interval (10–86400 dtk, median 5 sampel) — harus tidak flip-flop / tidak spam notifikasi.
-- **Efek samping DB & background:** `database is locked`, multi-worker Gunicorn + file lock `db-init`/`nexus-background`, cleanup 24 jam + VACUUM >1000 baris, backup `iot_*.db` (min keep 3, jangan hapus `pre-restore-*`), restore tertunda diterapkan saat start —
+- **Efek samping DB & background:** `database is locked`, multi-worker Gunicorn + file lock `db-init`/`aaguard-background`, cleanup 24 jam + VACUUM >1000 baris, backup `iot_*.db` (min keep 3, jangan hapus `pre-restore-*`), restore tertunda diterapkan saat start —
 - **Edge deploy/browser:** `/health` 503 tanpa bocor path, 500 tanpa bocor `str(e)`, CSP/HSTS header, static cache-busting `?v=<mtime>`, API key plain hanya sekali, CSV export anti formula-injection (`=+-@`), purge tanpa batas tanggal ditolak.
 
 ---
@@ -305,18 +305,18 @@ Run: `python3 -m pytest tests/test_phase3_infra.py tests/test_paket_a_ui.py test
 ## Task 7: Hardening Docker (tanpa ubah stack)
 
 **Files:**
-- Modify: `Dockerfile`, `docker-compose.yml`, `docker-compose.override.yml`, `docker-entrypoint.sh`, `nginx/nginx.conf`, `nginx/conf.d/nexus.conf`, `.dockerignore`
+- Modify: `Dockerfile`, `docker-compose.yml`, `docker-compose.override.yml`, `docker-entrypoint.sh`, `nginx/nginx.conf`, `nginx/conf.d/aaguard.conf`, `.dockerignore`
 - Test: `tests/test_phase3_infra.py`, `tests/test_phase3_backup.py`, `tests/test_phase3_restore.py`
 
 **Interfaces:**
-- Consumes: `PORT`, `NGINX_PORT`, `WEB_CONCURRENCY`, `NEXUS_LOCK_DIR`, `BACKUP_DIR`, `LOG_FILE`
+- Consumes: `PORT`, `NGINX_PORT`, `WEB_CONCURRENCY`, `AAGUARD_LOCK_DIR`, `BACKUP_DIR`, `LOG_FILE`
 - Produces: `make docker-up` → nginx :5008 → Flask :5000 → `/health` 200, `/login` 200
 
 - [ ] **Step 1: Failing/checklist test**
 
 ```python
 def test_dockerfile_nonroot():
-    assert 'useradd' in open('Dockerfile').read() or 'USER nexus' in open('Dockerfile').read()
+    assert 'useradd' in open('Dockerfile').read() or 'USER aaguard' in open('Dockerfile').read()
 ```
 
 - [ ] **Step 2: Run → PASS baseline**
@@ -371,14 +371,14 @@ curl -sf http://localhost:5008/ready
 | 7 | `/alerts`, ack + bulk-ack, `/attendance` report/export CSV | 200, CSV tanpa formula-injection |
 | 8 | `POST /api/v1/system/backup` → list → download | file `iot_*.db`, `pre-restore-*` tidak terhapus otomatis |
 | 9 | Chat (bila `LLM_API_KEY` diisi) `/api/v1/chat/health` | 200/offline tapi app tetap jalan |
-|10 | Restart `docker compose restart nexus-iot` | restore tertunda diterapkan, session/CSRF tetap valid, health 200 lagi |
+|10 | Restart `docker compose restart aaguard-iot` | restore tertunda diterapkan, session/CSRF tetap valid, health 200 lagi |
 
 Bila `LLM_API_KEY` kosong: panel chat memang tidak tampil (bukan error) — catat sebagai pass, jangan paksa isi.
 
 - [ ] **Step 3: Log & hygiene**
 
 ```bash
-docker compose logs nexus-iot | tail -100
+docker compose logs aaguard-iot | tail -100
 docker compose logs nginx | tail -50
 curl -s -D - http://localhost:5008/login | grep -i -E "content-security|strict-transport|x-frame"
 ```

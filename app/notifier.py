@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Telegram Notification Dispatcher (native async FastAPI)
+AAguard IoT - Telegram Notification Dispatcher (native async FastAPI)
 """
 import asyncio
 import hashlib
@@ -13,7 +13,7 @@ from app.config import get_config
 from app.database import get_db_context
 from app.workspace import get_dashboard_telegram
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 WIB = timezone(timedelta(hours=7))
 
 _notify_queue = None  # asyncio.Queue, dibuat lazily di event loop aktif
@@ -325,7 +325,7 @@ async def send_test_notification(token=None, chat_id=None):
         'alert_type': 'temperature',
         'severity': 'info',
         'old_severity': None,
-        'message': 'Ini pesan test dari NEXUS IoT.',
+        'message': 'Ini pesan test dari AAguard IoT.',
         'value': 25.5,
         'timestamp': datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S WIB'),
     }

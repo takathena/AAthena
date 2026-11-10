@@ -1,5 +1,5 @@
 /* ==========================================================
-   NEXUS — Lazy loader (v2.0 frontend trim)
+   AAguard — Lazy loader (v2.0 frontend trim)
    Memuat CDN & aset section secara dinamis, bukan eager di <head>.
    Fitur tidak dihapus, hanya cara load yang berubah.
    ========================================================== */
@@ -123,10 +123,10 @@
     // Command palette: load on demand via Ctrl+K / klik search-box (desktop).
     document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
-            if (window.NexusCommandPalette) return; // module sendiri yang menangani
+            if (window.AAGuardCommandPalette) return; // module sendiri yang menangani
             e.preventDefault();
             loadCommandPalette().then(function () {
-                if (window.NexusCommandPalette && window.NexusCommandPalette.open) window.NexusCommandPalette.open();
+                if (window.AAGuardCommandPalette && window.AAGuardCommandPalette.open) window.AAGuardCommandPalette.open();
             }).catch(function () { fail('Command palette gagal dimuat. Cek koneksi.'); });
         }
     }, true);
@@ -134,14 +134,14 @@
     document.addEventListener('click', function (e) {
         var sb = e.target.closest && e.target.closest('.search-box');
         if (!sb || sb.classList.contains('search-context')) return;
-        if (window.NexusCommandPalette) return; // module sendiri yang menangani (capture)
+        if (window.AAGuardCommandPalette) return; // module sendiri yang menangani (capture)
         e.preventDefault();
         loadCommandPalette().then(function () {
-            if (window.NexusCommandPalette && window.NexusCommandPalette.open) window.NexusCommandPalette.open();
+            if (window.AAGuardCommandPalette && window.AAGuardCommandPalette.open) window.AAGuardCommandPalette.open();
         }).catch(function () { fail('Command palette gagal dimuat. Cek koneksi.'); });
     }, true);
 
-    window.NexusLazy = {
+    window.AAGuardLazy = {
         loadMapLibs: loadMapLibs,
         loadChartLibs: loadChartLibs,
         loadMetrics: loadMetrics,

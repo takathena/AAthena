@@ -1,14 +1,14 @@
 /* ==========================================================
-   NEXUS — Command Palette (Ctrl+K / Cmd+K)
-   Akses cepat ke fitur Nexus via keyboard.
+   AAguard — Command Palette (Ctrl+K / Cmd+K)
+   Akses cepat ke fitur AAGuard via keyboard.
    ========================================================== */
 (function () {
     'use strict';
 
-    const STORAGE_KEY_HINT_SEEN = 'nexus-cmdk-hint-seen';
+    const STORAGE_KEY_HINT_SEEN = 'aaguard-cmdk-hint-seen';
 
     // ============================================================
-    // Daftar command — dapat diperluas dengan NexusCommandPalette.register()
+    // Daftar command — dapat diperluas dengan AAGuardCommandPalette.register()
     // ============================================================
     const COMMANDS = [
         // ---------- HALAMAN ----------
@@ -52,7 +52,7 @@
         // ---------- ADMIN ----------
         { id: 'manage-users', group: 'Admin', label: 'Kelola user',
           icon: 'fa-users', keywords: ['user', 'pengguna', 'kelola', 'manage', 'admin'],
-          action: () => (window.NexusUsers ? window.NexusUsers.open()
+          action: () => (window.AAGuardUsers ? window.AAGuardUsers.open()
                                            : _click('manageUsersBtn')),
           needs: 'admin' },
         { id: 'global-rules', group: 'Admin', label: 'Global alert rules',
@@ -124,7 +124,7 @@
     function _openDevice(deviceId) {
         close();
         setTimeout(() => {
-            try { sessionStorage.setItem('nexus_back_url', '/#' + (window.location.hash || '#dashboard').replace('#','')); } catch (e) {}
+            try { sessionStorage.setItem('aaguard_back_url', '/#' + (window.location.hash || '#dashboard').replace('#','')); } catch (e) {}
             window.location.href = '/device/' + encodeURIComponent(deviceId);
         }, 80);
     }
@@ -154,14 +154,14 @@
         setTimeout(() => {
             const section = hash.replace('#', '').split('/')[0];
             if (window.location.hash === hash) {
-                if (typeof window.__nexusShowSection === 'function') {
-                    window.__nexusShowSection(section);
+                if (typeof window.__aaguardShowSection === 'function') {
+                    window.__aaguardShowSection(section);
                 }
                 return;
             }
             window.location.hash = hash;
-            if (typeof window.__nexusShowSection === 'function') {
-                window.__nexusShowSection(section);
+            if (typeof window.__aaguardShowSection === 'function') {
+                window.__aaguardShowSection(section);
             }
         }, 80);
     }
@@ -188,8 +188,8 @@
     function _refresh() {
         close();
         setTimeout(() => {
-            if (typeof window.__nexusRefreshDashboard === 'function') {
-                window.__nexusRefreshDashboard();
+            if (typeof window.__aaguardRefreshDashboard === 'function') {
+                window.__aaguardRefreshDashboard();
             } else {
                 window.location.reload();
             }
@@ -674,7 +674,7 @@
         init();
     }
 
-    window.NexusCommandPalette = {
+    window.AAGuardCommandPalette = {
         open,
         close,
         toggle,

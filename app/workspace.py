@@ -1,5 +1,5 @@
 """
-NEXUS IoT - Workspace (dashboard = ruang kerja)
+AAguard IoT - Workspace (dashboard = ruang kerja)
 
 Async FastAPI murni:
 
@@ -29,7 +29,7 @@ from contextlib import asynccontextmanager
 
 import aiosqlite
 
-logger = logging.getLogger('nexus')
+logger = logging.getLogger('aaguard')
 
 ROLE_RANK = {'viewer': 1, 'editor': 2, 'owner': 3}
 MEMBER_ROLES = ('viewer', 'editor')
