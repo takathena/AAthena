@@ -2005,9 +2005,8 @@
         const usedTs = downsampleHistory(inRange.length > 0 ? inRange : allTs, 360);
         if (usedTs.length === 0) { showChartEmpty(config.id, 'Menunggu data sensor...'); return; }
 
-        // Bar Race (bar / horizontalBar) — animated over time frames
+        // Bar Race (bar / horizontalBar) — snapshot real data, animasi hanya saat data update (setOption)
         if (config.chartType === 'bar' || config.chartType === 'horizontalBar') {
-            const cats = [];
             const catInfo = [];
             deviceIds.forEach(did => {
                 const hist = historyByDevice[did] || [];
@@ -2015,43 +2014,28 @@
                 const tsMap = {}; hist.forEach(it => { tsMap[it.timestamp] = it.data || {}; });
                 activeKeys.forEach(key => {
                     const info = DATA_KEYS[key]; if(!info) return;
-                    const has = usedTs.some(ts => { const o=tsMap[ts]; const v=o?(o[key]??o[key.toLowerCase()]??o[key.toUpperCase()]):null; return v!==null && v!==undefined; });
-                    if(!has) return;
+                    let val = null;
+                    for (let i = usedTs.length - 1; i >= 0; i--) {
+                        const o = tsMap[usedTs[i]];
+                        const v = o ? (o[key] ?? o[key.toLowerCase()] ?? o[key.toUpperCase()]) : null;
+                        if (v !== null && v !== undefined && typeof v === 'number' && isFinite(v)) { val = v; break; }
+                    }
+                    if (val === null) return;
                     const label = deviceIds.length > 1 ? `${dname} — ${info.label}` : info.label;
-                    cats.push(label);
-                    catInfo.push({did,key,color: CHART_COLORS[cats.length % CHART_COLORS.length], tsMap});
+                    catInfo.push({ name: label, value: val, color: CHART_COLORS[catInfo.length % CHART_COLORS.length] });
                 });
             });
-            if (cats.length === 0) { showChartEmpty(config.id, 'Tidak ada data sensor yang cocok'); return; }
-            const frames = downsampleHistory(usedTs, 40).map(ts => {
-                const vals = catInfo.map(ci => { const o=ci.tsMap[ts]; const v=o?(o[ci.key]??o[ci.key.toLowerCase()]??o[ci.key.toUpperCase()]):0; return (typeof v==='number' && isFinite(v))?v:0; });
-                return { ts, vals };
-            });
-            const n = cats.length;
-            const palette = catInfo.map(c=>c.color);
-            const renderFrame = (fi) => {
-                const f = frames[fi];
-                const pairs = cats.map((name,i)=>({name,value:f.vals[i],color:palette[i]})).sort((a,b)=>a.value-b.value).slice(-10);
-                const names = pairs.map(p=>p.name), values = pairs.map(p=>p.value), cols = pairs.map(p=>p.color);
-                const tsLabel = (()=>{ const s=String(f.ts).replace(' ','T'); const d=new Date(/[+-]\d\d:\d\d$|Z$/.test(s)?s:s+'+07:00'); return isNaN(d)?String(f.ts):d.toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); })();
-                chart.setOption({
-                    animationDurationUpdate: 600, animationEasingUpdate: 'linear',
-                    grid:{left:10,right:30,top:20,bottom:20,containLabel:true},
-                    xAxis:{type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
-                    yAxis:{type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false},animationDurationUpdate:300},
-                    series:[{type:'bar',data:values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:[0,6,6,0]}})),barMaxWidth:22,label:{show:true,position:'right',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
-                    graphic:[{type:'text',right:20,bottom:30,style:{text:tsLabel,font: '600 14px '+font,fill:colors.labelColor+'55'}}],
-                    tooltip:{trigger:'item'}
-                }, {notMerge:true,lazyUpdate:false});
-            };
-            let fi = 0;
-            renderFrame(0);
-            if (frames.length > 1) {
-                plotEl._race = setInterval(() => {
-                    fi = (fi + 1) % frames.length;
-                    try { if(chart.isDisposed()) { clearInterval(plotEl._race); plotEl._race=null; return; } renderFrame(fi); } catch(e){ clearInterval(plotEl._race); plotEl._race=null; }
-                }, 700);
-            }
+            if (catInfo.length === 0) { showChartEmpty(config.id, 'Tidak ada data sensor yang cocok'); return; }
+            const pairs = catInfo.sort((a,b)=>a.value-b.value).slice(-10);
+            const names = pairs.map(p=>p.name), values = pairs.map(p=>p.value), cols = pairs.map(p=>p.color);
+            chart.setOption({
+                animation: true, animationDuration: 400, animationDurationUpdate: 700, animationEasingUpdate: 'cubicOut',
+                grid:{left:10,right:30,top:12,bottom:12,containLabel:true},
+                xAxis:{type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
+                yAxis:{type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false}},
+                series:[{type:'bar',data:values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:[0,6,6,0]}})),barMaxWidth:22,label:{show:true,position:'right',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
+                tooltip:{trigger:'item'}
+            }, {notMerge:true,lazyUpdate:false});
             config.chartInstance = plotEl;
             return;
         }

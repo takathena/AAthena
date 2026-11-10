@@ -957,30 +957,33 @@ function renderChart(ch, hist){
   const usedTs = (inRange.length ? inRange : allTs).slice(-300);
   if(!usedTs.length){ chart.clear(); return; }
 
-  // Bar Race
+  // Bar Race (snapshot real data, animasi hanya saat update data)
   if(ch.chartType==='bar' || ch.chartType==='horizontalBar'){
-    const cats=[], catInfo=[];
+    const catInfo=[];
     ch.deviceIds.forEach(did => {
       const h = hist[did] || []; const dn = devices.find(x=>x.device_id===did)?.device_name || did;
       const tsMap={}; h.forEach(it=>{ tsMap[it.timestamp]=it.data||{}; });
       activeKeys.forEach(k=>{
         const info=DATA_KEYS[k]; if(!info) return;
-        const has=usedTs.some(ts=>{const o=tsMap[ts]; const v=o?(o[k]??o[k.toLowerCase()]??o[k.toUpperCase()]):null; return v!==null&&v!==undefined;});
-        if(!has) return;
-        cats.push(ch.deviceIds.length>1?`${dn} — ${info.label}`:info.label);
-        catInfo.push({key:k,color:COLORS[cats.length%COLORS.length],tsMap});
+        let val=null;
+        for(let i=usedTs.length-1;i>=0;i--){
+          const o=tsMap[usedTs[i]]; const v=o?(o[k]??o[k.toLowerCase()]??o[k.toUpperCase()]):null;
+          if(v!==null&&v!==undefined&&typeof v==='number'&&isFinite(v)){ val=v; break; }
+        }
+        if(val===null) return;
+        catInfo.push({name: ch.deviceIds.length>1?`${dn} — ${info.label}`:info.label, value:val, color:COLORS[catInfo.length%COLORS.length]});
       });
     });
-    if(!cats.length){ chart.clear(); return; }
-    const frames = (usedTs.length>40? usedTs.filter((_,i)=>i%Math.ceil(usedTs.length/40)===0):usedTs).map(ts=>({ts, vals:catInfo.map(ci=>{const o=ci.tsMap[ts]; const v=o?(o[ci.key]??o[ci.key.toLowerCase()]??o[ci.key.toUpperCase()]):0; return (typeof v==='number'&&isFinite(v))?v:0;})}));
-    const palette = catInfo.map(c=>c.color);
-    const renderFrame=(fi)=>{
-      const f=frames[fi];
-      const pairs=cats.map((name,i)=>({name,value:f.vals[i],color:palette[i]})).sort((a,b)=>a.value-b.value).slice(-8);
-      chart.setOption({animationDurationUpdate:600,animationEasingUpdate:'linear',grid:{left:10,right:30,top:12,bottom:12,containLabel:true},xAxis:{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}},yAxis:{type:'category',data:pairs.map(p=>p.name),inverse:true,axisLabel:{color:labelC,fontSize:9},axisLine:{show:false},axisTick:{show:false}},series:[{type:'bar',data:pairs.map(p=>({value:p.value,itemStyle:{color:p.color,borderRadius:[0,6,6,0]}})),barMaxWidth:18,label:{show:true,position:'right',color:labelC,fontSize:9}}],tooltip:{trigger:'item'}},{notMerge:true,lazyUpdate:false});
-    };
-    let fi=0; renderFrame(0);
-    if(frames.length>1){ plotEl._race=setInterval(()=>{ fi=(fi+1)%frames.length; try{ if(chart.isDisposed()){clearInterval(plotEl._race);plotEl._race=null;return;} renderFrame(fi);}catch(e){clearInterval(plotEl._race);plotEl._race=null;} }, 700); }
+    if(!catInfo.length){ chart.clear(); return; }
+    const pairs = catInfo.sort((a,b)=>a.value-b.value).slice(-8);
+    chart.setOption({
+      animation:true, animationDuration:400, animationDurationUpdate:700, animationEasingUpdate:'cubicOut',
+      grid:{left:10,right:30,top:12,bottom:12,containLabel:true},
+      xAxis:{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}},
+      yAxis:{type:'category',data:pairs.map(p=>p.name),inverse:true,axisLabel:{color:labelC,fontSize:9},axisLine:{show:false},axisTick:{show:false}},
+      series:[{type:'bar',data:pairs.map(p=>({value:p.value,itemStyle:{color:p.color,borderRadius:[0,6,6,0]}})),barMaxWidth:18,label:{show:true,position:'right',color:labelC,fontSize:9}}],
+      tooltip:{trigger:'item'}
+    }, {notMerge:true,lazyUpdate:false});
     return;
   }
 
