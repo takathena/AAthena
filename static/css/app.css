@@ -1358,7 +1358,7 @@
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
   z-index: 1;
   user-select: none;
   transition: border-color 0.12s;
@@ -1370,6 +1370,7 @@
   box-shadow: var(--shadow-lg);
 }
 .chart-card-header {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: 8px 12px;
   border-bottom: 1px solid var(--hairline);
   display: flex;
@@ -1429,7 +1430,7 @@
   color: var(--accent-crit);
   border-color: var(--accent-crit);
 }
-.chart-card-body { flex: 1; min-height: 0; padding: 6px 10px 10px; overflow: visible; }
+.chart-card-body { flex: 1; min-height: 0; padding: 6px 10px 10px; overflow: visible; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .chart-canvas-container {
   position: relative;
   width: 100%;

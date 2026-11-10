@@ -936,9 +936,9 @@ function renderChart(ch, hist){
     let opt;
     if(ch.chartType==='doughnut'||ch.chartType==='halfDoughnut'){
       const isHalf = ch.chartType==='halfDoughnut';
-      opt = {...base, tooltip:{trigger:'item'}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:isHalf?['45%','80%']:['40%','70%'],center:isHalf?['50%','72%']:['50%','45%'],startAngle:isHalf?180:90,endAngle:isHalf?360:-270,padAngle:2,itemStyle:{borderRadius:8,borderColor:bg,borderWidth:2},data,label:{show:false}}]};
+      opt = {...base, tooltip:{trigger:'item',appendToBody:true,confine:true}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:isHalf?['45%','80%']:['40%','70%'],center:isHalf?['50%','72%']:['50%','45%'],startAngle:isHalf?180:90,endAngle:isHalf?360:-270,padAngle:2,itemStyle:{borderRadius:8,borderColor:bg,borderWidth:2},data,label:{show:false}}]};
     } else if(ch.chartType==='pie'){
-      opt = {...base, tooltip:{trigger:'item'}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:'65%',data,label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
+      opt = {...base, tooltip:{trigger:'item',appendToBody:true,confine:true}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:'65%',data,label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
     } else if(ch.chartType==='polarArea'){
       opt = {...base, polar:{radius:'65%'}, angleAxis:{type:'category',data:labels,axisLabel:{color:labelC,fontSize:9}}, radiusAxis:{axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}, series:[{type:'bar',data:vals.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{}};
     } else {
@@ -1015,7 +1015,7 @@ function renderChart(ch, hist){
     });
   });
   if(!series.length){ chart.clear(); return; }
-  chart.setOption({...base,grid:{left:6,right:8,top:26,bottom:4,containLabel:true},tooltip:{trigger:'axis',confine:true},legend:{type:'scroll',top:0,textStyle:{color:legendC,fontSize:10}},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9,hideOverlap:true}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
+  chart.setOption({...base,grid:{left:6,right:8,top:26,bottom:4,containLabel:true},tooltip:{trigger:'axis',confine:true,appendToBody:true},legend:{type:'scroll',top:0,textStyle:{color:legendC,fontSize:10}},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9,hideOverlap:true}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
 }
 
 
@@ -1425,7 +1425,7 @@ async function loadMobileTrend(){
     chart.setOption({
       animation:false,
       grid:{left:34,right:8,top:8,bottom:34},
-      tooltip:{trigger:'axis',axisPointer:{type:'shadow'},confine:true},
+      tooltip:{trigger:'axis',axisPointer:{type:'shadow'},confine:true,appendToBody:true},
       legend:{bottom:0,textStyle:{color:legendC,fontSize:10},itemWidth:10,itemHeight:10},
       xAxis:{type:'category',data:displayLabels,axisLine:{show:false},axisTick:{show:false},axisLabel:{color:labelC,fontSize:9}},
       yAxis:{type:'value',minInterval:1,splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},

@@ -639,7 +639,7 @@
             chart.setOption({
                 animation:false,
                 grid:{left:8,right:8,top:26,bottom:4,containLabel:true},
-                tooltip:{trigger:'axis',confine:true, axisPointer:{type:'shadow'}},
+                tooltip:{trigger:'axis',confine:true,appendToBody:true,axisPointer:{type:'shadow'}},
                 legend:{top:0,left:0,textStyle:{color:colors.legendColor,fontSize:10,fontFamily:CHART_FONT},itemWidth:10,itemHeight:10},
                 xAxis:{type:'time',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{show:false},axisLine:{show:false},axisTick:{show:false}},
                 yAxis:{type:'value',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{lineStyle:{color:colors.gridColor}}},
@@ -1970,7 +1970,7 @@
                 const isHalf = config.chartType === 'halfDoughnut';
                 opt = {
                     animation:false, textStyle:{fontFamily:font},
-                    tooltip:{trigger:'item'},
+                    tooltip:{trigger:'item',appendToBody:true,confine:true},
                     legend:{type:'scroll', bottom:0, textStyle:{color:colors.legendColor,fontSize:10}},
                     series:[{
                         type:'pie',
@@ -1983,7 +1983,7 @@
                     }]
                 };
             } else if (config.chartType === 'pie') {
-                opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item'}, legend:{ type:'scroll', orient:'vertical', right:0, top:'center', textStyle:{color:colors.legendColor,fontSize:10} }, series:[{type:'pie',radius:'58%',center:['32%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1}}] };
+                opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item',appendToBody:true,confine:true}, legend:{ type:'scroll', orient:'vertical', right:0, top:'center', textStyle:{color:colors.legendColor,fontSize:10} }, series:[{type:'pie',radius:'58%',center:['32%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1}}] };
             } else if (config.chartType === 'polarArea') {
                 opt = { animation:false, textStyle:{fontFamily:font}, polar:{radius:'65%'}, angleAxis:{type:'category',data:gaugeLabels,axisLabel:{color:colors.labelColor,fontSize:9}}, radiusAxis:{axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}}, series:[{type:'bar',data:gaugeValues.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{} };
             } else { // radar (unchanged)
@@ -2036,7 +2036,7 @@
                 xAxis: isH ? {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}} : {type:'category',data:names,axisLabel:{color:colors.labelColor,fontSize:10,interval:0,rotate:names.length>4?20:0},axisLine:{show:false},axisTick:{show:false}},
                 yAxis: isH ? {type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false}} : {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
                 series:[{type:'bar',data,barMaxWidth:28,label:{show:true,position:isH?'right':'top',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
-                tooltip:{trigger:'item'}
+                tooltip:{trigger:'item',appendToBody:true,confine:true}
             }, {notMerge:true,lazyUpdate:false});
             config.chartInstance = plotEl;
             return;
@@ -2087,7 +2087,7 @@
         chart.setOption({
             animation:false, textStyle:{fontFamily:font},
             grid:{left:8,right:12,top:28,bottom:8,containLabel:true},
-            tooltip:{trigger:'axis',confine:true},
+            tooltip:{trigger:'axis',confine:true,appendToBody:true},
             legend:{type:'scroll', top:0, textStyle:{color:colors.legendColor,fontSize:10}, pageIconSize:10, pageTextStyle:{color:colors.legendColor}},
             xAxis:{type:'time', splitLine:{show:false}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font, hideOverlap:true}},
             yAxis:{type:'value', splitLine:{lineStyle:{color:colors.gridColor}}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font}},
