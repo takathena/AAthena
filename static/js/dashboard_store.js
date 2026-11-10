@@ -151,7 +151,8 @@
             'doughnut': 'doughnut_chart', 'pie': 'pie_chart',
             'polarArea': 'polar_area', 'radar': 'radar_chart',
             'horizontalBar': 'horizontal_bar', 'stackedBar': 'stacked_bar',
-            'stackedArea': 'stacked_area',
+            'stackedArea': 'stacked_area', 'scatter': 'scatter_chart',
+            'halfDoughnut': 'half_doughnut', 'pieDataset': 'pie_dataset',
         };
         return map[chartType] || 'line_chart';
     }
@@ -162,7 +163,8 @@
             'doughnut_chart': 'doughnut', 'pie_chart': 'pie',
             'polar_area': 'polarArea', 'radar_chart': 'radar',
             'horizontal_bar': 'horizontalBar', 'stacked_bar': 'stackedBar',
-            'stacked_area': 'stackedArea',
+            'stacked_area': 'stackedArea', 'scatter_chart': 'scatter',
+            'half_doughnut': 'halfDoughnut', 'pie_dataset': 'pieDataset',
         };
         return map[widgetType] || 'line';
     }

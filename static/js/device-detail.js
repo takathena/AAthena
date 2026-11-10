@@ -411,8 +411,8 @@ async function loadHistoryChart(){
       }).filter(x => x && x[0]!=null);
       const name = key.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()) + (meta.unit ? ` (${meta.unit})` : '');
       return {
-        name, type: 'line', data, showSymbol: false, smooth: 0.25,
-        sampling: 'lttb', lineStyle: { width: 2, color }, itemStyle: { color },
+        name, type: 'line', data, showSymbol: false, smooth: true,
+        sampling: 'lttb', lineStyle: { width: 2.5, color }, itemStyle: { color },
         areaStyle: keys.length === 1 ? { color: color + '22' } : undefined,
         connectNulls: true, emphasis: { focus: 'series' },
       };

@@ -821,8 +821,8 @@ async function deleteTab(){
   else alert(d.error || 'Gagal');
 }
 
-const toChart = t => ({line_chart:'line', bar_chart:'bar', area_chart:'area', doughnut_chart:'doughnut', pie_chart:'pie', polar_area:'polarArea', radar_chart:'radar', horizontal_bar:'horizontalBar', stacked_bar:'stackedBar', stacked_area:'stackedArea'}[t] || 'line');
-const toWidget = t => ({line:'line_chart', bar:'bar_chart', area:'area_chart', doughnut:'doughnut_chart', pie:'pie_chart', polarArea:'polar_area', radar:'radar_chart', horizontalBar:'horizontal_bar', stackedBar:'stacked_bar', stackedArea:'stacked_area'}[t] || 'line_chart');
+const toChart = t => ({line_chart:'line', bar_chart:'bar', area_chart:'area', doughnut_chart:'doughnut', pie_chart:'pie', polar_area:'polarArea', radar_chart:'radar', horizontal_bar:'horizontalBar', stacked_bar:'stackedBar', stacked_area:'stackedArea', scatter_chart:'scatter', half_doughnut:'halfDoughnut', pie_dataset:'pieDataset'}[t] || 'line');
+const toWidget = t => ({line:'line_chart', bar:'bar_chart', area:'area_chart', doughnut:'doughnut_chart', pie:'pie_chart', polarArea:'polar_area', radar:'radar_chart', horizontalBar:'horizontal_bar', stackedBar:'stacked_bar', stackedArea:'stacked_area', scatter:'scatter_chart', halfDoughnut:'half_doughnut', pieDataset:'pie_dataset'}[t] || 'line_chart');
 
 async function loadCharts(){
   const c = document.getElementById('chartsList'); if(!c) return;
@@ -840,7 +840,7 @@ async function loadCharts(){
       return;
     }
     const widgets = d.widgets || [];
-    charts.forEach(ch => { if(ch.chartInstance){ const el=document.getElementById(ch.id+'_c'); if(el){ try{const i=echarts.getInstanceByDom(el); if(i) i.dispose();}catch(e){} try{if(el._ro){el._ro.disconnect();el._ro=null;}}catch(e){} } } ch.chartInstance=null; });
+    charts.forEach(ch => { const el=document.getElementById(ch.id+'_c'); if(el){ try{if(el._race){clearInterval(el._race);el._race=null;}}catch(e){} try{const i=echarts.getInstanceByDom(el); if(i) i.dispose();}catch(e){} try{if(el._ro){el._ro.disconnect();el._ro=null;}}catch(e){} } ch.chartInstance=null; });
     charts = widgets.map(w => {
       const cfg = w.config || {};
       const devs = Array.isArray(cfg.devices) && cfg.devices.length ? cfg.devices : (w.device_id ? [w.device_id] : []);
@@ -901,6 +901,7 @@ function renderChart(ch, hist){
     const w=document.getElementById(ch.id); if(w && !w.querySelector('.empty')) w.innerHTML += '<div class="empty" style="padding:20px;"><div class="empty-title">ECharts gagal dimuat. Cek koneksi internet/CDN.</div></div>';
     return;
   }
+  if(plotEl._race){ clearInterval(plotEl._race); plotEl._race=null; }
   let chart = echarts.getInstanceByDom(plotEl);
   if(!chart) chart = echarts.init(plotEl, null, {renderer:'canvas'});
   if(!plotEl._ro && typeof ResizeObserver!=='undefined'){ plotEl._ro=new ResizeObserver(()=>{try{chart&&!chart.isDisposed()&&chart.resize();}catch(e){}}); plotEl._ro.observe(plotEl); }
@@ -910,10 +911,12 @@ function renderChart(ch, hist){
   const gridC = isLight ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)';
   const labelC = isLight ? '#737373' : '#a3a3a3';
   const legendC = isLight ? '#525252' : '#a3a3a3';
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-2').trim() || (isLight?'#fff':'#141414');
   const font = CHART_FONT;
   const activeKeys = Object.entries(ch.showData || {}).filter(([k,v]) => v).map(([k]) => k);
-  const isGauge = ['doughnut','pie','polarArea','radar'].includes(ch.chartType);
+  const isGauge = ['doughnut','pie','polarArea','radar','halfDoughnut','pieDataset'].includes(ch.chartType);
   const base = { animation:false, textStyle:{fontFamily:font,color:labelC} };
+  const cutoff = Date.now() - timeMinutes*60*1000;
 
   if(isGauge){
     const labels = [], vals = [];
@@ -931,11 +934,20 @@ function renderChart(ch, hist){
     const pal = vals.map((_,i)=>COLORS[i%COLORS.length]);
     const data = labels.map((n,i)=>({name:n,value:vals[i],itemStyle:{color:pal[i]}}));
     let opt;
-    if(ch.chartType==='pie'||ch.chartType==='doughnut'){
-      opt = {...base, tooltip:{trigger:'item'}, legend:{bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:ch.chartType==='doughnut'?['40%','70%']: '70%', data, label:{show:false}, emphasis:{itemStyle:{shadowBlur:10}}}]};
+    if(ch.chartType==='doughnut'||ch.chartType==='halfDoughnut'){
+      const isHalf = ch.chartType==='halfDoughnut';
+      opt = {...base, tooltip:{trigger:'item'}, legend:{type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:isHalf?['45%','80%']:['40%','70%'],center:isHalf?['50%','72%']:['50%','45%'],startAngle:isHalf?180:90,endAngle:isHalf?360:-270,padAngle:2,itemStyle:{borderRadius:8,borderColor:bg,borderWidth:2},data,label:{show:false}}]};
+    } else if(ch.chartType==='pie'||ch.chartType==='pieDataset'){
+      const legend = {type:'scroll',bottom:0,textStyle:{color:legendC,fontSize:10}};
+      if(ch.chartType==='pieDataset'){
+        const source=[['name','value']].concat(labels.map((n,i)=>[n,vals[i]]));
+        opt = {...base, tooltip:{trigger:'item'}, legend, dataset:{source}, series:[{type:'pie',radius:'65%',encode:{itemName:'name',value:'value'},label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
+      } else {
+        opt = {...base, tooltip:{trigger:'item'}, legend, series:[{type:'pie',radius:'65%',data,label:{show:false},itemStyle:{borderRadius:4,borderColor:bg,borderWidth:1}}]};
+      }
     } else if(ch.chartType==='polarArea'){
-      opt = {...base, polar:{radius:'70%'}, angleAxis:{type:'category',data:labels,axisLabel:{color:labelC,fontSize:9}}, radiusAxis:{axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}, series:[{type:'bar',data:vals.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{}};
-    } else { // radar
+      opt = {...base, polar:{radius:'65%'}, angleAxis:{type:'category',data:labels,axisLabel:{color:labelC,fontSize:9}}, radiusAxis:{axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}, series:[{type:'bar',data:vals.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{}};
+    } else {
       const max = Math.max(...vals, 1);
       opt = {...base, radar:{indicator:labels.map(n=>({name:n,max:max*1.2})),axisName:{color:labelC,fontSize:9},splitLine:{lineStyle:{color:gridC}},splitArea:{show:false}}, series:[{type:'radar',data:[{value:vals,areaStyle:{color:pal[0]+'33'},lineStyle:{color:pal[0]},itemStyle:{color:pal[0]}}]}], tooltip:{}};
     }
@@ -946,50 +958,80 @@ function renderChart(ch, hist){
   const tsSet = new Set();
   ch.deviceIds.forEach(did => (hist[did] || []).forEach(it => tsSet.add(it.timestamp)));
   if(!tsSet.size){ chart.clear(); return; }
-  const cutoff = Date.now() - timeMinutes*60*1000;
   const allTs = Array.from(tsSet).sort();
   const inRange = allTs.filter(ts => { const d = parseTs(ts); return d && d.getTime() >= cutoff; });
   const usedTs = (inRange.length ? inRange : allTs).slice(-300);
   if(!usedTs.length){ chart.clear(); return; }
-  const series = []; let ci = 0;
 
+  // Bar Race
+  if(ch.chartType==='bar' || ch.chartType==='horizontalBar'){
+    const cats=[], catInfo=[];
+    ch.deviceIds.forEach(did => {
+      const h = hist[did] || []; const dn = devices.find(x=>x.device_id===did)?.device_name || did;
+      const tsMap={}; h.forEach(it=>{ tsMap[it.timestamp]=it.data||{}; });
+      activeKeys.forEach(k=>{
+        const info=DATA_KEYS[k]; if(!info) return;
+        const has=usedTs.some(ts=>{const o=tsMap[ts]; const v=o?(o[k]??o[k.toLowerCase()]??o[k.toUpperCase()]):null; return v!==null&&v!==undefined;});
+        if(!has) return;
+        cats.push(ch.deviceIds.length>1?`${dn} — ${info.label}`:info.label);
+        catInfo.push({key:k,color:COLORS[cats.length%COLORS.length],tsMap});
+      });
+    });
+    if(!cats.length){ chart.clear(); return; }
+    const frames = (usedTs.length>40? usedTs.filter((_,i)=>i%Math.ceil(usedTs.length/40)===0):usedTs).map(ts=>({ts, vals:catInfo.map(ci=>{const o=ci.tsMap[ts]; const v=o?(o[ci.key]??o[ci.key.toLowerCase()]??o[ci.key.toUpperCase()]):0; return (typeof v==='number'&&isFinite(v))?v:0;})}));
+    const palette = catInfo.map(c=>c.color);
+    const renderFrame=(fi)=>{
+      const f=frames[fi];
+      const pairs=cats.map((name,i)=>({name,value:f.vals[i],color:palette[i]})).sort((a,b)=>a.value-b.value).slice(-8);
+      chart.setOption({animationDurationUpdate:600,animationEasingUpdate:'linear',grid:{left:10,right:30,top:12,bottom:12,containLabel:true},xAxis:{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}},yAxis:{type:'category',data:pairs.map(p=>p.name),inverse:true,axisLabel:{color:labelC,fontSize:9},axisLine:{show:false},axisTick:{show:false}},series:[{type:'bar',data:pairs.map(p=>({value:p.value,itemStyle:{color:p.color,borderRadius:[0,6,6,0]}})),barMaxWidth:18,label:{show:true,position:'right',color:labelC,fontSize:9}}],tooltip:{trigger:'item'}},{notMerge:true,lazyUpdate:false});
+    };
+    let fi=0; renderFrame(0);
+    if(frames.length>1){ plotEl._race=setInterval(()=>{ fi=(fi+1)%frames.length; try{ if(chart.isDisposed()){clearInterval(plotEl._race);plotEl._race=null;return;} renderFrame(fi);}catch(e){clearInterval(plotEl._race);plotEl._race=null;} }, 700); }
+    return;
+  }
+
+  // Scatter X-Y
+  if(ch.chartType==='scatter'){
+    if(activeKeys.length<2){ chart.clear(); const w=document.getElementById(ch.id); if(w&&!w.querySelector('.empty')) w.innerHTML+='<div class="empty" style="padding:12px;"><div class="empty-title">Pilih 2 jenis data (X dan Y)</div></div>'; return; }
+    const kx=activeKeys[0], ky=activeKeys[1];
+    const ix=DATA_KEYS[kx]||{label:kx,unit:''}, iy=DATA_KEYS[ky]||{label:ky,unit:''};
+    const series=[]; let ci=0;
+    ch.deviceIds.forEach(did=>{
+      const h=hist[did]||[]; if(!h.length) return; const dn=devices.find(x=>x.device_id===did)?.device_name||did; const pts=[];
+      h.forEach(item=>{ const d=parseTs(item.timestamp); if(!d||d.getTime()<cutoff) return; const o=item.data||{}; const vx=o[kx], vy=o[ky]; if(typeof vx==='number'&&typeof vy==='number') pts.push([vx,vy]); });
+      if(!pts.length) return; const color=COLORS[ci%COLORS.length]; ci++;
+      series.push({name:ch.deviceIds.length>1?dn:`${ix.label} vs ${iy.label}`,type:'scatter',data:pts.slice(-300),symbolSize:7,itemStyle:{color,opacity:0.75}});
+    });
+    if(!series.length){ chart.clear(); return; }
+    chart.setOption({...base,grid:{left:46,right:12,top:12,bottom:34},tooltip:{trigger:'item'},legend:{textStyle:{color:legendC,fontSize:10},type:'scroll'},xAxis:{type:'value',name:`${ix.label}`,nameLocation:'middle',nameGap:22,nameTextStyle:{color:labelC,fontSize:9},axisLabel:{color:labelC,fontSize:9},splitLine:{lineStyle:{color:gridC}}},yAxis:{type:'value',name:`${iy.label}`,nameTextStyle:{color:labelC,fontSize:9},axisLabel:{color:labelC,fontSize:9},splitLine:{lineStyle:{color:gridC}}},series},{notMerge:true,lazyUpdate:true});
+    return;
+  }
+
+  // Time-series
+  const series=[]; let ci=0;
   ch.deviceIds.forEach(did => {
     const h = hist[did] || []; if(!h.length) return;
     const dn = devices.find(x => x.device_id === did)?.device_name || did;
     const tsMap = {}; h.forEach(it => { tsMap[it.timestamp] = it.data || {}; });
     activeKeys.forEach(k => {
       const info = DATA_KEYS[k]; if(!info) return;
-      const data = usedTs.map(ts => {
-        const o = tsMap[ts]; const v = o ? (o[k] ?? null) : null;
-        const d = parseTs(ts); const t = d ? d.getTime() : null;
-        return (t==null) ? null : [t, v];
-      }).filter(Boolean);
+      const data = usedTs.map(ts => { const o=tsMap[ts]; const v=o?(o[k]??null):null; const d=parseTs(ts); const t=d?d.getTime():null; return (t==null)?null:[t,v]; }).filter(Boolean);
       if(!data.some(p => p[1] != null)) return;
       const color = COLORS[ci % COLORS.length]; ci++;
-      const isArea = ch.chartType === 'area' || ch.chartType === 'stackedArea';
-      const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea';
-      const isBar = ch.chartType === 'bar' || ch.chartType === 'stackedBar' || ch.chartType === 'horizontalBar';
+      const isAreaType = ch.chartType === 'area' || ch.chartType === 'stackedArea';
+      const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea' || ch.chartType === 'area';
+      const isBarType = ch.chartType === 'stackedBar';
       const name = ch.deviceIds.length > 1 ? `${dn} — ${info.label}` : `${info.label} (${info.unit})`;
-      if(isBar){
-        series.push({ name, type:'bar', data, stack:isStacked?'s':undefined, itemStyle:{color}, barMaxWidth:24, emphasis:{focus:'series'} });
+      if(isBarType){
+        series.push({ name, type:'bar', data, stack:isStacked?'s':undefined, itemStyle:{color}, barMaxWidth:24 });
       } else {
-        series.push({ name, type:'line', data, showSymbol:false, smooth:0.25, sampling:'lttb', connectNulls:true, lineStyle:{width:2,color}, itemStyle:{color}, areaStyle:isArea?{color:color+'22'}:undefined, stack:(isArea&&isStacked)?'a':undefined, emphasis:{focus:'series'} });
+        const grad = { type:'linear', x:0,y:0,x2:0,y2:1, colorStops:[{offset:0,color:color+'55'},{offset:1,color:color+'05'}] };
+        series.push({ name, type:'line', data, showSymbol:false, smooth:true, sampling:'lttb', connectNulls:true, lineStyle:{width:2,color}, itemStyle:{color}, areaStyle:isAreaType?{color:grad}:undefined, stack:(isAreaType&&isStacked)?'a':undefined });
       }
     });
   });
   if(!series.length){ chart.clear(); return; }
-  const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea';
-  const isBar = ch.chartType === 'bar' || ch.chartType === 'stackedBar' || ch.chartType === 'horizontalBar';
-  const isH = ch.chartType === 'horizontalBar';
-  const xAxis = isH ? { type:'value', splitLine:{lineStyle:{color:gridC}}, axisLabel:{color:labelC,fontSize:9} } : { type:'time', axisLabel:{color:labelC,fontSize:9}, splitLine:{show:false} };
-  const yAxis = isH ? { type:'time', axisLabel:{color:labelC,fontSize:9}, splitLine:{show:false} } : { type:'value', splitLine:{lineStyle:{color:gridC}}, axisLabel:{color:labelC,fontSize:9} };
-  chart.setOption({
-    ...base,
-    grid:{left:40,right:8,top:8,bottom:30,containLabel:false},
-    tooltip:{trigger:'axis',confine:true},
-    legend:{bottom:0,textStyle:{color:legendC,fontSize:10},type:'scroll'},
-    xAxis, yAxis, series,
-  }, {notMerge:true,lazyUpdate:true});
+  chart.setOption({...base,grid:{left:40,right:8,top:8,bottom:30},tooltip:{trigger:'axis',confine:true},legend:{textStyle:{color:legendC,fontSize:10},type:'scroll',bottom:0},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
 }
 
 
