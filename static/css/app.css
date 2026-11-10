@@ -1429,7 +1429,7 @@
   color: var(--accent-crit);
   border-color: var(--accent-crit);
 }
-.chart-card-body { flex: 1; min-height: 0; padding: 6px 8px 8px; overflow: hidden; }
+.chart-card-body { flex: 1; min-height: 0; padding: 6px 10px 10px; overflow: visible; }
 .chart-canvas-container {
   position: relative;
   width: 100%;
@@ -3652,7 +3652,7 @@
     pointer-events: none; white-space: nowrap;
 }
 .bento-tile:hover .bento-badge, .bento-tile:focus-visible .bento-badge { opacity: 1; transform: none; }
-.bento-chart-wrap canvas {
+.bento-chart-wrap canvas, .bento-chart-wrap .echart {
     position: absolute;
     inset: 0;
     width: 100% !important;

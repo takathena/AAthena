@@ -638,7 +638,7 @@
             if(!chart) return;
             chart.setOption({
                 animation:false,
-                grid:{left:34,right:8,top:24,bottom:24},
+                grid:{left:8,right:8,top:26,bottom:4,containLabel:true},
                 tooltip:{trigger:'axis',confine:true, axisPointer:{type:'shadow'}},
                 legend:{top:0,left:0,textStyle:{color:colors.legendColor,fontSize:10,fontFamily:CHART_FONT},itemWidth:10,itemHeight:10},
                 xAxis:{type:'time',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{show:false},axisLine:{show:false},axisTick:{show:false}},
@@ -1974,8 +1974,8 @@
                     legend:{type:'scroll', bottom:0, textStyle:{color:colors.legendColor,fontSize:10}},
                     series:[{
                         type:'pie',
-                        radius: isHalf ? ['45%','80%'] : ['40%','70%'],
-                        center: isHalf ? ['50%','70%'] : ['50%','45%'],
+                        radius: isHalf ? ['42%','78%'] : ['38%','68%'],
+                        center: isHalf ? ['50%','72%'] : ['50%','45%'],
                         startAngle: isHalf ? 180 : 90,
                         endAngle: isHalf ? 360 : -270,
                         padAngle: 2, itemStyle:{borderRadius:8, borderColor:bg, borderWidth:2},
@@ -1983,7 +1983,7 @@
                     }]
                 };
             } else if (config.chartType === 'pie') {
-                opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item'}, legend:{ type:'scroll', orient:'vertical', right:4, top:'center', textStyle:{color:colors.legendColor,fontSize:10} }, series:[{type:'pie',radius:'65%',center:['35%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1}}] };
+                opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item'}, legend:{ type:'scroll', orient:'vertical', right:0, top:'center', textStyle:{color:colors.legendColor,fontSize:10} }, series:[{type:'pie',radius:'58%',center:['32%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}, itemStyle:{borderRadius:4, borderColor:bg, borderWidth:1}}] };
             } else if (config.chartType === 'polarArea') {
                 opt = { animation:false, textStyle:{fontFamily:font}, polar:{radius:'65%'}, angleAxis:{type:'category',data:gaugeLabels,axisLabel:{color:colors.labelColor,fontSize:9}}, radiusAxis:{axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}}, series:[{type:'bar',data:gaugeValues.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{} };
             } else { // radar (unchanged)
@@ -2032,7 +2032,7 @@
             const data = values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:isH?[0,6,6,0]:[6,6,0,0]}}));
             chart.setOption({
                 animation: true, animationDuration: 400, animationDurationUpdate: 700, animationEasingUpdate: 'cubicOut',
-                grid:{left:isH?10:46,right:isH?30:12,top:isH?12:20,bottom:isH?12:40,containLabel:true},
+                grid:{left:isH?8:8,right:isH?40:12,top:isH?12:20,bottom:isH?8:8,containLabel:true},
                 xAxis: isH ? {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}} : {type:'category',data:names,axisLabel:{color:colors.labelColor,fontSize:10,interval:0,rotate:names.length>4?20:0},axisLine:{show:false},axisTick:{show:false}},
                 yAxis: isH ? {type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false}} : {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
                 series:[{type:'bar',data,barMaxWidth:28,label:{show:true,position:isH?'right':'top',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
@@ -2086,10 +2086,10 @@
         const isBarType = config.chartType === 'stackedBar';
         chart.setOption({
             animation:false, textStyle:{fontFamily:font},
-            grid:{left:46,right:12,top:8,bottom:32},
+            grid:{left:8,right:12,top:28,bottom:8,containLabel:true},
             tooltip:{trigger:'axis',confine:true},
-            legend:{textStyle:{color:colors.legendColor,fontSize:10},type:'scroll'},
-            xAxis:{type:'time', splitLine:{show:false}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font}},
+            legend:{type:'scroll', top:0, textStyle:{color:colors.legendColor,fontSize:10}, pageIconSize:10, pageTextStyle:{color:colors.legendColor}},
+            xAxis:{type:'time', splitLine:{show:false}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font, hideOverlap:true}},
             yAxis:{type:'value', splitLine:{lineStyle:{color:colors.gridColor}}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font}},
             series,
         }, {notMerge:true,lazyUpdate:true});

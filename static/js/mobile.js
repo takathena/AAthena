@@ -981,7 +981,7 @@ function renderChart(ch, hist){
     const data=values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:isH?[0,6,6,0]:[6,6,0,0]}}));
     chart.setOption({
       animation:true, animationDuration:400, animationDurationUpdate:700, animationEasingUpdate:'cubicOut',
-      grid:{left:isH?10:40,right:isH?30:8,top:isH?10:18,bottom:isH?10:34,containLabel:true},
+      grid:{left:isH?6:6,right:isH?36:8,top:isH?10:18,bottom:isH?4:4,containLabel:true},
       xAxis: isH?{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}:{type:'category',data:names,axisLabel:{color:labelC,fontSize:9,interval:0,rotate:names.length>3?25:0},axisLine:{show:false},axisTick:{show:false}},
       yAxis: isH?{type:'category',data:names,inverse:true,axisLabel:{color:labelC,fontSize:9},axisLine:{show:false},axisTick:{show:false}}:{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}},
       series:[{type:'bar',data,barMaxWidth:24,label:{show:true,position:isH?'right':'top',color:labelC,fontSize:9,formatter:'{c}'}}],
@@ -1015,7 +1015,7 @@ function renderChart(ch, hist){
     });
   });
   if(!series.length){ chart.clear(); return; }
-  chart.setOption({...base,grid:{left:40,right:8,top:8,bottom:30},tooltip:{trigger:'axis',confine:true},legend:{textStyle:{color:legendC,fontSize:10},type:'scroll',bottom:0},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
+  chart.setOption({...base,grid:{left:6,right:8,top:26,bottom:4,containLabel:true},tooltip:{trigger:'axis',confine:true},legend:{type:'scroll',top:0,textStyle:{color:legendC,fontSize:10}},xAxis:{type:'time',splitLine:{show:false},axisLabel:{color:labelC,fontSize:9,hideOverlap:true}},yAxis:{type:'value',splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},series},{notMerge:true,lazyUpdate:true});
 }
 
 
