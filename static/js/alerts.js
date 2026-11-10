@@ -207,6 +207,22 @@
     // ==========================================
     // ALERT TREND CHART
     // ==========================================
+    function ensureChart(el){
+        if(!el || typeof echarts === 'undefined') return null;
+        let inst = echarts.getInstanceByDom(el);
+        if(!inst) inst = echarts.init(el, null, {renderer:'canvas'});
+        if(!el._ro && typeof ResizeObserver !== 'undefined'){
+            el._ro = new ResizeObserver(() => { try{ inst && !inst.isDisposed() && inst.resize(); }catch(e){} });
+            el._ro.observe(el);
+        }
+        return inst;
+    }
+    function disposeChart(el){
+        if(!el) return;
+        try{ const inst = echarts.getInstanceByDom(el); if(inst) inst.dispose(); }catch(e){}
+        try{ if(el._ro){ el._ro.disconnect(); el._ro=null; } }catch(e){}
+    }
+
     async function loadTrend(hours) {
         const h = hours || state.trendHours;
         try {
@@ -226,7 +242,7 @@
 
             if (labels.length === 0) {
                 if (empty) empty.style.display = 'flex';
-                if (canvas) { canvas.style.display = 'none'; try { if (window.Plotly) Plotly.purge(canvas); } catch (e) {} }
+                if (canvas) { canvas.style.display = 'none'; disposeChart(canvas); }
                 state.trendChart = null;
                 return;
             }
@@ -246,12 +262,9 @@
                 return time.slice(0, 5);
             });
 
-            if (typeof Plotly === 'undefined') {
+            if (typeof echarts === 'undefined') {
                 try { if (window.AAGuardLazy) await window.AAGuardLazy.loadChartLibs(); } catch (e) {}
-                if (typeof Plotly === 'undefined') {
-                    console.warn('[Trend] Plotly not loaded');
-                    return;
-                }
+                if (typeof echarts === 'undefined') { console.warn('[Trend] ECharts not loaded'); return; }
             }
 
             const isLight = document.documentElement.getAttribute('data-theme') === 'light';
@@ -260,24 +273,21 @@
             const legendColor = isLight ? '#525252' : '#a3a3a3';
             const font = 'Geist, -apple-system, sans-serif';
 
-            const traces = [
-                { type: 'bar', name: 'Bahaya', x: displayLabels, y: dangerData, marker: { color: 'rgba(239,68,68,0.75)' }, hovertemplate: '%{x}<br>Bahaya: %{y}<extra></extra>' },
-                { type: 'bar', name: 'Peringatan', x: displayLabels, y: warningData, marker: { color: 'rgba(249,115,22,0.75)' }, hovertemplate: '%{x}<br>Peringatan: %{y}<extra></extra>' },
-                { type: 'bar', name: 'Info', x: displayLabels, y: infoData, marker: { color: 'rgba(139,92,246,0.75)' }, hovertemplate: '%{x}<br>Info: %{y}<extra></extra>' },
-            ];
-            const layout = {
-                barmode: 'stack',
-                margin: { l: 36, r: 8, t: 8, b: 36 },
-                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { family: font, color: labelColor, size: 10 },
-                legend: { orientation: 'h', y: -0.2, font: { size: 10, color: legendColor } },
-                xaxis: { gridcolor: gridColor, zeroline: false, tickfont: { size: 10, color: labelColor } },
-                yaxis: { gridcolor: gridColor, zeroline: false, tickfont: { size: 10, color: labelColor }, rangemode: 'tozero' },
-                hovermode: 'x unified',
-                uirevision: 'alertTrend',
-            };
-            const cfg = { responsive: true, displayModeBar: false };
-            await Plotly.react(canvas, traces, layout, cfg);
+            const chart = ensureChart(canvas);
+            if(!chart) return;
+            chart.setOption({
+                animation: false,
+                grid: { left: 36, right: 8, top: 8, bottom: 36, containLabel: false },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true },
+                legend: { bottom: 0, textStyle: { color: legendColor, fontSize: 10, fontFamily: font }, itemWidth: 10, itemHeight: 10 },
+                xAxis: { type: 'category', data: displayLabels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: labelColor, fontSize: 10, fontFamily: font, interval: 'auto' } },
+                yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: gridColor } }, axisLabel: { color: labelColor, fontSize: 10, fontFamily: font } },
+                series: [
+                    { name: 'Bahaya', type: 'bar', stack: 's', data: dangerData, itemStyle: { color: 'rgba(239,68,68,0.75)' }, emphasis: { focus: 'series' }, barMaxWidth: 28 },
+                    { name: 'Peringatan', type: 'bar', stack: 's', data: warningData, itemStyle: { color: 'rgba(249,115,22,0.75)' }, emphasis: { focus: 'series' }, barMaxWidth: 28 },
+                    { name: 'Info', type: 'bar', stack: 's', data: infoData, itemStyle: { color: 'rgba(139,92,246,0.75)' }, emphasis: { focus: 'series' }, barMaxWidth: 28 },
+                ],
+            }, { notMerge: true, lazyUpdate: true });
             state.trendChart = canvas;
         } catch (e) {
             console.error('[Trend] Load failed:', e);
@@ -967,7 +977,7 @@
             state.refreshInterval = null;
         }
         if (state.trendChart) {
-            try { if (window.Plotly) Plotly.purge(state.trendChart); } catch (e) {}
+            try { disposeChart(state.trendChart); } catch (e) {}
             state.trendChart = null;
         }
     });

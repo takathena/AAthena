@@ -3635,7 +3635,7 @@
     color: var(--text-3);
 }
 
-/* Analitik bento: chart sensor gabungan (Plotly, klik tile -> section graph) */
+/* Analitik bento: chart sensor gabungan (ECharts, klik tile -> section graph) */
 .bento-chart-wrap {
     position: relative;
     flex: 1;

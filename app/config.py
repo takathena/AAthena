@@ -131,7 +131,7 @@ class Config:
         'CSP_SCRIPT_SRC',
         "'self' "
         "https://cdnjs.cloudflare.com https://unpkg.com "
-        "https://cdn.jsdelivr.net https://cdn.plot.ly https://fonts.googleapis.com"
+        "https://cdn.jsdelivr.net https://fonts.googleapis.com"
     )
     CSP_STYLE_SRC = os.getenv(
         'CSP_STYLE_SRC',

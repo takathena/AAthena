@@ -245,7 +245,7 @@ function go(name, opts = {}){
 
   if(name === 'dashboard'){ loadDashboard(); loadActivity(); }
   else if(name === 'map') setTimeout(() => { if(window.AAGuardLazy) window.AAGuardLazy.loadMapLibs().then(()=> initMap()).catch(()=> initMap()); else initMap(); }, 100);
-  else if(name === 'analytics') { const loadAnalytics = ()=> loadTabs().then(() => { if(currentTabId) loadCharts(); }); if(window.AAGuardLazy) window.AAGuardLazy.loadChartLibs().then(loadAnalytics).catch(()=>{ const cl=document.getElementById('chartsList'); if(cl) cl.innerHTML='<div class="empty" style="padding:30px;"><div class="empty-title">Plotly gagal dimuat. Cek koneksi lalu buka lagi Analitik.</div></div>'; }); else loadAnalytics(); }
+  else if(name === 'analytics') { const loadAnalytics = ()=> loadTabs().then(() => { if(currentTabId) loadCharts(); }); if(window.AAGuardLazy) window.AAGuardLazy.loadChartLibs().then(loadAnalytics).catch(()=>{ const cl=document.getElementById('chartsList'); if(cl) cl.innerHTML='<div class="empty" style="padding:30px;"><div class="empty-title">ECharts gagal dimuat. Cek koneksi lalu buka lagi Analitik.</div></div>'; }); else loadAnalytics(); }
   else if(name === 'devices') renderDevicesFull();
   else if(name === 'alerts') loadAlerts();
 
@@ -840,7 +840,7 @@ async function loadCharts(){
       return;
     }
     const widgets = d.widgets || [];
-    charts.forEach(ch => { if(ch.chartInstance && window.Plotly) try{ Plotly.purge(ch.chartInstance); }catch(e){} ch.chartInstance=null; });
+    charts.forEach(ch => { if(ch.chartInstance){ const el=document.getElementById(ch.id+'_c'); if(el){ try{const i=echarts.getInstanceByDom(el); if(i) i.dispose();}catch(e){} try{if(el._ro){el._ro.disconnect();el._ro=null;}}catch(e){} } } ch.chartInstance=null; });
     charts = widgets.map(w => {
       const cfg = w.config || {};
       const devs = Array.isArray(cfg.devices) && cfg.devices.length ? cfg.devices : (w.device_id ? [w.device_id] : []);
@@ -866,7 +866,7 @@ async function loadCharts(){
             <button class="chart-act danger" data-action="remove-chart" data-chart-id="${escAttr(ch.id)}"><i class="fa-solid fa-trash"></i></button>
           </div>
         </div>
-        <div class="chart-canvas"><div id="${ch.id}_c" class="plotly-chart" style="width:100%;height:100%;"></div></div>
+        <div class="chart-canvas"><div id="${ch.id}_c" class="echart" style="width:100%;height:100%;"></div></div>
       </div>`;
     }).join('');
     c.querySelectorAll('[data-action="open-chart"]').forEach(btn => {
@@ -896,23 +896,24 @@ async function loadChartsData(){
 
 function renderChart(ch, hist){
   const plotEl = document.getElementById(`${ch.id}_c`); if(!plotEl) return;
-  if(typeof Plotly === 'undefined'){
+  if(typeof echarts === 'undefined'){
     try{ if(window.AAGuardLazy) window.AAGuardLazy.loadChartLibs().then(()=>loadChartsData()); }catch(e){}
-    const w=document.getElementById(ch.id); if(w) w.innerHTML += '<div class="empty" style="padding:20px;"><div class="empty-title">Plotly gagal dimuat. Cek koneksi internet/CDN.</div></div>';
+    const w=document.getElementById(ch.id); if(w && !w.querySelector('.empty')) w.innerHTML += '<div class="empty" style="padding:20px;"><div class="empty-title">ECharts gagal dimuat. Cek koneksi internet/CDN.</div></div>';
     return;
   }
-  if(ch.chartInstance && window.Plotly) try{ Plotly.purge(ch.chartInstance); }catch(e){}
-  ch.chartInstance = null;
+  let chart = echarts.getInstanceByDom(plotEl);
+  if(!chart) chart = echarts.init(plotEl, null, {renderer:'canvas'});
+  if(!plotEl._ro && typeof ResizeObserver!=='undefined'){ plotEl._ro=new ResizeObserver(()=>{try{chart&&!chart.isDisposed()&&chart.resize();}catch(e){}}); plotEl._ro.observe(plotEl); }
+  ch.chartInstance = plotEl;
 
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const gridC = isLight ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)';
   const labelC = isLight ? '#737373' : '#a3a3a3';
   const legendC = isLight ? '#525252' : '#a3a3a3';
-  const paper = 'rgba(0,0,0,0)';
   const font = CHART_FONT;
-
   const activeKeys = Object.entries(ch.showData || {}).filter(([k,v]) => v).map(([k]) => k);
   const isGauge = ['doughnut','pie','polarArea','radar'].includes(ch.chartType);
+  const base = { animation:false, textStyle:{fontFamily:font,color:labelC} };
 
   if(isGauge){
     const labels = [], vals = [];
@@ -926,35 +927,31 @@ function renderChart(ch, hist){
         if(v != null){ labels.push(ch.deviceIds.length > 1 ? `${dn} — ${info.label}` : info.label); vals.push(v); }
       });
     });
-    if(!vals.length) return;
+    if(!vals.length){ chart.clear(); return; }
     const pal = vals.map((_,i)=>COLORS[i%COLORS.length]);
-    let trace, layout;
-    if(ch.chartType === 'pie' || ch.chartType === 'doughnut'){
-      trace = { type:'pie', labels, values:vals, marker:{colors:pal}, hole: ch.chartType==='doughnut'?0.5:0, hovertemplate:'%{label}: %{value}<extra></extra>' };
-      layout = { margin:{l:8,r:8,t:8,b:8}, paper_bgcolor:paper, font:{family:font,color:legendC,size:10}, legend:{font:{color:legendC}}, uirevision:ch.id };
-    } else if(ch.chartType === 'polarArea'){
-      trace = { type:'barpolar', r:vals, theta:labels, marker:{color:pal,opacity:0.8} };
-      layout = { margin:{l:16,r:16,t:16,b:16}, paper_bgcolor:paper, polar:{bgcolor:paper, radialaxis:{gridcolor:gridC,tickfont:{color:labelC}}, angularaxis:{gridcolor:gridC,tickfont:{color:labelC,size:9}}}, font:{family:font,color:legendC}, showlegend:false, uirevision:ch.id };
-    } else {
-      const r = vals.concat(vals[0]||0), theta = labels.concat(labels[0]||'');
-      trace = { type:'scatterpolar', r, theta, fill:'toself', fillcolor:pal[0]+'33', line:{color:pal[0]}, marker:{color:pal[0]} };
-      layout = { margin:{l:16,r:16,t:16,b:16}, paper_bgcolor:paper, polar:{bgcolor:paper, radialaxis:{gridcolor:gridC,tickfont:{color:labelC}}, angularaxis:{gridcolor:gridC,tickfont:{color:labelC,size:9}}}, font:{family:font,color:legendC}, showlegend:false, uirevision:ch.id };
+    const data = labels.map((n,i)=>({name:n,value:vals[i],itemStyle:{color:pal[i]}}));
+    let opt;
+    if(ch.chartType==='pie'||ch.chartType==='doughnut'){
+      opt = {...base, tooltip:{trigger:'item'}, legend:{bottom:0,textStyle:{color:legendC,fontSize:10}}, series:[{type:'pie',radius:ch.chartType==='doughnut'?['40%','70%']: '70%', data, label:{show:false}, emphasis:{itemStyle:{shadowBlur:10}}}]};
+    } else if(ch.chartType==='polarArea'){
+      opt = {...base, polar:{radius:'70%'}, angleAxis:{type:'category',data:labels,axisLabel:{color:labelC,fontSize:9}}, radiusAxis:{axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}, series:[{type:'bar',data:vals.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{}};
+    } else { // radar
+      const max = Math.max(...vals, 1);
+      opt = {...base, radar:{indicator:labels.map(n=>({name:n,max:max*1.2})),axisName:{color:labelC,fontSize:9},splitLine:{lineStyle:{color:gridC}},splitArea:{show:false}}, series:[{type:'radar',data:[{value:vals,areaStyle:{color:pal[0]+'33'},lineStyle:{color:pal[0]},itemStyle:{color:pal[0]}}]}], tooltip:{}};
     }
-    Plotly.react(plotEl, [trace], layout, {responsive:true, displayModeBar:false});
-    ch.chartInstance = plotEl;
+    chart.setOption(opt,{notMerge:true,lazyUpdate:true});
     return;
   }
 
   const tsSet = new Set();
   ch.deviceIds.forEach(did => (hist[did] || []).forEach(it => tsSet.add(it.timestamp)));
-  if(!tsSet.size) return;
+  if(!tsSet.size){ chart.clear(); return; }
   const cutoff = Date.now() - timeMinutes*60*1000;
   const allTs = Array.from(tsSet).sort();
   const inRange = allTs.filter(ts => { const d = parseTs(ts); return d && d.getTime() >= cutoff; });
-  const usedTs = (inRange.length ? inRange : allTs).slice(-200);
-  if(!usedTs.length) return;
-  const xVals = usedTs.map(ts => { const s=String(ts).replace(' ','T'); return /[+-]\d\d:\d\d$|Z$/.test(s)?s:s+'+07:00'; });
-  const traces = []; let ci = 0;
+  const usedTs = (inRange.length ? inRange : allTs).slice(-300);
+  if(!usedTs.length){ chart.clear(); return; }
+  const series = []; let ci = 0;
 
   ch.deviceIds.forEach(did => {
     const h = hist[did] || []; if(!h.length) return;
@@ -962,36 +959,37 @@ function renderChart(ch, hist){
     const tsMap = {}; h.forEach(it => { tsMap[it.timestamp] = it.data || {}; });
     activeKeys.forEach(k => {
       const info = DATA_KEYS[k]; if(!info) return;
-      const values = usedTs.map(ts => { const o = tsMap[ts]; return o ? (o[k] ?? null) : null; });
-      if(!values.some(v => v != null)) return;
+      const data = usedTs.map(ts => {
+        const o = tsMap[ts]; const v = o ? (o[k] ?? null) : null;
+        const d = parseTs(ts); const t = d ? d.getTime() : null;
+        return (t==null) ? null : [t, v];
+      }).filter(Boolean);
+      if(!data.some(p => p[1] != null)) return;
       const color = COLORS[ci % COLORS.length]; ci++;
       const isArea = ch.chartType === 'area' || ch.chartType === 'stackedArea';
       const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea';
       const isBar = ch.chartType === 'bar' || ch.chartType === 'stackedBar' || ch.chartType === 'horizontalBar';
       const name = ch.deviceIds.length > 1 ? `${dn} — ${info.label}` : `${info.label} (${info.unit})`;
       if(isBar){
-        traces.push({ type:'bar', name, x: ch.chartType==='horizontalBar'?values:xVals, y: ch.chartType==='horizontalBar'?xVals:values, marker:{color}, orientation: ch.chartType==='horizontalBar'?'h':'v', hovertemplate:`%{fullData.name}: %{${ch.chartType==='horizontalBar'?'x':'y'}}<extra></extra>` });
+        series.push({ name, type:'bar', data, stack:isStacked?'s':undefined, itemStyle:{color}, barMaxWidth:24, emphasis:{focus:'series'} });
       } else {
-        traces.push({ type:'scatter', mode:'lines', name, x:xVals, y:values, line:{color,width:2,shape:'spline',smoothing:0.6}, fill:isArea?'tonexty':'none', fillcolor:color+'22', stackgroup:(isArea&&isStacked)?'one':undefined, connectgaps:true, hovertemplate:`%{fullData.name}: %{y}<extra></extra>` });
+        series.push({ name, type:'line', data, showSymbol:false, smooth:0.25, sampling:'lttb', connectNulls:true, lineStyle:{width:2,color}, itemStyle:{color}, areaStyle:isArea?{color:color+'22'}:undefined, stack:(isArea&&isStacked)?'a':undefined, emphasis:{focus:'series'} });
       }
     });
   });
-  traces.forEach((tr,i)=>{ if(tr.fill==='tonexty' && !tr.stackgroup && i===0) tr.fill='tozeroy'; });
-  if(!traces.length) return;
-
+  if(!series.length){ chart.clear(); return; }
   const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea';
   const isBar = ch.chartType === 'bar' || ch.chartType === 'stackedBar' || ch.chartType === 'horizontalBar';
-  const layout = {
-    margin:{l:40,r:8,t:8,b:28}, paper_bgcolor:paper, plot_bgcolor:paper,
-    font:{family:font,color:labelC,size:10},
-    legend:{font:{size:10,color:legendC}},
-    xaxis:{gridcolor:gridC,zeroline:false,tickfont:{size:9,color:labelC},automargin:true, type: ch.chartType==='horizontalBar'?'-':'date'},
-    yaxis:{gridcolor:gridC,zeroline:false,tickfont:{size:9,color:labelC},rangemode:'tozero', type: ch.chartType==='horizontalBar'?'date':'-'},
-    hovermode:'x unified', uirevision: ch.id,
-  };
-  if(isBar) layout.barmode = isStacked ? 'stack' : 'group';
-  Plotly.react(plotEl, traces, layout, {responsive:true, displayModeBar:false});
-  ch.chartInstance = plotEl;
+  const isH = ch.chartType === 'horizontalBar';
+  const xAxis = isH ? { type:'value', splitLine:{lineStyle:{color:gridC}}, axisLabel:{color:labelC,fontSize:9} } : { type:'time', axisLabel:{color:labelC,fontSize:9}, splitLine:{show:false} };
+  const yAxis = isH ? { type:'time', axisLabel:{color:labelC,fontSize:9}, splitLine:{show:false} } : { type:'value', splitLine:{lineStyle:{color:gridC}}, axisLabel:{color:labelC,fontSize:9} };
+  chart.setOption({
+    ...base,
+    grid:{left:40,right:8,top:8,bottom:30,containLabel:false},
+    tooltip:{trigger:'axis',confine:true},
+    legend:{bottom:0,textStyle:{color:legendC,fontSize:10},type:'scroll'},
+    xAxis, yAxis, series,
+  }, {notMerge:true,lazyUpdate:true});
 }
 
 
@@ -1362,64 +1360,55 @@ async function loadMobileTrend(){
   const canvas = document.getElementById('mobileTrendCanvas');
   const empty = document.getElementById('mobileTrendEmpty');
   if(!canvas) return;
-  if(typeof Plotly === 'undefined'){
-    if(window.AAGuardLazy){ try{ await window.AAGuardLazy.loadChartLibs(); }catch(e){ if(empty){ empty.style.display='flex'; empty.textContent='Plotly gagal dimuat. Cek koneksi internet/CDN.'; } return; } }
-    if(typeof Plotly === 'undefined'){ if(empty){ empty.style.display='flex'; empty.textContent='Plotly gagal dimuat. Cek koneksi internet/CDN.'; } return; }
+  if(typeof echarts === 'undefined'){
+    if(window.AAGuardLazy){ try{ await window.AAGuardLazy.loadChartLibs(); }catch(e){ if(empty){ empty.style.display='flex'; empty.textContent='ECharts gagal dimuat. Cek koneksi internet/CDN.'; } return; } }
+    if(typeof echarts === 'undefined'){ if(empty){ empty.style.display='flex'; empty.textContent='ECharts gagal dimuat. Cek koneksi internet/CDN.'; } return; }
   }
-
   try{
     const r = await api(`/api/v1/alerts/trend?hours=${trendHours}`);
     const d = await r.json();
     if(!d.success) return;
-
     const buckets = {};
     (d.trend || []).forEach(row => {
       if(!buckets[row.hour_bucket]) buckets[row.hour_bucket] = {danger:0, warning:0, info:0};
       if(buckets[row.hour_bucket][row.severity] !== undefined) buckets[row.hour_bucket][row.severity] = row.count;
     });
-
     const labels = Object.keys(buckets).sort();
     if(labels.length === 0){
       if(empty) empty.style.display = 'flex';
       canvas.style.display = 'none';
-      if(mobileTrendChart && window.Plotly){ try{Plotly.purge(mobileTrendChart);}catch(e){} mobileTrendChart = null; }
+      try{ const inst=echarts.getInstanceByDom(canvas); if(inst) inst.dispose(); }catch(e){}
+      if(canvas._ro){ try{canvas._ro.disconnect();}catch(e){} canvas._ro=null; }
+      mobileTrendChart = null;
       return;
     }
     if(empty) empty.style.display = 'none';
     canvas.style.display = '';
-
+    const isLongRange = trendHours > 48;
+    const displayLabels = labels.map(l => { const p=String(l).split(' '); const date=p[0]||'', time=p[1]||''; return isLongRange?`${date.slice(5)} ${time.slice(0,2)}h`:time.slice(0,5); });
     const dangerData = labels.map(l => buckets[l].danger || 0);
     const warningData = labels.map(l => buckets[l].warning || 0);
     const infoData = labels.map(l => buckets[l].info || 0);
-
-    const isLongRange = trendHours > 48;
-    const displayLabels = labels.map(l => {
-      const parts = String(l).split(' ');
-      const date = parts[0] || '';
-      const time = parts[1] || '';
-      if(isLongRange) return `${date.slice(5)} ${time.slice(0,2)}h`;
-      return time.slice(0, 5);
-    });
-
     const isLight = document.documentElement.getAttribute('data-theme') === 'light';
     const gridC = isLight ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)';
     const labelC = isLight ? '#737373' : '#a3a3a3';
     const legendC = isLight ? '#525252' : '#a3a3a3';
-    const traces = [
-      { type:'bar', name:'Bahaya', x:displayLabels, y:dangerData, marker:{color:'rgba(239,68,68,0.75)'} },
-      { type:'bar', name:'Peringatan', x:displayLabels, y:warningData, marker:{color:'rgba(249,115,22,0.75)'} },
-      { type:'bar', name:'Info', x:displayLabels, y:infoData, marker:{color:'rgba(139,92,246,0.75)'} },
-    ];
-    const layout = {
-      barmode:'stack', margin:{l:34,r:8,t:8,b:34},
-      paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
-      font:{family:CHART_FONT,color:labelC,size:10},
-      legend:{orientation:'h', y:-0.2, font:{size:10,color:legendC}},
-      xaxis:{gridcolor:gridC,zeroline:false,tickfont:{size:9,color:labelC}},
-      yaxis:{gridcolor:gridC,zeroline:false,tickfont:{size:9,color:labelC},rangemode:'tozero'},
-      hovermode:'x unified', uirevision:'mobileTrend',
-    };
-    await Plotly.react(canvas, traces, layout, {responsive:true, displayModeBar:false});
+    let chart = echarts.getInstanceByDom(canvas);
+    if(!chart) chart = echarts.init(canvas, null, {renderer:'canvas'});
+    if(!canvas._ro && typeof ResizeObserver!=='undefined'){ canvas._ro=new ResizeObserver(()=>{try{chart&&!chart.isDisposed()&&chart.resize();}catch(e){}}); canvas._ro.observe(canvas); }
+    chart.setOption({
+      animation:false,
+      grid:{left:34,right:8,top:8,bottom:34},
+      tooltip:{trigger:'axis',axisPointer:{type:'shadow'},confine:true},
+      legend:{bottom:0,textStyle:{color:legendC,fontSize:10},itemWidth:10,itemHeight:10},
+      xAxis:{type:'category',data:displayLabels,axisLine:{show:false},axisTick:{show:false},axisLabel:{color:labelC,fontSize:9}},
+      yAxis:{type:'value',minInterval:1,splitLine:{lineStyle:{color:gridC}},axisLabel:{color:labelC,fontSize:9}},
+      series:[
+        {name:'Bahaya',type:'bar',stack:'s',data:dangerData,itemStyle:{color:'rgba(239,68,68,0.75)'},barMaxWidth:24},
+        {name:'Peringatan',type:'bar',stack:'s',data:warningData,itemStyle:{color:'rgba(249,115,22,0.75)'},barMaxWidth:24},
+        {name:'Info',type:'bar',stack:'s',data:infoData,itemStyle:{color:'rgba(139,92,246,0.75)'},barMaxWidth:24},
+      ],
+    }, {notMerge:true,lazyUpdate:true});
     mobileTrendChart = canvas;
   }catch(e){ console.error(e); }
 }

@@ -323,14 +323,14 @@
                     loadAnalyticsTabs();
                     refreshAllCharts();
                     setTimeout(() => {
-                        state.charts.forEach(c => { if (c.chartInstance && window.Plotly) try { Plotly.Plots.resize(c.chartInstance); } catch (e) {} });
+                        state.charts.forEach(c => { if (c.chartInstance) try { const i=echarts.getInstanceByDom(c.chartInstance); if(i) i.resize(); } catch (e) {} });
                     }, 200);
                 };
-                // Plotly/interact.js lazy-load saat graph dibuka; fallback pesan bila offline
+                // ECharts/interact.js lazy-load saat graph dibuka; fallback pesan bila offline
                 if (window.AAGuardLazy && typeof window.AAGuardLazy.loadChartLibs === 'function') {
                     window.AAGuardLazy.loadChartLibs().then(runGraph).catch(() => {
                         const grid = $('chartsGrid');
-                        if (grid) grid.innerHTML = '<div class="chart-empty" style="padding:30px;text-align:center;">Gagal memuat Plotly (offline?). Cek koneksi lalu buka lagi section Analitik.</div>';
+                        if (grid) grid.innerHTML = '<div class="chart-empty" style="padding:30px;text-align:center;">Gagal memuat ECharts (offline?). Cek koneksi lalu buka lagi section Analitik.</div>';
                     });
                 } else {
                     runGraph();
@@ -573,6 +573,17 @@
         loadBentoChart();
     }
 
+    function ensureEChart(el){
+        if(!el || typeof echarts === 'undefined') return null;
+        let inst = echarts.getInstanceByDom(el);
+        if(!inst) inst = echarts.init(el, null, {renderer:'canvas'});
+        if(!el._ro && typeof ResizeObserver !== 'undefined'){
+            el._ro = new ResizeObserver(() => { try{ inst && !inst.isDisposed() && inst.resize(); }catch(e){} });
+            el._ro.observe(el);
+        }
+        return inst;
+    }
+
     async function loadBentoChart() {
         const plotEl = $('bentoChart');
         const sub = $('bentoChartSub');
@@ -580,9 +591,9 @@
         if (badgeCount) badgeCount.textContent = `${state.devices.length} perangkat`;
         if (!plotEl) return;
         if (state.devices.length === 0) { if (sub) sub.textContent = 'Belum ada perangkat'; return; }
-        if (typeof Plotly === 'undefined') {
+        if (typeof echarts === 'undefined') {
             try { if (window.AAGuardLazy) await window.AAGuardLazy.loadChartLibs(); } catch (e) {}
-            if (typeof Plotly === 'undefined') { if (sub) sub.textContent = 'Plotly gagal dimuat (offline?)'; return; }
+            if (typeof echarts === 'undefined') { if (sub) sub.textContent = 'ECharts gagal dimuat (offline?)'; return; }
         }
         const hours = 24, limit = 500;
         const ids = state.devices.slice(0, 15).map(d => d.device_id);
@@ -604,10 +615,6 @@
             const tsList = Object.keys(byTs).sort();
             if (tsList.length === 0) { if (sub) sub.textContent = 'Menunggu data sensor…'; return; }
             const usedTs = downsampleHistory(tsList, 120);
-            const x = usedTs.map(ts => {
-                const s = String(ts).replace(' ', 'T');
-                return /[+-]\d\d:\d\d$|Z$/.test(s) ? s : s + '+07:00';
-            });
             const keyCounts = {};
             usedTs.forEach(ts => Object.keys(byTs[ts]).forEach(k => { keyCounts[k] = (keyCounts[k] || 0) + 1; }));
             const PRIORITY = ['temperature', 'humidity', 'gas_level', 'smoke'];
@@ -616,33 +623,28 @@
                 .slice(0, 3);
             if (keys.length === 0) { if (sub) sub.textContent = 'Tidak ada data sensor yang cocok'; return; }
             const colors = getChartColors();
-            const traces = keys.map((key, i) => {
+            const series = keys.map((key, i) => {
                 const info = DATA_KEYS[key] || { label: key, unit: '', color: CHART_COLORS[i % CHART_COLORS.length] };
                 const color = info.color || CHART_COLORS[i % CHART_COLORS.length];
-                const vals = usedTs.map(ts => { const c = byTs[ts][key]; return c ? +(c.sum / c.n).toFixed(2) : null; });
-                const unit = info.unit ? ` ${info.unit}` : '';
-                return {
-                    type: 'scatter', mode: 'lines', name: info.label,
-                    x, y: vals, line: { color, width: 2, shape: 'spline', smoothing: 0.6 },
-                    fill: 'tozeroy', fillcolor: color + '22', connectgaps: true,
-                    hovertemplate: `${info.label}: %{y:.1f}${unit}<extra></extra>`,
-                };
+                const data = usedTs.map(ts => {
+                    const t = String(ts).replace(' ','T'); const dt = new Date(/[+-]\d\d:\d\d$|Z$/.test(t)?t:t+'+07:00'); const ms = dt.getTime();
+                    const c = byTs[ts][key];
+                    return [isNaN(ms)?null:ms, c ? +(c.sum/c.n).toFixed(2) : null];
+                }).filter(p => p[0]!=null);
+                return { name: info.label, type:'line', data, showSymbol:false, smooth:0.25, sampling:'lttb', connectNulls:true, lineStyle:{width:2,color}, itemStyle:{color}, areaStyle:{color:color+'22'}, emphasis:{focus:'series'} };
             });
-            const layout = {
-                margin: { l: 34, r: 8, t: 6, b: 24 },
-                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { family: CHART_FONT, color: colors.labelColor, size: 10 },
-                legend: { orientation: 'h', y: 1.12, x: 0, font: { size: 10, color: colors.legendColor } },
-                xaxis: { type: 'date', gridcolor: colors.gridColor, zeroline: false, tickfont: { size: 9, color: colors.labelColor }, showspikes: true, spikemode: 'across', spikesnap: 'cursor', spikecolor: colors.labelColor, spikethickness: 1, spikedash: 'dot' },
-                yaxis: { gridcolor: colors.gridColor, zeroline: false, tickfont: { size: 9, color: colors.labelColor } },
-                hovermode: 'x unified',
-                hoverlabel: { bgcolor: colors.tooltipBg, font: { color: colors.tooltipTitleColor, family: CHART_FONT } },
-                uirevision: 'bento',
-            };
-            const cfg = { responsive: true, displayModeBar: false };
-            await Plotly.react(plotEl, traces, layout, cfg);
+            const chart = ensureEChart(plotEl);
+            if(!chart) return;
+            chart.setOption({
+                animation:false,
+                grid:{left:34,right:8,top:24,bottom:24},
+                tooltip:{trigger:'axis',confine:true},
+                legend:{top:0,left:0,textStyle:{color:colors.legendColor,fontSize:10,fontFamily:CHART_FONT},itemWidth:10,itemHeight:10},
+                xAxis:{type:'time',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{show:false},axisLine:{show:false},axisTick:{show:false}},
+                yAxis:{type:'value',axisLabel:{color:colors.labelColor,fontSize:9,fontFamily:CHART_FONT},splitLine:{lineStyle:{color:colors.gridColor}}},
+                series,
+            }, {notMerge:true,lazyUpdate:true});
             state.bentoChart = plotEl;
-            // prevent parent tile click swallow issues same as before
             plotEl.onclick = e => e.stopPropagation();
             plotEl.onpointerdown = e => e.stopPropagation();
             const last = usedTs[usedTs.length - 1];
@@ -1305,7 +1307,7 @@
             await loadAnalyticsTabs();
             if (state.analyticsTabs.length > 0) switchAnalyticsTab(state.analyticsTabs[0].id);
             else {
-                state.charts.forEach(c => { if (c.chartInstance && window.Plotly) try { Plotly.purge(c.chartInstance); } catch (e) {} });
+                state.charts.forEach(c => { if (c.chartInstance) { try { const i=echarts.getInstanceByDom(c.chartInstance); if(i) i.dispose(); } catch(e){} try{ if(c.chartInstance._ro){c.chartInstance._ro.disconnect(); c.chartInstance._ro=null;} }catch(e){} } });
                 state.charts = [];
                 const grid = $('chartsGrid');
                 if (grid) grid.innerHTML = `<div class="empty-charts" style="text-align:center;padding:40px;color:var(--text-3);"><i class="fa-solid fa-chart-column" style="font-size:40px;margin-bottom:12px;display:block;opacity:.4;"></i><p style="font-size:14px;font-weight:600;">Belum ada diagram di tab ini</p></div>`;
@@ -1420,7 +1422,7 @@
         console.log('[Charts] Loaded widgets:', widgets.length);
 
         state.charts.forEach(c => {
-            if (c.chartInstance) try { if (window.Plotly) Plotly.purge(c.chartInstance); } catch (e) {}
+            if (c.chartInstance) { try { const i=echarts.getInstanceByDom(c.chartInstance); if(i) i.dispose(); } catch(e){} try{ if(c.chartInstance._ro){c.chartInstance._ro.disconnect(); c.chartInstance._ro=null;} }catch(e){} }
             const el = document.getElementById(c.id);
             if (el) { try { interact(el).unset(); } catch (e) {} el.remove(); }
         });
@@ -1541,7 +1543,7 @@
             </div>
             <div class="chart-card-body">
                 <div class="chart-canvas-container">
-                    <div id="${config.id}_canvas" class="plotly-chart" style="width:100%;height:100%;"></div>
+                    <div id="${config.id}_canvas" class="echart" style="width:100%;height:100%;"></div>
                 </div>
             </div>
             <div class="chart-card-resize"></div>
@@ -1681,7 +1683,7 @@
                         c.h = event.rect.height;
                         el.style.width = c.w + 'px';
                         el.style.height = c.h + 'px';
-                        if (c.chartInstance && window.Plotly) try { Plotly.Plots.resize(c.chartInstance); } catch (e) {}
+                        if (c.chartInstance) try { const i=echarts.getInstanceByDom(c.chartInstance); if(i) i.resize(); } catch (e) {}
                     },
                     end() {
                         el.classList.remove('resizing');
@@ -1842,7 +1844,7 @@
             chart.chartType = chartType;
             chart.showData = showData;
 
-            if (chart.chartInstance) { try { if (window.Plotly) Plotly.purge(chart.chartInstance); } catch (e) {} chart.chartInstance = null; }
+            if (chart.chartInstance) { try { const i=echarts.getInstanceByDom(chart.chartInstance); if(i) i.dispose(); } catch(e){} try{ if(chart.chartInstance._ro){chart.chartInstance._ro.disconnect(); chart.chartInstance._ro=null;} }catch(e){} chart.chartInstance = null; }
 
             const card = document.getElementById(editId);
             if (card) {
@@ -1924,27 +1926,27 @@
         const container = card && card.querySelector('.chart-canvas-container');
         if (!container) return;
         if (!plotEl || plotEl.tagName === 'CANVAS') {
-            container.innerHTML = `<div id="${config.id}_canvas" class="plotly-chart" style="width:100%;height:100%;"></div>`;
+            container.innerHTML = `<div id="${config.id}_canvas" class="echart" style="width:100%;height:100%;"></div>`;
             plotEl = document.getElementById(`${config.id}_canvas`);
         }
 
-        if (typeof Plotly === 'undefined') {
-            showChartEmpty(config.id, 'Plotly gagal dimuat. Cek koneksi internet/CDN.');
+        if (typeof echarts === 'undefined') {
+            showChartEmpty(config.id, 'ECharts gagal dimuat. Cek koneksi internet/CDN.');
             return;
         }
-
-        const colors = getChartColors();
-        if (config.chartInstance && window.Plotly) { try { Plotly.purge(config.chartInstance); } catch (e) {} }
+        if (config.chartInstance) { try { const i=echarts.getInstanceByDom(config.chartInstance); if(i) i.dispose(); } catch(e){} try{ if(config.chartInstance._ro){config.chartInstance._ro.disconnect(); config.chartInstance._ro=null;} }catch(e){} }
         config.chartInstance = null;
 
+        const colors = getChartColors();
         const deviceIds = config.deviceIds || [];
         const activeKeys = Object.entries(config.showData || {}).filter(([_, v]) => v).map(([k]) => k);
         const isGauge = ['doughnut', 'pie', 'polarArea', 'radar'].includes(config.chartType);
         const font = CHART_FONT;
+        const chart = ensureEChart(plotEl);
+        if(!chart) return;
 
         if (isGauge) {
-            const gaugeLabels = [];
-            const gaugeValues = [];
+            const gaugeLabels = [], gaugeValues = [];
             deviceIds.forEach(did => {
                 const hist = historyByDevice[did] || [];
                 if (hist.length === 0) return;
@@ -1962,20 +1964,17 @@
             });
             if (gaugeValues.length === 0) { showChartEmpty(config.id, 'Tidak ada data terbaru'); return; }
             const pal = gaugeValues.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]);
-            let trace, layout;
+            const data = gaugeLabels.map((n,i)=>({name:n,value:gaugeValues[i],itemStyle:{color:pal[i]}}));
+            let opt;
             if (config.chartType === 'pie' || config.chartType === 'doughnut') {
-                trace = { type: 'pie', labels: gaugeLabels, values: gaugeValues, marker: { colors: pal }, hole: config.chartType === 'doughnut' ? 0.5 : 0, textinfo: 'label+percent', hovertemplate: '%{label}: %{value}<extra></extra>' };
-                layout = { margin: { l: 8, r: 8, t: 8, b: 8 }, paper_bgcolor: 'rgba(0,0,0,0)', font: { family: font, color: colors.legendColor, size: 11 }, legend: { font: { color: colors.legendColor } }, uirevision: config.id };
+                opt = { animation:false, textStyle:{fontFamily:font}, tooltip:{trigger:'item'}, legend:{orient:'vertical',right:4,top:'center',textStyle:{color:colors.legendColor,fontSize:10}}, series:[{type:'pie',radius:config.chartType==='doughnut'?['40%','70%']:'70%',center:['35%','50%'],data,label:{show:false},emphasis:{itemStyle:{shadowBlur:8}}}] };
             } else if (config.chartType === 'polarArea') {
-                trace = { type: 'barpolar', r: gaugeValues, theta: gaugeLabels, marker: { color: pal, opacity: 0.8 }, hovertemplate: '%{theta}: %{r}<extra></extra>' };
-                layout = { margin: { l: 20, r: 20, t: 20, b: 20 }, paper_bgcolor: 'rgba(0,0,0,0)', polar: { bgcolor: 'rgba(0,0,0,0)', radialaxis: { gridcolor: colors.gridColor, tickfont: { color: colors.labelColor } }, angularaxis: { gridcolor: colors.gridColor, tickfont: { color: colors.labelColor, size: 10 } } }, font: { family: font, color: colors.legendColor }, showlegend: false, uirevision: config.id };
-            } else { // radar
-                const r = gaugeValues.concat(gaugeValues[0] || 0);
-                const theta = gaugeLabels.concat(gaugeLabels[0] || '');
-                trace = { type: 'scatterpolar', r, theta, fill: 'toself', fillcolor: pal[0] + '33', line: { color: pal[0] }, marker: { color: pal[0] }, hovertemplate: '%{theta}: %{r}<extra></extra>' };
-                layout = { margin: { l: 20, r: 20, t: 20, b: 20 }, paper_bgcolor: 'rgba(0,0,0,0)', polar: { bgcolor: 'rgba(0,0,0,0)', radialaxis: { gridcolor: colors.gridColor, tickfont: { color: colors.labelColor } }, angularaxis: { gridcolor: colors.gridColor, tickfont: { color: colors.labelColor, size: 10 } } }, font: { family: font, color: colors.legendColor }, showlegend: false, uirevision: config.id };
+                opt = { animation:false, textStyle:{fontFamily:font}, polar:{radius:'65%'}, angleAxis:{type:'category',data:gaugeLabels,axisLabel:{color:colors.labelColor,fontSize:9}}, radiusAxis:{axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}}, series:[{type:'bar',data:gaugeValues.map((v,i)=>({value:v,itemStyle:{color:pal[i]}})),coordinateSystem:'polar'}], tooltip:{} };
+            } else {
+                const max = Math.max(...gaugeValues, 1);
+                opt = { animation:false, textStyle:{fontFamily:font}, radar:{indicator:gaugeLabels.map(n=>({name:n,max:max*1.2})),axisName:{color:colors.labelColor,fontSize:9},splitLine:{lineStyle:{color:colors.gridColor}},splitArea:{show:false}}, series:[{type:'radar',data:[{value:gaugeValues,areaStyle:{color:pal[0]+'33'},lineStyle:{color:pal[0]},itemStyle:{color:pal[0]}}]}], tooltip:{} };
             }
-            Plotly.react(plotEl, [trace], layout, { responsive: true, displayModeBar: false });
+            chart.setOption(opt,{notMerge:true,lazyUpdate:true});
             config.chartInstance = plotEl;
             return;
         }
@@ -1983,86 +1982,56 @@
         const timestampSet = new Set();
         deviceIds.forEach(did => { (historyByDevice[did] || []).forEach(item => timestampSet.add(item.timestamp)); });
         if (timestampSet.size === 0) { showChartEmpty(config.id, 'Menunggu data sensor...'); return; }
-
         const now = Date.now();
         const cutoff = now - state.globalTimeMinutes * 60 * 1000;
         const allTs = Array.from(timestampSet).sort();
         const inRange = allTs.filter(ts => { const d = parseDate(ts); return d && d.getTime() >= cutoff; });
-        const usedTs = downsampleHistory(inRange.length > 0 ? inRange : allTs, 500);
+        const usedTs = downsampleHistory(inRange.length > 0 ? inRange : allTs, 400);
         if (usedTs.length === 0) { showChartEmpty(config.id, 'Menunggu data sensor...'); return; }
 
-        const xVals = usedTs.map(ts => { const s = String(ts).replace(' ', 'T'); return /[+-]\d\d:\d\d$|Z$/.test(s) ? s : s + '+07:00'; });
-        const traces = [];
+        const series = [];
         let colorIdx = 0;
-
         deviceIds.forEach(did => {
             const hist = historyByDevice[did] || [];
             if (hist.length === 0) return;
             const dname = state.devices.find(d => d.device_id === did)?.device_name || did;
             const tsMap = {};
             hist.forEach(item => { tsMap[item.timestamp] = item.data || {}; });
-
             activeKeys.forEach(key => {
                 const info = DATA_KEYS[key];
                 if (!info) return;
-                const values = usedTs.map(ts => {
+                const data = usedTs.map(ts => {
                     const obj = tsMap[ts];
-                    if (!obj) return null;
-                    const v = obj[key] ?? obj[key.toLowerCase()] ?? obj[key.toUpperCase()];
-                    return (v === null || v === undefined) ? null : v;
-                });
-                if (!values.some(v => v !== null && v !== undefined)) return;
-                const color = CHART_COLORS[colorIdx % CHART_COLORS.length];
-                colorIdx++;
+                    const v = obj ? (obj[key] ?? obj[key.toLowerCase()] ?? obj[key.toUpperCase()]) : null;
+                    const t = String(ts).replace(' ','T'); const dt = new Date(/[+-]\d\d:\d\d$|Z$/.test(t)?t:t+'+07:00'); const ms = dt.getTime();
+                    return (ms && !isNaN(ms)) ? [ms, (v===null||v===undefined)?null:v] : null;
+                }).filter(Boolean);
+                if (!data.some(p => p[1] !== null && p[1] !== undefined)) return;
+                const color = CHART_COLORS[colorIdx % CHART_COLORS.length]; colorIdx++;
                 const isArea = config.chartType === 'area' || config.chartType === 'stackedArea';
                 const isStacked = config.chartType === 'stackedBar' || config.chartType === 'stackedArea';
                 const isBar = config.chartType === 'bar' || config.chartType === 'stackedBar' || config.chartType === 'horizontalBar';
                 const label = deviceIds.length > 1 ? `${dname} — ${info.label}` : `${info.label} (${info.unit})`;
-
                 if (isBar) {
-                    const tr = { type: 'bar', name: label, x: config.chartType === 'horizontalBar' ? values : xVals, y: config.chartType === 'horizontalBar' ? xVals : values, marker: { color }, orientation: config.chartType === 'horizontalBar' ? 'h' : 'v', hovertemplate: `%{fullData.name}: %{${config.chartType === 'horizontalBar' ? 'x' : 'y'}}<extra></extra>` };
-                    traces.push(tr);
+                    series.push({ name: label, type:'bar', data, stack:isStacked?'s':undefined, itemStyle:{color}, barMaxWidth:28, emphasis:{focus:'series'} });
                 } else {
-                    traces.push({
-                        type: 'scatter', mode: 'lines', name: label,
-                        x: xVals, y: values,
-                        line: { color, width: 2, shape: 'spline', smoothing: 0.6 },
-                        fill: isArea ? 'tonexty' : 'none',
-                        fillcolor: color + '22',
-                        stackgroup: (isArea && isStacked) ? 'one' : undefined,
-                        connectgaps: true,
-                        hovertemplate: `%{fullData.name}: %{y}<extra></extra>`,
-                    });
+                    series.push({ name: label, type:'line', data, showSymbol:false, smooth:0.25, sampling:'lttb', connectNulls:true, lineStyle:{width:2,color}, itemStyle:{color}, areaStyle:isArea?{color:color+'22'}:undefined, stack:(isArea&&isStacked)?'a':undefined, emphasis:{focus:'series'} });
                 }
             });
         });
-
-        // fix first area fill baseline
-        traces.forEach((tr, i) => { if (tr.fill === 'tonexty' && !tr.stackgroup && i === 0) tr.fill = 'tozeroy'; });
-        if (traces.length === 0) { showChartEmpty(config.id, 'Tidak ada data sensor yang cocok'); return; }
-
-        const isStacked = config.chartType === 'stackedBar' || config.chartType === 'stackedArea';
+        if (series.length === 0) { showChartEmpty(config.id, 'Tidak ada data sensor yang cocok'); return; }
         const isBar = config.chartType === 'bar' || config.chartType === 'stackedBar' || config.chartType === 'horizontalBar';
-        const layout = {
-            margin: { l: 46, r: 12, t: 8, b: 32 },
-            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { family: font, color: colors.labelColor, size: 10 },
-            legend: { font: { size: 10, color: colors.legendColor } },
-            xaxis: { gridcolor: colors.gridColor, zeroline: false, tickfont: { size: 10, color: colors.labelColor }, automargin: true },
-            yaxis: { gridcolor: colors.gridColor, zeroline: false, tickfont: { size: 10, color: colors.labelColor }, rangemode: 'tozero' },
-            hovermode: 'x unified',
-            hoverlabel: { bgcolor: colors.tooltipBg, font: { color: colors.tooltipTitleColor, family: font } },
-            uirevision: config.id,
-        };
-        if (!isBar || config.chartType === 'horizontalBar') {
-            layout.xaxis.type = config.chartType === 'horizontalBar' ? '-' : 'date';
-            if (config.chartType === 'horizontalBar') layout.yaxis.type = 'date';
-        } else {
-            layout.xaxis.type = 'date';
-        }
-        if (isBar) layout.barmode = isStacked ? 'stack' : 'group';
-        // stacked area handled by stackgroup
-        Plotly.react(plotEl, traces, layout, { responsive: true, displayModeBar: false });
+        const isH = config.chartType === 'horizontalBar';
+        const xAxis = isH ? { type:'value', splitLine:{lineStyle:{color:colors.gridColor}}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font} } : { type:'time', splitLine:{show:false}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font} };
+        const yAxis = isH ? { type:'time', splitLine:{show:false}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font} } : { type:'value', splitLine:{lineStyle:{color:colors.gridColor}}, axisLabel:{color:colors.labelColor,fontSize:10,fontFamily:font} };
+        chart.setOption({
+            animation:false,
+            textStyle:{fontFamily:font},
+            grid:{left:46,right:12,top:8,bottom:32},
+            tooltip:{trigger:'axis',confine:true},
+            legend:{textStyle:{color:colors.legendColor,fontSize:10},type:'scroll'},
+            xAxis, yAxis, series,
+        }, {notMerge:true,lazyUpdate:true});
         config.chartInstance = plotEl;
     }
 
@@ -2070,7 +2039,7 @@
         const card = document.getElementById(chartId); if (!card) return;
         const container = card.querySelector('.chart-canvas-container'); if (!container) return;
         const plot = document.getElementById(`${chartId}_canvas`);
-        if (plot && window.Plotly) try { Plotly.purge(plot); } catch (e) {}
+        if (plot) { try { const i=echarts.getInstanceByDom(plot); if(i) i.dispose(); } catch(e){} try{ if(plot._ro){plot._ro.disconnect(); plot._ro=null;} }catch(e){} }
         container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:center;"><i class="fa-solid fa-satellite-dish" style="font-size:20px;opacity:0.5;"></i><span>${escapeHtml(message)}</span></div>`;
     }
 
@@ -2107,7 +2076,7 @@
         const chart = state.charts[idx];
         if (!confirm(`Hapus diagram "${chart.title}"?`)) return;
         await API.call(`/api/v1/widgets/${chart.widgetId}`, { method: 'DELETE' });
-        if (chart.chartInstance) try { if (window.Plotly) Plotly.purge(chart.chartInstance); } catch (e) {}
+        if (chart.chartInstance) { try { const i=echarts.getInstanceByDom(chart.chartInstance); if(i) i.dispose(); } catch(e){} try{ if(chart.chartInstance._ro){chart.chartInstance._ro.disconnect(); chart.chartInstance._ro=null;} }catch(e){} }
         state.charts.splice(idx, 1);
         const card = document.getElementById(chartId);
         if (card) { try { interact(card).unset(); } catch (e) {} card.remove(); }
@@ -2136,7 +2105,7 @@
         clampChartsToCanvas();
         resolveCollisions();
         applyAllGeom();
-        state.charts.forEach(c => { if (c.chartInstance && window.Plotly) try { Plotly.Plots.resize(c.chartInstance); } catch (e) {} });
+        state.charts.forEach(c => { if (c.chartInstance) try { const i=echarts.getInstanceByDom(c.chartInstance); if(i) i.resize(); } catch (e) {} });
         try { localStorage.removeItem(layoutKey()); localStorage.removeItem(STORAGE_KEYS.CANVAS_HEIGHT); } catch (e) {}
         showToast('Layout direset', 'success');
     }
@@ -4083,7 +4052,7 @@
             if (state.dashboardInterval) clearInterval(state.dashboardInterval);
             if (state.autoRefreshInterval) clearInterval(state.autoRefreshInterval);
             if (state.activityRefreshInterval) clearInterval(state.activityRefreshInterval);
-            state.charts.forEach(c => { if (c.chartInstance && window.Plotly) try { Plotly.purge(c.chartInstance); } catch (e) {} });
+            state.charts.forEach(c => { if (c.chartInstance) { try { const i=echarts.getInstanceByDom(c.chartInstance); if(i) i.dispose(); } catch(e){} try{ if(c.chartInstance._ro){c.chartInstance._ro.disconnect(); c.chartInstance._ro=null;} }catch(e){} } });
         });
     }
 
