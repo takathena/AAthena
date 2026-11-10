@@ -957,7 +957,7 @@ function renderChart(ch, hist){
   const usedTs = (inRange.length ? inRange : allTs).slice(-300);
   if(!usedTs.length){ chart.clear(); return; }
 
-  // Bar Race (snapshot real data, animasi hanya saat update data)
+  // Bar Race (vertikal/horizontal) — snapshot real data, animasi saat update
   if(ch.chartType==='bar' || ch.chartType==='horizontalBar'){
     const catInfo=[];
     ch.deviceIds.forEach(did => {
@@ -975,13 +975,16 @@ function renderChart(ch, hist){
       });
     });
     if(!catInfo.length){ chart.clear(); return; }
-    const pairs = catInfo.sort((a,b)=>a.value-b.value).slice(-8);
+    const isH = ch.chartType==='horizontalBar';
+    const pairs = catInfo.sort((a,b)=>b.value-a.value).slice(0,8);
+    const names=pairs.map(p=>p.name), values=pairs.map(p=>p.value), cols=pairs.map(p=>p.color);
+    const data=values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:isH?[0,6,6,0]:[6,6,0,0]}}));
     chart.setOption({
       animation:true, animationDuration:400, animationDurationUpdate:700, animationEasingUpdate:'cubicOut',
-      grid:{left:10,right:30,top:12,bottom:12,containLabel:true},
-      xAxis:{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}},
-      yAxis:{type:'category',data:pairs.map(p=>p.name),inverse:true,axisLabel:{color:labelC,fontSize:9},axisLine:{show:false},axisTick:{show:false}},
-      series:[{type:'bar',data:pairs.map(p=>({value:p.value,itemStyle:{color:p.color,borderRadius:[0,6,6,0]}})),barMaxWidth:18,label:{show:true,position:'right',color:labelC,fontSize:9}}],
+      grid:{left:isH?10:40,right:isH?30:8,top:isH?10:18,bottom:isH?10:34,containLabel:true},
+      xAxis: isH?{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}}:{type:'category',data:names,axisLabel:{color:labelC,fontSize:9,interval:0,rotate:names.length>3?25:0},axisLine:{show:false},axisTick:{show:false}},
+      yAxis: isH?{type:'category',data:names,inverse:true,axisLabel:{color:labelC,fontSize:9},axisLine:{show:false},axisTick:{show:false}}:{type:'value',axisLabel:{color:labelC},splitLine:{lineStyle:{color:gridC}}},
+      series:[{type:'bar',data,barMaxWidth:24,label:{show:true,position:isH?'right':'top',color:labelC,fontSize:9,formatter:'{c}'}}],
       tooltip:{trigger:'item'}
     }, {notMerge:true,lazyUpdate:false});
     return;
@@ -1000,7 +1003,7 @@ function renderChart(ch, hist){
       if(!data.some(p => p[1] != null)) return;
       const color = COLORS[ci % COLORS.length]; ci++;
       const isAreaType = ch.chartType === 'area' || ch.chartType === 'stackedArea';
-      const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea' || ch.chartType === 'area';
+      const isStacked = ch.chartType === 'stackedBar' || ch.chartType === 'stackedArea';
       const isBarType = ch.chartType === 'stackedBar';
       const name = ch.deviceIds.length > 1 ? `${dn} — ${info.label}` : `${info.label} (${info.unit})`;
       if(isBarType){

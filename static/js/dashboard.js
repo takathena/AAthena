@@ -2005,7 +2005,7 @@
         const usedTs = downsampleHistory(inRange.length > 0 ? inRange : allTs, 360);
         if (usedTs.length === 0) { showChartEmpty(config.id, 'Menunggu data sensor...'); return; }
 
-        // Bar Race (bar / horizontalBar) — snapshot real data, animasi hanya saat data update (setOption)
+        // Bar Race (bar vertikal / horizontalBar horizontal) — snapshot real data, animasi saat update
         if (config.chartType === 'bar' || config.chartType === 'horizontalBar') {
             const catInfo = [];
             deviceIds.forEach(did => {
@@ -2026,14 +2026,17 @@
                 });
             });
             if (catInfo.length === 0) { showChartEmpty(config.id, 'Tidak ada data sensor yang cocok'); return; }
-            const pairs = catInfo.sort((a,b)=>a.value-b.value).slice(-10);
+            const isH = config.chartType === 'horizontalBar';
+            const pairs = catInfo.sort((a,b)=>b.value-a.value).slice(0,10);
             const names = pairs.map(p=>p.name), values = pairs.map(p=>p.value), cols = pairs.map(p=>p.color);
+            const data = values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:isH?[0,6,6,0]:[6,6,0,0]}}));
+            const labelOpt = {show:true, position:isH?'right':'top', color:colors.labelColor, fontSize:10, formatter:'{c}'};
             chart.setOption({
                 animation: true, animationDuration: 400, animationDurationUpdate: 700, animationEasingUpdate: 'cubicOut',
-                grid:{left:10,right:30,top:12,bottom:12,containLabel:true},
-                xAxis:{type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
-                yAxis:{type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false}},
-                series:[{type:'bar',data:values.map((v,i)=>({value:v,itemStyle:{color:cols[i],borderRadius:[0,6,6,0]}})),barMaxWidth:22,label:{show:true,position:'right',color:colors.labelColor,fontSize:10,formatter:'{c}'}}],
+                grid:{left:isH?10:46,right:isH?30:12,top:isH?12:20,bottom:isH?12:40,containLabel:true},
+                xAxis: isH ? {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}} : {type:'category',data:names,axisLabel:{color:colors.labelColor,fontSize:10,interval:0,rotate:names.length>4?20:0},axisLine:{show:false},axisTick:{show:false}},
+                yAxis: isH ? {type:'category',data:names,inverse:true,axisLabel:{color:colors.labelColor,fontSize:10},axisLine:{show:false},axisTick:{show:false}} : {type:'value',axisLabel:{color:colors.labelColor},splitLine:{lineStyle:{color:colors.gridColor}}},
+                series:[{type:'bar',data,barMaxWidth:28,label:labelOpt}],
                 tooltip:{trigger:'item'}
             }, {notMerge:true,lazyUpdate:false});
             config.chartInstance = plotEl;
@@ -2062,7 +2065,7 @@
                 if (!data.some(p => p[1] !== null && p[1] !== undefined)) return;
                 const color = CHART_COLORS[colorIdx % CHART_COLORS.length]; colorIdx++;
                 const isAreaType = config.chartType === 'area' || config.chartType === 'stackedArea';
-                const isStacked = config.chartType === 'stackedBar' || config.chartType === 'stackedArea' || config.chartType === 'area';
+                const isStacked = config.chartType === 'stackedBar' || config.chartType === 'stackedArea';
                 const isBarType = config.chartType === 'stackedBar';
                 const label = deviceIds.length > 1 ? `${dname} — ${info.label}` : `${info.label} (${info.unit})`;
                 if (isBarType) {
