@@ -13,7 +13,7 @@
     // Pattern noise yang harus di-skip (tidak informatif)
     const NOISE_PATTERNS = [
         /^Script error\.?$/i,               // cross-origin generic
-        /ResizeObserver loop/i,             // Chart.js noise
+        /ResizeObserver loop/i,             // Chart/Plotly resize noise
         /Non-Error promise rejection/i,     // Promise reject non-error
         /Loading chunk/i,                   // code-split fail
         /^null$/i,                          // null message

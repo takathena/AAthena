@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0a0a0a">
 <meta name="dashboard-id" content="{{ dashboard_id }}">
 <title>AAguard</title>
-<!-- Leaflet + Chart.js dimuat lazy via lazy-load.js saat section map/graph dibuka -->
+<!-- Leaflet + Plotly dimuat lazy via lazy-load.js saat section map/graph dibuka -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
@@ -1226,7 +1226,7 @@
       <button class="trend-range-btn" data-hours="168" data-click="setTrendRange" data-arg="168" data-self="1">7 Hari</button>
     </div>
     <div class="alert-trend-body-m">
-      <canvas id="mobileTrendCanvas"></canvas>
+      <div id="mobileTrendCanvas" style="width:100%;height:100%;"></div>
       <div class="alert-trend-empty-m" id="mobileTrendEmpty" style="display:none;">
         <i class="fa-solid fa-chart-simple"></i>
         <span>Belum ada data</span>

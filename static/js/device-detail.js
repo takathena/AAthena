@@ -303,8 +303,8 @@ function renderSensors(device){
   `;
 }
 
-/* ---------- Chart History (Batch 7) ---------- */
-let historyChart = null;
+/* ---------- Chart History (Plotly) ---------- */
+let historyChart = null; // plotly div ref/id state
 let historyHours = 24;
 
 const CHART_COLORS = [
@@ -315,29 +315,32 @@ const CHART_COLORS = [
 function getChartTheme(){
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   return {
-    grid: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+    grid: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
     label: isLight ? '#737373' : '#a3a3a3',
     legend: isLight ? '#525252' : '#a3a3a3',
-    tooltipBg: isLight ? '#0a0a0a' : '#fafafa',
-    tooltipTitle: isLight ? '#fafafa' : '#0a0a0a',
-    tooltipBody: isLight ? '#a3a3a3' : '#525252',
-    pointBorder: isLight ? '#fafafa' : '#0a0a0a',
+    paper: 'rgba(0,0,0,0)',
+    plot: 'rgba(0,0,0,0)',
+    hoverBg: isLight ? '#0a0a0a' : '#171717',
+    hoverText: isLight ? '#fafafa' : '#fafafa',
   };
 }
 
 function showChartFallback(msg){
-  const canvas = document.getElementById('historyChartCanvas');
+  const el = document.getElementById('historyChartCanvas');
   const legendEl = document.getElementById('chartLegend');
   if(legendEl) legendEl.innerHTML = '';
-  if(!canvas) return;
-  if(historyChart){ historyChart.destroy(); historyChart = null; }
-  canvas.style.display = 'none';
-  const parent = canvas.parentElement;
+  if(!el) return;
+  try{ if(window.Plotly) Plotly.purge(el); }catch(e){}
+  historyChart = null;
+  el.innerHTML = '';
+  const parent = el.parentElement;
   if(parent && !parent.querySelector('.chart-empty-msg')){
-    const el = document.createElement('div');
-    el.className = 'chart-empty-msg';
-    el.innerHTML = '<i class="fa-solid fa-satellite-dish"></i><span>' + esc(msg) + '</span>';
-    parent.appendChild(el);
+    const msgEl = document.createElement('div');
+    msgEl.className = 'chart-empty-msg';
+    msgEl.innerHTML = '<i class="fa-solid fa-satellite-dish"></i><span>' + esc(msg) + '</span>';
+    parent.appendChild(msgEl);
+  } else if(parent){
+    const m = parent.querySelector('.chart-empty-msg span'); if(m) m.textContent = msg;
   }
 }
 
@@ -345,11 +348,10 @@ async function loadHistoryChart(){
   const canvas = document.getElementById('historyChartCanvas');
   if(!canvas) return;
 
-  // Chart.js lazy-load: muat dulu bila belum siap; fallback rapi bila offline
-  if(typeof Chart === 'undefined'){
+  if(typeof Plotly === 'undefined'){
     try{ if(window.AAGuardLazy) await window.AAGuardLazy.loadChartLibs(); }
-    catch(e){ showChartFallback('Chart.js gagal dimuat. Cek koneksi internet/CDN.'); return; }
-    if(typeof Chart === 'undefined'){ showChartFallback('Chart.js gagal dimuat. Cek koneksi internet/CDN.'); return; }
+    catch(e){ showChartFallback('Plotly gagal dimuat. Cek koneksi internet/CDN.'); return; }
+    if(typeof Plotly === 'undefined'){ showChartFallback('Plotly gagal dimuat. Cek koneksi internet/CDN.'); return; }
   }
 
   try{
@@ -358,9 +360,10 @@ async function loadHistoryChart(){
     const d = await r.json();
 
     if(!d.success || !d.history || !d.history.length){
-      if(historyChart){ historyChart.destroy(); historyChart = null; }
+      try{ Plotly.purge(canvas); }catch(e){}
+      historyChart = null;
       const lg = document.getElementById('chartLegend'); if(lg) lg.innerHTML = '';
-      canvas.style.display = 'none';
+      canvas.innerHTML = '';
       const parent = canvas.parentElement;
       if(parent && !parent.querySelector('.chart-empty-msg')){
         const msg = document.createElement('div');
@@ -371,8 +374,7 @@ async function loadHistoryChart(){
       return;
     }
 
-    canvas.style.display = '';
-    const old = canvas.parentElement.querySelector('.chart-empty-msg');
+    const old = canvas.parentElement && canvas.parentElement.querySelector('.chart-empty-msg');
     if(old) old.remove();
 
     const allKeys = new Set();
@@ -384,110 +386,73 @@ async function loadHistoryChart(){
     const keys = Array.from(allKeys);
 
     if(keys.length === 0){
-      if(historyChart){ historyChart.destroy(); historyChart = null; }
-      canvas.style.display = 'none';
+      try{ Plotly.purge(canvas); }catch(e){}
+      historyChart = null;
+      canvas.innerHTML = '';
       return;
     }
 
-    const timestamps = d.history.map(h => h.timestamp);
-    const labels = timestamps.map(ts => {
-      try{
-        const dt = new Date(String(ts).replace(' ','T') + '+07:00');
-        if(historyHours <= 24){
-          return dt.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
-        }
-        return dt.toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
-      }catch(e){ return ''; }
+    const timestamps = d.history.map(h => {
+      const ts = String(h.timestamp || '').replace(' ','T');
+      return /[+-]\d\d:\d\d$|Z$/.test(ts) ? ts : ts + '+07:00';
     });
 
     const theme = getChartTheme();
-    const font = "'Geist', -apple-system, sans-serif";
+    const font = 'Geist, -apple-system, sans-serif';
 
-    const datasets = keys.map((key, i) => {
+    const traces = keys.map((key, i) => {
       const meta = getSensor(key);
       const color = CHART_COLORS[i % CHART_COLORS.length];
       const values = d.history.map(h => {
         const v = h.data?.[key];
         return (typeof v === 'number') ? v : null;
       });
+      const name = key.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()) + (meta.unit ? ` (${meta.unit})` : '');
       return {
-        label: key.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()) + (meta.unit ? ` (${meta.unit})` : ''),
-        data: values,
-        borderColor: color,
-        backgroundColor: color + '15',
-        fill: keys.length === 1,
-        tension: 0.3,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        pointHoverBackgroundColor: color,
-        pointHoverBorderColor: theme.pointBorder,
-        pointHoverBorderWidth: 2,
-        pointBackgroundColor: color,
-        pointBorderColor: theme.pointBorder,
-        pointBorderWidth: 0,
-        borderWidth: 2,
-        spanGaps: true,
+        type: 'scatter', mode: 'lines',
+        name, x: timestamps, y: values,
+        line: { color, width: 2, shape: 'spline', smoothing: 0.6 },
+        fill: keys.length === 1 ? 'tozeroy' : 'none',
+        fillcolor: color + '22',
+        connectgaps: true,
+        hovertemplate: '%{x|%d %b %H:%M}<br>%{fullData.name}: %{y}<extra></extra>',
       };
     });
 
-    if(historyChart){ historyChart.destroy(); historyChart = null; }
-
-    historyChart = new Chart(canvas.getContext('2d'), {
-      type: 'line',
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        animation: { duration: 300, easing: 'easeOutQuart' },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: theme.tooltipBg,
-            titleColor: theme.tooltipTitle,
-            bodyColor: theme.tooltipBody,
-            borderColor: theme.grid,
-            borderWidth: 1,
-            padding: 10,
-            cornerRadius: 8,
-            titleFont: { size: 11, family: font, weight: '600' },
-            bodyFont: { size: 11, family: font, weight: '500' },
-          },
-        },
-        scales: {
-          x: {
-            grid: { color: theme.grid, drawBorder: false, drawTicks: false },
-            border: { display: false },
-            ticks: {
-              color: theme.label,
-              font: { size: 10, family: font, weight: '500' },
-              maxTicksLimit: 6,
-              maxRotation: 0,
-              autoSkip: true,
-              padding: 6,
-            },
-          },
-          y: {
-            grid: { color: theme.grid, drawBorder: false, drawTicks: false },
-            border: { display: false },
-            ticks: {
-              color: theme.label,
-              font: { size: 10, family: font, weight: '500' },
-              padding: 8,
-            },
-            beginAtZero: false,
-          },
-        },
+    const layout = {
+      margin: { l: 42, r: 12, t: 8, b: 28 },
+      paper_bgcolor: theme.paper, plot_bgcolor: theme.plot,
+      showlegend: false,
+      font: { family: font, color: theme.label, size: 10 },
+      xaxis: {
+        type: 'date', gridcolor: theme.grid, zeroline: false,
+        tickfont: { size: 10, color: theme.label },
+        hoverformat: '%d %b %Y %H:%M',
       },
-    });
+      yaxis: {
+        gridcolor: theme.grid, zeroline: false,
+        tickfont: { size: 10, color: theme.label },
+      },
+      hovermode: 'x unified',
+      hoverlabel: { bgcolor: theme.hoverBg, font: { color: theme.hoverText, family: font, size: 11 } },
+      uirevision: 'history',
+    };
+    const config = { responsive: true, displayModeBar: false };
+
+    if(historyChart){
+      await Plotly.react(canvas, traces, layout, config);
+    } else {
+      await Plotly.newPlot(canvas, traces, layout, config);
+      historyChart = canvas;
+    }
 
     const legendEl = document.getElementById('chartLegend');
     if(legendEl){
-      legendEl.innerHTML = datasets.map(ds => {
-        const color = ds.borderColor;
+      legendEl.innerHTML = traces.map(ds => {
+        const color = ds.line.color;
         return `<div class="chart-legend-item">
           <span class="chart-legend-dot" style="background:${color};"></span>
-          <span class="chart-legend-label">${esc(ds.label)}</span>
+          <span class="chart-legend-label">${esc(ds.name)}</span>
         </div>`;
       }).join('');
     }
@@ -508,6 +473,7 @@ function bindChartRange(){
     });
   });
 }
+
 
 /* ---------- Status History ---------- */
 function statusReasonLabel(reason){

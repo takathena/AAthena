@@ -10,7 +10,7 @@
     var CDN = {
         leafletCss: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
         leafletJs: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-        chartJs: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+        plotly: 'https://cdn.plot.ly/plotly-2.35.2.min.js',
         interactJs: 'https://cdn.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js',
     };
 
@@ -67,7 +67,7 @@
     }
 
     function loadChartLibs() {
-        return loadSequential([CDN.chartJs, CDN.interactJs]);
+        return loadSequential([CDN.plotly, CDN.interactJs]);
     }
 
     function loadMetrics() { return loadCSS('/static/css/metrics.css').then(function () { return loadScript('/static/js/metrics.js'); }); }
@@ -103,7 +103,7 @@
     }, true);
 
     // Section pertama langsung preload (direct #settings, restore session) supaya
-    // Leaflet/Chart.js/picker sudah siap tanpa menunggu klik pertama.
+    // Leaflet/Plotly/picker sudah siap tanpa menunggu klik pertama.
     document.addEventListener('DOMContentLoaded', function () {
         // Hanya halaman desktop (ada nav [data-section]); mobile punya section sendiri.
         if (!document.querySelector('[data-section]')) return;

@@ -10,7 +10,7 @@ Platform monitoring IoT real-time untuk perangkat ESP32, ESP8266, Arduino, dan R
 ![Gunicorn](https://img.shields.io/badge/Gunicorn-23.0.0-499848?style=flat-square&logo=gunicorn&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-alpine-009639?style=flat-square&logo=nginx&logoColor=white)
-![Chart.js](https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=flat-square&logo=chartdotjs&logoColor=white)
+![Plotly.js](https://img.shields.io/badge/Plotly.js-2.35.2-3F4F75?style=flat-square&logo=plotly&logoColor=white)
 ![Leaflet](https://img.shields.io/badge/Leaflet-1.9.4-199900?style=flat-square&logo=leaflet&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
@@ -123,7 +123,7 @@ Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn mul
 | Templating Support | MarkupSafe | 3.0.3 |
 | CLI | Click | 8.5.0 |
 | Event Signals | blinker | 1.9.0 |
-| Chart Library | Chart.js | 4.4.0 |
+| Chart Library | Plotly.js | 2.35.2 |
 | Peta | Leaflet | 1.9.4 |
 | Drag / Resize | interact.js | 1.10.27 |
 | Icons | Font Awesome Free | 6.5.1 |
@@ -1310,7 +1310,7 @@ Penyebab umum:
 1. Belum ada tab analitik. Buat tab dulu.
 2. Tab tidak punya widget. Klik Tambah Diagram.
 3. Widget ada tapi device atau sensor key salah. Edit widget.
-4. Chart.js gagal load dari CDN. Cek console browser.
+4. Plotly gagal load dari CDN. Cek console browser.
 
 ### Chat AI offline
 

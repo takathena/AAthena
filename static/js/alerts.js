@@ -216,12 +216,8 @@
 
             const buckets = {};
             (data.trend || []).forEach(r => {
-                if (!buckets[r.hour_bucket]) {
-                    buckets[r.hour_bucket] = { danger: 0, warning: 0, info: 0 };
-                }
-                if (buckets[r.hour_bucket][r.severity] !== undefined) {
-                    buckets[r.hour_bucket][r.severity] = r.count;
-                }
+                if (!buckets[r.hour_bucket]) buckets[r.hour_bucket] = { danger: 0, warning: 0, info: 0 };
+                if (buckets[r.hour_bucket][r.severity] !== undefined) buckets[r.hour_bucket][r.severity] = r.count;
             });
 
             const labels = Object.keys(buckets).sort();
@@ -230,8 +226,8 @@
 
             if (labels.length === 0) {
                 if (empty) empty.style.display = 'flex';
-                if (canvas) canvas.style.display = 'none';
-                if (state.trendChart) { state.trendChart.destroy(); state.trendChart = null; }
+                if (canvas) { canvas.style.display = 'none'; try { if (window.Plotly) Plotly.purge(canvas); } catch (e) {} }
+                state.trendChart = null;
                 return;
             }
             if (empty) empty.style.display = 'none';
@@ -246,134 +242,43 @@
                 const parts = String(l).split(' ');
                 const date = parts[0] || '';
                 const time = parts[1] || '';
-                if (isLongRange) {
-                    const dateShort = date.slice(5);
-                    return `${dateShort} ${time.slice(0, 2)}h`;
-                }
+                if (isLongRange) return `${date.slice(5)} ${time.slice(0, 2)}h`;
                 return time.slice(0, 5);
             });
 
-            if (state.trendChart) {
-                state.trendChart.destroy();
-                state.trendChart = null;
+            if (typeof Plotly === 'undefined') {
+                try { if (window.AAGuardLazy) await window.AAGuardLazy.loadChartLibs(); } catch (e) {}
+                if (typeof Plotly === 'undefined') {
+                    console.warn('[Trend] Plotly not loaded');
+                    return;
+                }
             }
 
             const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-            const gridColor = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)';
+            const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
             const labelColor = isLight ? '#737373' : '#a3a3a3';
             const legendColor = isLight ? '#525252' : '#a3a3a3';
-            const tooltipBg = isLight ? '#0a0a0a' : '#fafafa';
-            const tooltipTitle = isLight ? '#fafafa' : '#0a0a0a';
-            const tooltipBody = isLight ? '#a3a3a3' : '#525252';
-            const font = "'Geist', -apple-system, sans-serif";
+            const font = 'Geist, -apple-system, sans-serif';
 
-            if (typeof Chart === 'undefined') {
-                console.warn('[Trend] Chart.js not loaded');
-                return;
-            }
-
-            state.trendChart = new Chart(canvas.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: displayLabels,
-                    datasets: [
-                        {
-                            label: 'Bahaya',
-                            data: dangerData,
-                            backgroundColor: 'rgba(239, 68, 68, 0.75)',
-                            borderColor: '#ef4444',
-                            borderWidth: 0,
-                            borderRadius: 4,
-                            stack: 'stack1',
-                        },
-                        {
-                            label: 'Peringatan',
-                            data: warningData,
-                            backgroundColor: 'rgba(249, 115, 22, 0.75)',
-                            borderColor: '#f97316',
-                            borderWidth: 0,
-                            borderRadius: 4,
-                            stack: 'stack1',
-                        },
-                        {
-                            label: 'Info',
-                            data: infoData,
-                            backgroundColor: 'rgba(139, 92, 246, 0.75)',
-                            borderColor: '#8b5cf6',
-                            borderWidth: 0,
-                            borderRadius: 4,
-                            stack: 'stack1',
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    animation: { duration: 250, easing: 'easeOutQuart' },
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: legendColor,
-                                font: { size: 11, family: font, weight: '500' },
-                                usePointStyle: true,
-                                pointStyle: 'circle',
-                                boxWidth: 8,
-                                boxHeight: 8,
-                                padding: 14,
-                            },
-                        },
-                        tooltip: {
-                            backgroundColor: tooltipBg,
-                            titleColor: tooltipTitle,
-                            bodyColor: tooltipBody,
-                            borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)',
-                            borderWidth: 1,
-                            padding: 10,
-                            cornerRadius: 8,
-                            displayColors: true,
-                            boxPadding: 4,
-                            titleFont: { size: 11, family: font, weight: '600' },
-                            bodyFont: { size: 11, family: font, weight: '500' },
-                            callbacks: {
-                                title: (items) => {
-                                    if (!items.length) return '';
-                                    const idx = items[0].dataIndex;
-                                    return labels[idx] || '';
-                                },
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            stacked: true,
-                            grid: { display: false },
-                            border: { display: false },
-                            ticks: {
-                                color: labelColor,
-                                font: { size: 10, family: font, weight: '500' },
-                                maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 12,
-                                padding: 4,
-                            },
-                        },
-                        y: {
-                            stacked: true,
-                            beginAtZero: true,
-                            grid: { color: gridColor, drawBorder: false, drawTicks: false },
-                            border: { display: false },
-                            ticks: {
-                                color: labelColor,
-                                font: { size: 10, family: font, weight: '500' },
-                                padding: 6,
-                                precision: 0,
-                            },
-                        },
-                    },
-                },
-            });
+            const traces = [
+                { type: 'bar', name: 'Bahaya', x: displayLabels, y: dangerData, marker: { color: 'rgba(239,68,68,0.75)' }, hovertemplate: '%{x}<br>Bahaya: %{y}<extra></extra>' },
+                { type: 'bar', name: 'Peringatan', x: displayLabels, y: warningData, marker: { color: 'rgba(249,115,22,0.75)' }, hovertemplate: '%{x}<br>Peringatan: %{y}<extra></extra>' },
+                { type: 'bar', name: 'Info', x: displayLabels, y: infoData, marker: { color: 'rgba(139,92,246,0.75)' }, hovertemplate: '%{x}<br>Info: %{y}<extra></extra>' },
+            ];
+            const layout = {
+                barmode: 'stack',
+                margin: { l: 36, r: 8, t: 8, b: 36 },
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: font, color: labelColor, size: 10 },
+                legend: { orientation: 'h', y: -0.2, font: { size: 10, color: legendColor } },
+                xaxis: { gridcolor: gridColor, zeroline: false, tickfont: { size: 10, color: labelColor } },
+                yaxis: { gridcolor: gridColor, zeroline: false, tickfont: { size: 10, color: labelColor }, rangemode: 'tozero' },
+                hovermode: 'x unified',
+                uirevision: 'alertTrend',
+            };
+            const cfg = { responsive: true, displayModeBar: false };
+            await Plotly.react(canvas, traces, layout, cfg);
+            state.trendChart = canvas;
         } catch (e) {
             console.error('[Trend] Load failed:', e);
         }
@@ -1062,7 +967,7 @@
             state.refreshInterval = null;
         }
         if (state.trendChart) {
-            try { state.trendChart.destroy(); } catch (e) {}
+            try { if (window.Plotly) Plotly.purge(state.trendChart); } catch (e) {}
             state.trendChart = null;
         }
     });

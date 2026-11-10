@@ -92,7 +92,7 @@
     </div>
     <div class="group-body" id="chartBody">
       <div class="chart-canvas-wrap">
-        <canvas id="historyChartCanvas"></canvas>
+        <div id="historyChartCanvas" class="history-plot"></div>
       </div>
       <div class="chart-legend" id="chartLegend"></div>
     </div>
@@ -199,7 +199,7 @@
   </div>
 </div>
 
-<!-- Chart.js dimuat lazy via lazy-load.js (AAGuardLazy.loadChartLibs), bukan eager di sini -->
+<!-- Plotly dimuat lazy via lazy-load.js (AAGuardLazy.loadChartLibs), bukan eager di sini -->
 <script src="{{ url_for('static', filename='js/lazy-load.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
