@@ -411,10 +411,11 @@ async function loadHistoryChart(){
       }).filter(x => x && x[0]!=null);
       const name = key.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()) + (meta.unit ? ` (${meta.unit})` : '');
       return {
-        name, type: 'line', data, showSymbol: false, smooth: true,
-        sampling: 'lttb', triggerLineEvent: true, lineStyle: { width: 2.5, color }, itemStyle: { color },
+        name, type: 'line', data, showSymbol: true, symbol: 'circle', symbolSize: 7,
+        itemStyle: { color: 'transparent' }, smooth: true,
+        sampling: 'lttb', triggerLineEvent: true, lineStyle: { width: 2.5, color },
         areaStyle: keys.length === 1 ? { color: color + '22' } : undefined,
-        connectNulls: true, emphasis: { focus: 'series' },
+        connectNulls: true, emphasis: { focus: 'series', itemStyle: { color: color } },
       };
     });
 
