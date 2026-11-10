@@ -734,21 +734,6 @@
             </div>`;
     }
 
-    function applyDateFilter() {
-        const startEl = $('alertStartDate');
-        const endEl = $('alertEndDate');
-        state.dateStart = startEl ? startEl.value : '';
-        state.dateEnd = endEl ? endEl.value : '';
-        applyFilter();
-    }
-
-    function clearDateFilter() {
-        if (state.alertDRP) state.alertDRP.setValue(null, null);
-        state.dateStart = '';
-        state.dateEnd = '';
-        applyFilter();
-    }
-
     // ==========================================
     // TEST NOTIFIKASI
     // ==========================================

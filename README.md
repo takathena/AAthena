@@ -55,7 +55,7 @@ Dirancang untuk berjalan di lingkungan produksi: FastAPI + Uvicorn (Gunicorn mul
 
 ### Monitoring dan Visualisasi
 
-- Dashboard real-time dengan auto-refresh 30 detik, health ring, dan activity feed
+- Dashboard real-time dengan auto-refresh 30 detik, kartu metrik, dan activity feed
 - Peta interaktif berbasis Leaflet dengan marker cluster, filter status, dan pencarian
 - Editor lokasi device drag-and-drop langsung di peta
 - Analitik multi-chart: line, bar, area, doughnut, pie, polar area, radar, horizontal bar, stacked bar, dan stacked area
@@ -377,7 +377,7 @@ Catatan: `memory://` tidak shared antar worker Gunicorn; aplikasi mencatat perin
 | Variabel | Default | Deskripsi |
 |----------|---------|-----------|
 | `LOG_LEVEL` | `INFO` | Level log |
-| `LOG_FILE` | `logs/aaguard.log` | Path file log |
+| `LOG_FILE` | `logs/aaguard.log` | Path dasar file log; tiap worker menulis `logs/aaguard.log.<pid>` |
 | `LOG_MAX_BYTES` | `10485760` | Ukuran maksimum per file log |
 | `LOG_BACKUP_COUNT` | `5` | Jumlah file log yang disimpan |
 
@@ -626,7 +626,6 @@ AAthena/
 │   ├── database.py               # Layer SQLite koneksi + init runner
 │   ├── migrations.py             # Migrasi v1..v19 + registry MIGRATIONS
 │   ├── logging_config.py         # Setup log rotating
-│   ├── login_throttle.py         # Throttle login gagal
 │   ├── notifier.py               # Dispatcher Telegram
 │   ├── permissions.py            # Peran dan izin
 │   ├── restore.py                # Restore database tertunda
@@ -665,7 +664,7 @@ AAthena/
 │       ├── sidebar.js
 │       ├── theme.js
 │       └── toast.js
-├── tests/                        # Tes pytest (conftest.py + test_phase*.py)
+├── tests/                        # Tes pytest (unit/integration + e2e Playwright)
 ├── templates/
 │   ├── alerts.html               # Redirect ke /#alerts
 │   ├── base.html                 # Base template
@@ -1296,7 +1295,7 @@ Penyebab umum:
 3. Rate limit terlampaui. Cek log untuk `429 Too Many Requests`.
 4. Payload bukan JSON valid. Cek log untuk `Invalid JSON`.
 
-Solusi: cek log dengan `docker compose logs -f aaguard-iot` atau `tail -f logs/aaguard.log`.
+Solusi: cek log dengan `docker compose logs -f aaguard-iot` atau `tail -f logs/aaguard.log.*` (satu file per worker).
 
 ### Alert tidak muncul
 
@@ -1428,6 +1427,19 @@ ruff check app run.py
 ```
 
 Tes memakai database sementara dan konfigurasi `testing`; tidak menyentuh `database/iot.db`. Nama berkas tes (`test_phaseN_*.py`) mengikuti urutan fase perbaikan; setiap temuan di [CHANGELOG](CHANGELOG.md) punya minimal satu tes.
+
+### Tes E2E browser (Playwright)
+
+Tes E2E menjalankan browser sungguhan terhadap instance yang sudah berjalan dan **mengubah database live** (membuat lalu menghapus satu device uji). Karena itu tes ini opt-in:
+
+```bash
+pip install playwright
+playwright install chromium
+
+E2E=1 pytest -q tests/e2e/test_live_e2e.py
+```
+
+Kredensial diambil dari `E2E_USERNAME`/`E2E_PASSWORD`, atau fallback ke `IOT_USERNAME`/`IOT_PASSWORD` di `.env`. Target default `http://localhost:4455`; ubah dengan `E2E_BASE_URL`. Skenario: login, metrik dashboard, navigasi semua section, marker peta, command palette, tab pengaturan, logout, dan create/delete device.
 
 ### CI
 

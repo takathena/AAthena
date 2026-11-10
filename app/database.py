@@ -100,11 +100,6 @@ def get_db_context():
     return _DBContext()
 
 
-def get_db():
-    """Kompatibilitas tes/FastAPI lama: return koneksi sync (untuk teardown)."""
-    return None
-
-
 def close_db(error=None):
     """Kompatibilitas conftest/tests: no-op (async CM menutup per call)."""
     return None

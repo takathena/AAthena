@@ -12,5 +12,4 @@
     if (!isSettingsHash && window.location.hash !== '#' + hash) {
         try { history.replaceState(null, '', '#' + hash); } catch (e) {}
     }
-    window.__AAGUARD_INITIAL_SECTION = isSettingsHash ? 'settings' : hash;
 })();

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — AAguard rename + pembersihan
+
+- **Rename penuh:** NEXUS → AAguard di UI, dokumentasi, logger, env (`AAGUARD_LOCK_DIR`), container/service/network Docker (`aaguard-iot`, `aaguard-nginx`, `aaguard-network`), user container (`aaguard`), dan konfigurasi Nginx (`nginx/conf.d/aaguard.conf`).
+- **Dead code dihapus:** modul throttle login Flask-era, sync wrapper alert/permission, schema Pydantic tak terpakai, helper API Flask-era, health-ring JS/CSS sisa, dan template `error.html` (halaman error kini inline `_html_error`).
+- **Logging file aktif:** `setup_logging()` dipanggil dari `run.py`; jika file log tidak bisa ditulis, aplikasi tetap jalan dengan log console.
+- **E2E Playwright:** `tests/e2e/test_live_e2e.py` (opt-in `E2E=1`), mencakup login, metrik, navigasi section, peta, command palette, settings, logout, dan create/delete device.
+
 ## V2.0.0 — 2026-11-09
 
 Breaking release: migrasi ke FastAPI + async + Pydantic di `app/main.py` (route `/api/v1/*` dipertahankan), hapus fitur absensi v19 (route `/cardholders`, `/attendance/*`, tabel `attendance`+`cardholders`, 5 chat tools, menu & section absensi; `DROP TABLE attendance/cardholders`), frontend ringan (lazy-load Chart.js/Leaflet, gabung CSS), port publik 4455/443 via Nginx, DB fresh (database/iot.db mulai dari nol, tanpa migrasi data lama).
@@ -160,7 +167,7 @@ Dead code + logika backend. Baseline test: 323 lulus → 335 lulus, 0 gagal.
 | Backup | `pre-delete_*` dan `pre-restore_*` ikut di-prune (file manual tetap aman). Sebelumnya menumpuk selamanya. |
 | Session | `/api/v1/metrics` dan `/api/v1/chat` didaftarkan sebagai polling agar idle timeout benar-benar aktif. |
 | Restore | `_db_in_use()` membedakan `database is locked` (True) dari DB rusak (False) — restore tidak lagi ditolak selamanya saat DB korup. |
-| Halaman error | 404/401/403/429/500 untuk route halaman merender `error.html`; endpoint `/api/*` tetap JSON. |
+| Halaman error | 404/401/403/429/500 untuk route halaman dirender inline oleh `_html_error`; endpoint `/api/*` tetap JSON. |
 | Dead code | `app/decorators.py`, `role_required`, `can_access_dashboard`, `default_dashboard_for_admin`, route `/alerts` + template, dan sisa JS/CSS untuk id yang tidak ada (`mapPreview`, `pageTitle`, `mapListCount`, `alertFilterInfo`, `chatTab`, `updateJsonPreview`) dihapus. |
 
 ### Diketahui masih terbuka (Fase C)

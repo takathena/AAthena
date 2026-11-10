@@ -126,15 +126,6 @@ const fmtTime = iso => {
   try{ return d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}); }
   catch(e){ return '-'; }
 };
-const fmtDateSplit = iso => {
-  const d = parseTs(iso); if(!d) return {date:'-',time:'-'};
-  try{
-    return {
-      date: d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',timeZone:'Asia/Jakarta'}),
-      time: d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Jakarta'})
-    };
-  }catch(e){ return {date:'-',time:'-'}; }
-};
 const fmtRelative = iso => {
   const d = parseTs(iso); if(!d) return '-';
   const diff = (Date.now() - d.getTime())/1000;
@@ -790,10 +781,6 @@ function renderTabs(){
     });
   }
 }
-
-window.editTabMobile = function(tabId, currentName) {
-  openTabModal('edit', tabId, currentName);
-};
 
 window.confirmDeleteTabMobile = function(tabId) {
   confirmModal('Hapus Tab', 'Hapus tab ini beserta diagramnya?', async () => {

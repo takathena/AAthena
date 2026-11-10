@@ -17,9 +17,6 @@ ROLE_SUPERADMIN = 'superadmin'
 ROLE_ADMIN = 'admin'
 ROLE_MODERATOR = 'moderator'
 ROLE_USER = 'user'
-ROLES = (ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_MODERATOR, ROLE_USER)
-
-PERMISSION_DENIED_ERROR = 'Anda tidak punya izin untuk fitur ini'
 
 
 def resolve_role(is_admin, stored_role):
@@ -33,49 +30,6 @@ def resolve_role(is_admin, stored_role):
 
 def is_privileged(role):
     return role in (ROLE_SUPERADMIN, ROLE_ADMIN)
-
-
-def get_user_info(conn, user_id):
-    """Return dict {id, role, is_admin} atau None bila user tidak ada."""
-    if not user_id:
-        return None
-    row = conn.execute(
-        'SELECT id, is_admin, role FROM users WHERE id = ?', (user_id,)
-    ).fetchone()
-    if not row:
-        return None
-    return {
-        'id': row['id'],
-        'role': resolve_role(row['is_admin'], row['role']),
-        'is_admin': bool(row['is_admin']),
-    }
-
-
-def explicit_permissions(conn, user_id):
-    rows = conn.execute(
-        'SELECT permission FROM user_permissions WHERE user_id = ?', (user_id,)
-    ).fetchall()
-    return {r['permission'] for r in rows}
-
-
-def effective_permissions(conn, user_id):
-    """Semua izin yang berlaku saat ini untuk user (dibaca dari DB setiap kali)."""
-    return explicit_permissions(conn, user_id)
-
-
-def has_permission(conn, user_id, permission):
-    return permission in effective_permissions(conn, user_id)
-
-
-def set_user_permissions(conn, user_id, permissions, granted_by=None):
-    """Replace explicit permissions. Caller must commit."""
-    conn.execute('DELETE FROM user_permissions WHERE user_id = ?', (user_id,))
-    for p in permissions:
-        conn.execute(
-            'INSERT INTO user_permissions (user_id, permission, granted_by) VALUES (?, ?, ?)',
-            (user_id, p, granted_by),
-        )
-    return set(permissions)
 
 
 async def get_user_info_async(conn, user_id):

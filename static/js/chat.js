@@ -187,8 +187,6 @@
         }
     }
 
-    window.__aaguardChatDownload = _downloadFile;
-
     // ============================================================
     // INIT
     // ============================================================
@@ -261,10 +259,6 @@
         });
     }
 
-    function openShortcutsMenu() {
-        if (!els.shortcutsMenu) return;
-        els.shortcutsMenu.classList.add('open');
-    }
     function closeShortcutsMenu() {
         if (!els.shortcutsMenu) return;
         els.shortcutsMenu.classList.remove('open');

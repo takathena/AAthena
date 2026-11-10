@@ -9,9 +9,15 @@ import signal
 import sys
 
 from app.config import get_config
-from app.main import app  # FastAPI app (dari app/main.py:create_app)
 
 config = get_config()
+
+from app.logging_config import setup_logging  # noqa: E402
+
+setup_logging(config)
+
+from app.main import app  # noqa: E402  FastAPI app (dari app/main.py:create_app)
+
 logger = logging.getLogger('aaguard')
 
 

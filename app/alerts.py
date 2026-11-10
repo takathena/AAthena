@@ -164,42 +164,6 @@ async def _load_stored_global_rules(conn=None):
     return valid
 
 
-def _get_global_rules_sync(conn=None):
-    """Sync version untuk tests/caller sync: baca user_settings via sync conn."""
-    now = time.monotonic()
-    with _global_rules_lock:
-        cached = _global_rules_cache['rules']
-        if cached is not None and (now - _global_rules_cache['ts']) < GLOBAL_RULES_TTL_SECONDS:
-            return copy.deepcopy(cached)
-    rules = _default_global_rules()
-    try:
-        if conn is not None:
-            row = conn.execute("SELECT value FROM user_settings WHERE key = 'global_alert_rules'").fetchone()
-        else:
-            from app.database import get_db_context as _sync_ctx
-            with _sync_ctx() as c:
-                row = c.execute("SELECT value FROM user_settings WHERE key = 'global_alert_rules'").fetchone()
-        stored = {}
-        if row and row['value']:
-            parsed = json.loads(row['value'])
-            if isinstance(parsed, dict):
-                for sensor, rule in parsed.items():
-                    if _validate_rule(rule):
-                        stored[sensor] = rule
-    except Exception:
-        stored = {}
-    for sensor, rule in stored.items():
-        merged = copy.deepcopy(rule)
-        for k, v in rules.get(sensor, {}).items():
-            if k.startswith('_'):
-                merged.setdefault(k, v)
-        rules[sensor] = merged
-    with _global_rules_lock:
-        _global_rules_cache['rules'] = copy.deepcopy(rules)
-        _global_rules_cache['ts'] = now
-    return rules
-
-
 async def _get_global_rules(conn=None):
     """Rules default config, ditimpa per sensor oleh rules tersimpan di DB."""
     now = time.monotonic()
@@ -290,17 +254,6 @@ def _apply_hysteresis(new_severity, old_severity, value, rule):
     if (n_min + offset) <= value <= (n_max - offset):
         return new_severity
     return old_severity
-
-
-def evaluate(value, rule, old_severity=None):
-    """Evaluate murni: severity dari band + hysteresis per-sensor.
-
-    Return severity final (atau None bila rule invalid).
-    """
-    new_severity, _ = _evaluate_severity(value, rule)
-    if new_severity is None:
-        return None
-    return _apply_hysteresis(new_severity, old_severity, value, rule)
 
 
 _BAND_LABELS = {'healthy': 'normal', 'info': 'info', 'warning': 'warning', 'danger': 'danger'}
@@ -801,10 +754,6 @@ async def acknowledge_alert(alert_id, scope=None):
         return True
 
 
-# Alias singkat untuk pemakai router lama.
-acknowledge = acknowledge_alert
-
-
 async def bulk_acknowledge_alerts(alert_ids, scope=None):
     if not alert_ids:
         return 0
@@ -866,26 +815,6 @@ def _run(coro):
         with _cf.ThreadPoolExecutor(max_workers=1) as ex:
             return ex.submit(lambda: _aio.run(coro)).result()
     return _aio.run(coro)
-
-
-def check_and_create_alerts_sync(device_id, sensor_data):
-    return _run(check_and_create_alerts(device_id, sensor_data))
-
-
-def get_active_alerts_sync(limit=100, severity=None, device_id=None, scope=None):
-    return _run(get_active_alerts(limit, severity, device_id, scope))
-
-
-def get_alert_history_sync(device_id=None, limit=200, scope=None):
-    return _run(get_alert_history(device_id, limit, scope))
-
-
-def acknowledge_alert_sync(alert_id, scope=None):
-    return _run(acknowledge_alert(alert_id, scope))
-
-
-def bulk_acknowledge_alerts_sync(alert_ids, scope=None):
-    return _run(bulk_acknowledge_alerts(alert_ids, scope))
 
 
 def get_device_alert_rules_sync(conn, device_id):

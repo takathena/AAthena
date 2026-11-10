@@ -170,16 +170,6 @@
         console.log('[Sidebar] Initialized v4. Mobile:', isMobile());
     }
 
-    // Expose public API
-    window.toggleSidebar = toggleSidebar;
-    window.AAGuardSidebar = {
-        toggle: toggleSidebar,
-        setDesktopCollapsed,
-        setMobileExpanded,
-        isMobile,
-        isMobileExpanded,
-    };
-
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

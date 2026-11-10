@@ -5,8 +5,6 @@
 (function () {
     'use strict';
 
-    const STORAGE_KEY_HINT_SEEN = 'aaguard-cmdk-hint-seen';
-
     // ============================================================
     // Daftar command — dapat diperluas dengan AAGuardCommandPalette.register()
     // ============================================================

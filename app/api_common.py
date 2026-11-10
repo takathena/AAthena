@@ -1,18 +1,9 @@
 """
 AAguard IoT - API Common Helpers
-Dipisahkan dari app/api.py agar helper yang dipakai banyak route (timestamp,
-auth device, status, label alert, auto-interval, user, purge) punya rumah sendiri.
-Khususnya test yang mengimpor helper lewat app.api tetap jalan karena app/api.py
-mengimpor ulang semua nama di sini.
+Helper yang dipakai banyak route (timestamp, label alert, validasi username,
+purge) punya rumah sendiri.
 """
-import logging
 from datetime import timedelta, datetime
-
-from app.database import get_db_context, get_wib_time
-from app.utils import verify_api_key
-from app.alerts import clear_offline_alert
-
-logger = logging.getLogger('aaguard')
 
 # ============================================================
 # Helper
@@ -22,73 +13,6 @@ def _clean_timestamp(ts):
         return None
     s = str(ts).strip().replace('T', ' ')
     return s.split('.')[0]
-
-
-def validate_device_api_key(device_id, api_key):
-    if not device_id or not api_key:
-        return False
-
-    with get_db_context() as conn:
-        device = conn.execute(
-            'SELECT device_id, api_key, api_key_hash FROM devices WHERE device_id = ?',
-            (device_id,)
-        ).fetchone()
-
-    if not device:
-        return False
-
-    if device['api_key_hash']:
-        return verify_api_key(api_key, device['api_key_hash'])
-
-    if device['api_key']:
-        import hmac
-        return hmac.compare_digest(device['api_key'], api_key)
-    return False
-
-
-def update_device_status(device_id, status, ip=None):
-    with get_db_context() as conn:
-        prev = conn.execute(
-            'SELECT status FROM devices WHERE device_id = ?', (device_id,)
-        ).fetchone()
-        prev_status = prev['status'] if prev else None
-
-        if ip:
-            conn.execute(
-                'UPDATE devices SET status = ?, last_seen = ?, last_ip = ? WHERE device_id = ?',
-                (status, get_wib_time(), ip, device_id)
-            )
-        else:
-            conn.execute(
-                'UPDATE devices SET status = ?, last_seen = ? WHERE device_id = ?',
-                (status, get_wib_time(), device_id)
-            )
-
-        if prev_status is not None and prev_status != status:
-            conn.execute(
-                'INSERT INTO device_status_log (device_id, status, reason, created_at) '
-                'VALUES (?, ?, ?, ?)',
-                (device_id, status, 'data_received', get_wib_time())
-            )
-        conn.commit()
-
-    if status == 'online':
-        try:
-            # clear_offline_alert kini async (FastAPI native). Jalankan via asyncio.run
-            # bila belum ada loop berjalan (konteks sync/routers sweep).
-            import asyncio as _aio
-            _r = clear_offline_alert(device_id)
-            try:
-                _aio.get_running_loop()  # type: ignore[attr-defined]
-            except RuntimeError:
-                _aio.run(_r)
-            else:
-                # ada loop berjalan -> scheduler ke thread
-                import concurrent.futures as _cf
-                with _cf.ThreadPoolExecutor(max_workers=1) as ex:
-                    ex.submit(lambda: _aio.run(clear_offline_alert(device_id))).result(timeout=5)
-        except Exception as e:
-            logger.error(f"Failed to clear offline alert: {e}", exc_info=True)
 
 
 def _alert_label(alert_type, severity):
@@ -106,33 +30,6 @@ AUTO_INTERVAL_MIN_SAMPLES = 5      # minimal jumlah data terakhir
 AUTO_INTERVAL_MIN_DELTAS = 3       # minimal selisih valid
 AUTO_INTERVAL_IGNORE_BELOW = 2     # detik: selisih lebih kecil diabaikan
 AUTO_INTERVAL_FLOOR = 10           # detik: interval otomatis tidak di bawah ini
-
-
-def _detect_interval(conn, device_id):
-    """Perkirakan interval kirim (detik) dari median selisih data terakhir.
-
-    Return None bila sampel belum cukup. Tidak menulis apa pun ke DB.
-    """
-    from app.utils import parse_datetime
-    rows = conn.execute(
-        'SELECT timestamp FROM sensor_data WHERE device_id = ? '
-        'ORDER BY timestamp DESC LIMIT 10', (device_id,)
-    ).fetchall()
-    if len(rows) < AUTO_INTERVAL_MIN_SAMPLES:
-        return None
-
-    stamps = [t for t in (parse_datetime(r['timestamp']) for r in rows) if t]
-    deltas = []
-    for i in range(len(stamps) - 1):
-        d = (stamps[i] - stamps[i + 1]).total_seconds()
-        if AUTO_INTERVAL_IGNORE_BELOW <= d < 86400:
-            deltas.append(d)
-    if len(deltas) < AUTO_INTERVAL_MIN_DELTAS:
-        return None
-
-    deltas.sort()
-    median = deltas[len(deltas) // 2]
-    return max(AUTO_INTERVAL_FLOOR, min(86400, int(round(median))))
 
 
 def _validate_username(username):
@@ -231,19 +128,3 @@ def _purge_where(table_key, spec):
         where.append('device_id IN (SELECT device_id FROM devices WHERE dashboard_id = ?)')
         params.append(spec['dashboard_id'])
     return ' AND '.join(where) if where else '1=1', params
-
-
-def _purge_preview(conn, spec):
-    result, total_rows, total_bytes = {}, 0, 0
-    for key in spec['tables']:
-        table, _, size_expr, _ = PURGE_TABLES[key]
-        where, params = _purge_where(key, spec)
-        row = conn.execute(
-            f'SELECT COUNT(*) AS n, COALESCE(SUM({size_expr}), COUNT(*) * 80) AS b '
-            f'FROM {table} WHERE {where}', params
-        ).fetchone()
-        n, b = row['n'] or 0, int(row['b'] or 0)
-        result[key] = {'rows': n, 'estimated_bytes': b}
-        total_rows += n
-        total_bytes += b
-    return result, total_rows, total_bytes

@@ -141,16 +141,6 @@
         try { return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }); } catch (e) { return '-'; }
     }
 
-    function formatDateTimeSplit(iso) {
-        const d = parseDate(iso); if (!d) return { date: '-', time: '-' };
-        try {
-            return {
-                date: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', timeZone: 'Asia/Jakarta' }),
-                time: d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' }),
-            };
-        } catch (e) { return { date: '-', time: '-' }; }
-    }
-
     function formatRelativeTime(date) {
         if (!(date instanceof Date)) return '-';
         const diff = (Date.now() - date.getTime()) / 1000;
@@ -377,7 +367,6 @@
         setText('alertBadge', alerts);
         const onboarding = $('onboardingCard');
         if (onboarding) onboarding.hidden = (summary.total_devices || 0) > 0;
-        updateHealthRing(summary);
         if (state.mapFull) loadMarkers(state.mapFull, true);
         refreshBento();
         updateFilterCounts();
@@ -415,174 +404,6 @@
         M.setTrend('onlineDevices', calcTrend(online), { label: 'vs 24 jam lalu' });
         M.setTrend('offlineDevices', calcTrend(offline), { label: 'vs 24 jam lalu', invertColors: true });
         M.setTrend('activeAlerts', calcTrend(alerts), { label: 'vs 24 jam lalu', invertColors: true });
-    }
-
-    // ==========================================
-    // RING GAUGE (multi-ring)
-    // ==========================================
-    const RING = {
-        activeMetric: 'total',      // 'total' | 'online' | 'healthy'
-        data: { total: 0, online: 0, healthy: 0 },
-        circumference: { total: 427.26, online: 339.29, healthy: 251.33 },
-        labels: {
-            total:   'Total Perangkat',
-            online:  'Online',
-            healthy: 'Sehat',
-        },
-        bound: false,
-    };
-
-    function _ringSetProgress(metric, pct) {
-        const el = document.getElementById('ring' + metric.charAt(0).toUpperCase() + metric.slice(1));
-        if (!el) return;
-        const C = RING.circumference[metric];
-        const clamped = Math.max(0, Math.min(100, pct || 0));
-        const offset = C - (clamped / 100) * C;
-        el.setAttribute('stroke-dasharray', C.toFixed(2));
-        // Force reflow supaya animasi jalan tiap update
-        void el.getBoundingClientRect();
-        el.style.strokeDashoffset = offset.toFixed(2);
-    }
-
-    function _ringAnimateValue(newVal) {
-        const el = $('ringValue');
-        if (!el) return;
-        const oldVal = parseInt(el.textContent.replace(/\D/g, ''), 10) || 0;
-        if (oldVal === newVal) { el.textContent = newVal; return; }
-
-        el.classList.add('updating');
-        const duration = 500;
-        const start = performance.now();
-        const diff = newVal - oldVal;
-
-        function step(now) {
-            const t = Math.min(1, (now - start) / duration);
-            const eased = 1 - Math.pow(1 - t, 3);
-            const cur = Math.round(oldVal + diff * eased);
-            el.textContent = cur.toLocaleString('id-ID');
-            if (t < 1) requestAnimationFrame(step);
-            else {
-                el.textContent = newVal.toLocaleString('id-ID');
-                el.classList.remove('updating');
-            }
-        }
-        requestAnimationFrame(step);
-    }
-
-    function _ringUpdateCenter() {
-        const val = RING.data[RING.activeMetric] || 0;
-        _ringAnimateValue(val);
-        const labelEl = $('ringLabel');
-        if (labelEl) labelEl.textContent = RING.labels[RING.activeMetric];
-    }
-
-    function _ringSetActive(metric) {
-        RING.activeMetric = metric;
-
-        // Legend active state
-        document.querySelectorAll('.ring-legend-item').forEach(b => {
-            const on = b.dataset.metric === metric;
-            b.classList.toggle('active', on);
-            b.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-
-        // Highlight ring
-        const svg = document.querySelector('.ring-svg');
-        if (svg) svg.classList.add('has-hover');
-        document.querySelectorAll('.ring-progress').forEach(r => {
-            r.classList.toggle('highlighted', r.dataset.ring === metric);
-        });
-
-        _ringUpdateCenter();
-    }
-
-    function _ringClearHighlight() {
-        const svg = document.querySelector('.ring-svg');
-        if (svg) svg.classList.remove('has-hover');
-        document.querySelectorAll('.ring-progress').forEach(r => {
-            r.classList.remove('highlighted');
-        });
-        // Balik ke metric aktif
-        document.querySelectorAll('.ring-progress').forEach(r => {
-            if (r.dataset.ring === RING.activeMetric) r.classList.add('highlighted');
-        });
-    }
-
-    function _bindRingEvents() {
-        if (RING.bound) return;
-        RING.bound = true;
-
-        // Legend opsional (dihapus dari HTML); hover ring SVG tetap jalan
-        const legend = document.getElementById('ringLegend');
-        if (legend) {
-            legend.querySelectorAll('.ring-legend-item').forEach(btn => {
-                btn.addEventListener('click', () => _ringSetActive(btn.dataset.metric));
-                btn.addEventListener('mouseenter', () => _ringSetActive(btn.dataset.metric));
-            });
-            legend.addEventListener('mouseleave', _ringClearHighlight);
-        }
-
-        // Hover di ring SVG → highlight ring itu juga
-        document.querySelectorAll('.ring-progress').forEach(r => {
-            r.style.cursor = 'pointer';
-            r.addEventListener('mouseenter', () => {
-                const metric = r.dataset.ring;
-                if (!metric) return;
-                const svg = document.querySelector('.ring-svg');
-                if (svg) svg.classList.add('has-hover');
-                document.querySelectorAll('.ring-progress').forEach(rr => {
-                    rr.classList.toggle('highlighted', rr.dataset.ring === metric);
-                });
-                // Update center sementara
-                RING.activeMetric = metric;
-                document.querySelectorAll('.ring-legend-item').forEach(b => {
-                    b.classList.toggle('active', b.dataset.metric === metric);
-                });
-                _ringUpdateCenter();
-            });
-            r.addEventListener('click', () => _ringSetActive(r.dataset.ring));
-        });
-
-        const svg = document.querySelector('.ring-svg');
-        if (svg) svg.addEventListener('mouseleave', _ringClearHighlight);
-    }
-
-    function updateHealthRing(summary) {
-        const total = summary.total_devices ?? 0;
-        const online = summary.online_devices ?? 0;
-        const healthy = summary.healthy_devices ?? 0;
-
-        RING.data.total = total;
-        RING.data.online = online;
-        RING.data.healthy = healthy;
-
-        // Persentase
-        const totalPct   = total > 0 ? 100 : 0;
-        const onlinePct  = total > 0 ? (online / total) * 100 : 0;
-        const healthyPct = total > 0 ? (healthy / total) * 100 : 0;
-
-        _ringSetProgress('total', totalPct);
-        _ringSetProgress('online', onlinePct);
-        _ringSetProgress('healthy', healthyPct);
-
-        // Legend values
-        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v || 0).toLocaleString('id-ID'); };
-        setTxt('ringLegendTotal', total);
-        setTxt('ringLegendOnline', online);
-        setTxt('ringLegendHealthy', healthy);
-
-        // Empty state
-        const card = document.querySelector('.ring-card');
-        if (card) card.classList.toggle('is-empty', total === 0);
-
-        // Kalau active metric nilainya jadi 0 dan total > 0, pindah ke online
-        if (total > 0 && RING.activeMetric === 'healthy' && healthy === 0) {
-            RING.activeMetric = 'online';
-        }
-        if (total === 0) RING.activeMetric = 'total';
-
-        _ringSetActive(RING.activeMetric);
-        _bindRingEvents();
     }
 
     // ==========================================

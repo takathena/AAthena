@@ -457,7 +457,6 @@
    CARDS
    ========================================================== */
 .section-card,
-.stat-card,
 .chart-card,
 .activity-card,
 .alert-stat-card,
@@ -514,119 +513,6 @@
   .overview-grid .activity-card { grid-column: 1 / -1; }
 }
 @media (max-width: 768px) { .overview-grid { grid-template-columns: 1fr; } }
-
-/* ---------- Ring card ---------- */
-.ring-wrap {
-  position: relative;
-  width: 112px;
-  height: 112px;
-  margin: 0 auto;
-  flex-shrink: 0;
-}
-.ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.ring-track {
-  fill: none;
-  stroke: var(--surface-3);
-  stroke-width: 8;
-}
-.ring-progress {
-  fill: none;
-  stroke: var(--accent-warn);
-  stroke-width: 8;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.5s var(--ease);
-}
-.ring-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-.ring-center .pct {
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-.ring-center .lbl {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-3);
-  margin-top: 6px;
-}
-.ring-caption {
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--text-2);
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-/* ---------- Stats grid ---------- */
-.stats-grid-2x2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 10px;
-}
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 14px 16px;
-  gap: 6px;
-  min-height: 96px;
-  cursor: pointer;
-}
-.stat-card.clickable:hover {
-  background: var(--surface-2);
-  border-color: var(--text-3);
-}
-.stat-top { display: flex; align-items: flex-start; justify-content: space-between; }
-.stat-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-}
-.stat-icon.total   { background: var(--surface-2); color: var(--text-2); }
-.stat-icon.online  { background: var(--accent-ok-bg); color: var(--accent-ok); }
-.stat-icon.offline { background: var(--accent-crit-bg); color: var(--accent-crit); }
-.stat-icon.alerts  { background: var(--accent-warn-bg); color: var(--accent-warn); }
-
-.stat-info { margin-top: auto; }
-.stat-info h3 {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-3);
-  margin-bottom: 2px;
-  letter-spacing: -0.005em;
-}
-.stat-info .value {
-  font-family: var(--mono);
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
 
 /* ---------- Activity card ---------- */
 .activity-card {
@@ -2226,7 +2112,6 @@
   .main-content,
   .main-content.expanded { margin-left: var(--sidebar-w-collapsed); }
   .content-area { padding: 14px 14px 40px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
   .map-layout { grid-template-columns: 1fr; }
   .map-device-list { max-height: 50vh; }
   .analytics-header { flex-direction: column; align-items: stretch; }
@@ -2237,7 +2122,6 @@
   :root { --topbar-h: 52px; }
   .topbar { padding: 0 14px; }
   .search-box { display: none; }
-  .stats-grid, .stats-grid-2x2 { grid-template-columns: 1fr; }
   .alert-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .alert-stat-card { padding: 12px; }
   .alert-stat-icon { width: 32px; height: 32px; font-size: 13px; }
@@ -2865,10 +2749,6 @@
   background: var(--surface-3);
   color: var(--text-3);
   flex-shrink: 0;
-}
-.user-badge-admin {
-  background: var(--accent-warn-bg);
-  color: var(--accent-warn);
 }
 .user-badge-me {
   background: var(--accent-info-bg);
@@ -3577,98 +3457,6 @@
     min-width: 16px;
 }
 /* ============================================================
-   RING GAUGE — Multi-ring (replace single ring)
-   ============================================================ */
-.ring-wrap {
-    position: relative;
-    width: 112px;
-    height: 112px;
-    flex-shrink: 0;
-}
-
-.ring-svg {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-    transform-origin: center;
-    overflow: visible;
-}
-
-.ring-track {
-    fill: none;
-    stroke: var(--surface-2);
-    stroke-width: 7;
-    transition: stroke 0.2s var(--ease);
-}
-
-.ring-progress {
-    fill: none;
-    stroke-width: 7;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.9s cubic-bezier(0.16, 1, 0.3, 1),
-                stroke-width 0.2s var(--ease),
-                opacity 0.25s var(--ease),
-                filter 0.2s var(--ease);
-}
-
-.ring-total   { stroke: var(--text-3); }
-.ring-online  { stroke: var(--accent-ok); }
-.ring-healthy { stroke: #3b82f6; }
-
-/* Dim ring lain saat satu ring di-hover */
-.ring-svg.has-hover .ring-progress:not(.highlighted) {
-    opacity: 0.35;
-}
-
-/* Highlight ring aktif */
-.ring-progress.highlighted {
-    stroke-width: 9;
-}
-
-/* Center */
-.ring-center {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    text-align: center;
-}
-
-.ring-value {
-    font-family: var(--font-display);
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1;
-    letter-spacing: -0.045em;
-    font-variant-numeric: tabular-nums;
-    transition: opacity 0.15s var(--ease), transform 0.15s var(--ease);
-}
-.ring-value.updating {
-    opacity: 0.4;
-    transform: translateY(-2px);
-}
-
-.ring-label {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-3);
-    margin-top: 6px;
-    transition: color 0.2s var(--ease);
-}
-
-/* Responsive */
-@media (max-width: 480px) {
-    .ring-wrap { width: 112px; height: 112px; }
-    .ring-value { font-size: 20px; }
-}
-
-/* ============================================================
    BENTO OVERVIEW GRID (dashboard)
    ============================================================ */
 .overview-grid {
@@ -4066,7 +3854,6 @@
 /* ==========================================================
    CARD HOVER
    ========================================================== */
-.stat-card.clickable:hover,
 .group:hover,
 .hero-card:hover,
 .chart-card:hover {

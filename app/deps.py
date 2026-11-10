@@ -63,11 +63,6 @@ def is_api_polling_request(request: Request) -> bool:
     return path.startswith(POLLING_PREFIXES)
 
 
-def _session_user(request: Request):
-    """Return user_id atau raise HTTPException/redirect sesuai varian pemanggil."""
-    return request.session.get('user_id')
-
-
 def get_current_user(request: Request):
     """Varian API: 401 JSON bila belum login / idle expired."""
     session = request.session
@@ -120,10 +115,6 @@ async def is_admin(user_id) -> bool:
             'SELECT is_admin FROM users WHERE id = ?', (user_id,)
         )).fetchone()
     return bool(row and row['is_admin'])
-
-
-# Alias lama (kini async); tetap diekspor agar import lama jalan.
-is_admin_sync = is_admin
 
 
 async def require_admin(request: Request):

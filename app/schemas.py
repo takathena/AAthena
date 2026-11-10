@@ -6,8 +6,6 @@ import typing
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SENSOR_KEY_PATTERN = re.compile(r'^[a-zA-Z0-9_]{1,32}$')
-SENSOR_TYPE_PATTERN = re.compile(r'^[A-Za-z0-9_\-]{1,32}$')
-DEVICE_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_\-]+$')
 MAX_SENSOR_KEYS = 32
 MAX_SENSOR_STRING_LEN = 64
 
@@ -114,60 +112,3 @@ class BulkImportItem(_Base):
     @classmethod
     def check_offline_timeout(cls, v):
         return _offline_timeout_before(v)
-
-
-class BulkImportRequest(_Base):
-    devices: list = Field(...)
-    dashboard_id: typing.Any = None
-
-
-class UserCreate(_Base):
-    username: str
-    password: str
-    display_name: typing.Optional[str] = None
-    role: typing.Optional[str] = None
-    is_admin: typing.Optional[bool] = None
-
-
-class UserUpdate(_Base):
-    display_name: typing.Optional[str] = None
-    password: typing.Optional[str] = None
-    role: typing.Optional[str] = None
-    is_admin: typing.Optional[bool] = None
-    model_config = ConfigDict(extra='ignore', populate_by_name=True)
-
-
-class PasswordChange(_Base):
-    old_password: str = ''
-    new_password: str = ''
-
-
-class BulkAckRequest(_Base):
-    ids: typing.Any = None
-
-
-class PurgeRequest(_Base):
-    tables: typing.Any = None
-    date_from: typing.Any = None
-    date_to: typing.Any = None
-    device_id: typing.Any = None
-    dashboard_id: typing.Any = None
-    confirm: typing.Any = None
-    backup_first: typing.Any = None
-
-
-class RestoreRequest(_Base):
-    filename: typing.Any = None
-    confirm: typing.Any = None
-
-
-class ChannelTestRequest(_Base):
-    channel: typing.Any = None
-
-
-class UserPermissionsUpdate(_Base):
-    pass
-
-
-class AlertRulesUpdate(_Base):
-    model_config = ConfigDict(extra='allow')
